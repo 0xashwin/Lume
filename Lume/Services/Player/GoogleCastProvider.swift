@@ -28,7 +28,14 @@ import OSLog
         /// `CastService`.
         var onProgress: ((TimeInterval, TimeInterval) -> Void)?
 
-        private(set) var isCasting = false
+        /// Reports session start/end. `CastService` mirrors this into its
+        /// observable `isProviderCasting` so the player UI can react (this
+        /// class is not `@Observable`).
+        var onCastingChanged: ((Bool) -> Void)?
+
+        private(set) var isCasting = false {
+            didSet { if isCasting != oldValue { onCastingChanged?(isCasting) } }
+        }
 
         var connectedDeviceName: String? {
             sessionManager.currentCastSession?.device.friendlyName
@@ -143,9 +150,18 @@ import OSLog
 
         func sessionManager(_: GCKSessionManager, didEnd _: GCKCastSession, withError error: Error?) {
             isCasting = false
+            pendingMedia = nil
             if let error {
                 Logger.player.error("Chromecast: session ended with error: \(error.localizedDescription, privacy: .public)")
             }
+        }
+
+        func sessionManager(_: GCKSessionManager, didFailToStart _: GCKCastSession, withError error: Error) {
+            // The connect attempt died — don't leave the queued media around to
+            // auto-load onto some later, unrelated session.
+            pendingMedia = nil
+            isCasting = false
+            Logger.player.error("Chromecast: session failed to start: \(error.localizedDescription, privacy: .public)")
         }
     }
 

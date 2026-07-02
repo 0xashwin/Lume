@@ -16,7 +16,9 @@ third-party SDK.
 | Provider | `Lume/Services/Player/GoogleCastProvider.swift` | `GCKSessionManager` / `GCKRemoteMediaClient` bridge; loads the current `PlayableMedia`, exposes play/pause/seek + a progress callback |
 | Cast button | `Lume/Views/Player/ChromecastButton.swift` | `GCKUICastButton` styled to match the overlay |
 | Launch hook | `Lume/LumeApp.swift` | calls `CastService.shared.configureGoogleCast()` |
+| Session → load hook | `Lume/Views/Player/FullScreenPlayerView.swift` | observes `CastService.isProviderCasting`; loads the stream being watched onto the receiver when a session connects |
 | Discovery keys | `Lume/Info.plist` | `NSBonjourServices`, `NSLocalNetworkUsageDescription`, `NSBluetoothAlwaysUsageDescription` |
+| Usage-description strings | `Lume/InfoPlist.xcstrings` | localizes the two usage descriptions (all catalog languages) |
 
 The XCFramework carries its own `PrivacyInfo.xcprivacy`, so its required-reason
 API and data-use declarations are covered without editing Lume's manifest.
@@ -57,18 +59,21 @@ framework layout changes.
 
 ## Remaining work (not yet wired)
 
-The SDK links and the cast button discovers/starts sessions, but the transport is
-not yet fully bridged — verify and finish on a real Cast device:
+The SDK links, the cast button discovers/starts sessions, and when a session
+connects `FullScreenPlayerView` loads the stream being watched onto the receiver
+(resuming at the local position). The rest of the transport is not yet bridged —
+verify and finish on a real Cast device:
 
 - **Transport mirroring:** the overlay's play/pause/seek act on the local engine.
   Route them to the active `GoogleCastProvider` session and reflect the receiver's
   `GCKMediaStatus` back into the overlay.
+- **Stream switches mid-cast:** picking another episode/channel while casting
+  keeps playing the old stream on the receiver; re-load on `activeMedia` change
+  (mind Stalker placeholders — reuse the `displayMedia` gate).
 - **Watch progress:** wire `GoogleCastProvider.onProgress` to `WatchProgressWriter`
   so casting updates resume points and the 90%-watched / NextUp flow.
 - **Engine pause:** pause the on-device engine when a cast session starts so the
   stream isn't decoded in two places.
-- **Localize** the `NSLocalNetworkUsageDescription` / `NSBluetoothAlwaysUsageDescription`
-  strings (currently English-only).
 - **On-device verification:** the integration is verified to build, link, and
   embed on the iOS simulator, but casting to a physical receiver has not been
   exercised.

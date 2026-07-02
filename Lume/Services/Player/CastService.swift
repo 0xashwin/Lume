@@ -41,9 +41,27 @@ final class CastService {
     /// Display name of the active AirPlay route, when the system reports one.
     private(set) var airPlayRouteName: String?
 
-    /// A registered casting provider (e.g. a future Chromecast backend). `nil`
-    /// until the Google Cast SDK is integrated — see `CastProvider` and #103.
+    /// The registered casting provider (Chromecast, via the bundled Google Cast
+    /// SDK on iOS). `nil` on the platforms the SDK doesn't support — see
+    /// `CastProvider`, `configureGoogleCast()` and #103.
     var castProvider: (any CastProvider)?
+
+    /// Whether the registered provider has an active cast session. Mirrored
+    /// from the provider (which is not `@Observable`) so SwiftUI can react —
+    /// `FullScreenPlayerView` loads the current stream onto the receiver when
+    /// this flips true.
+    private(set) var isProviderCasting = false
+
+    /// True when the Google Cast SDK is linked into this build (iOS only).
+    /// Lets tests assert the provider seam without re-deriving the platform
+    /// gate themselves.
+    nonisolated static var isGoogleCastAvailable: Bool {
+        #if os(iOS) && canImport(GoogleCast)
+            true
+        #else
+            false
+        #endif
+    }
 
     /// Touched from the nonisolated `deinit`; `removeObserver` is thread-safe.
     private nonisolated(unsafe) var routeObserver: (any NSObjectProtocol)?
@@ -74,15 +92,19 @@ final class CastService {
     }
 
     /// Configure the Google Cast SDK and register the Chromecast provider against
-    /// the `castProvider` seam. Call once at app launch. This is a no-op unless
-    /// the `GoogleCast` product is linked (the SDK is not bundled — see
-    /// `Docs/Chromecast.md`), so it is safe to call unconditionally.
+    /// the `castProvider` seam. Call once at app launch. This is a no-op on the
+    /// platforms where the (iOS-only) Cast SDK isn't linked — see
+    /// `Docs/Chromecast.md` — so it is safe to call unconditionally.
     func configureGoogleCast() {
         #if os(iOS) && canImport(GoogleCast)
             let criteria = GCKDiscoveryCriteria(applicationID: kGCKDefaultMediaReceiverApplicationID)
             let options = GCKCastOptions(discoveryCriteria: criteria)
             GCKCastContext.setSharedInstanceWith(options)
-            castProvider = GoogleCastProvider()
+            let provider = GoogleCastProvider()
+            provider.onCastingChanged = { [weak self] casting in
+                self?.isProviderCasting = casting
+            }
+            castProvider = provider
             Logger.player.log("Chromecast: Cast context configured")
         #endif
     }
@@ -114,8 +136,8 @@ final class CastService {
 }
 
 /// A casting backend abstraction. AirPlay is handled natively by AVFoundation
-/// and needs no provider; this seam exists for a future Google Cast
-/// (Chromecast) integration — see #103. A provider discovers receivers, starts
+/// and needs no provider; this seam is where the Google Cast (Chromecast)
+/// backend plugs in — see #103. A provider discovers receivers, starts
 /// and ends a session for a given `PlayableMedia`, and mirrors transport state
 /// back to the overlay so watch-progress / NextUp tracking can follow the cast.
 @MainActor
@@ -125,6 +147,10 @@ protocol CastProvider: AnyObject {
 
     /// Whether a cast session is currently active.
     var isCasting: Bool { get }
+
+    /// Reports `isCasting` flips so `CastService` can mirror them into its
+    /// observable `isProviderCasting`. Set by `CastService` at registration.
+    var onCastingChanged: ((Bool) -> Void)? { get set }
 
     /// Begin casting the given media to the selected receiver, seeking the
     /// receiver to `position` seconds so playback resumes where it left off.

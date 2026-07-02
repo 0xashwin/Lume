@@ -280,6 +280,21 @@ struct FullScreenPlayerView: View {
             guard engineSwaps, priorityEngine != .avPlayer, !activeMedia.isLive, clock.current > 1 else { return }
             resumeActiveMedia(at: clock.current)
         }
+        .onChange(of: castService.isProviderCasting) { _, casting in
+            // A Chromecast session connected — hand it the stream being watched,
+            // resuming at the local position. Uses `displayMedia` so a Stalker
+            // stream casts its resolved URL, never the placeholder (if the
+            // resolve is still in flight there is nothing castable yet).
+            guard casting, let media = displayMedia else { return }
+            // The running clock is the position being watched; before the first
+            // tick (session started from the poster screen) fall back to the
+            // stream's resume point.
+            let position = clock.current > 1 ? clock.current : media.startTime
+            castService.castProvider?.beginSession(
+                for: media,
+                startingAt: media.isLive ? 0 : position
+            )
+        }
         .onDisappear {
             // Capture the clock synchronously, then flush off the main thread.
             persistProgressDetached(force: true)
