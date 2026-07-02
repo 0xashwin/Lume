@@ -113,8 +113,9 @@ Metacritic), and your viewing activity can be scrobbled to **Trakt**.
 - **Parental controls**: mark profiles as child profiles, restrict categories (hidden from browsing and search), and protect them with a PIN required to leave a child profile or open Content Management
 
 #### ⚙️ Library management
-- Manage multiple playlists — **Xtream Codes** and **M3U/M3U8** (add / edit / delete / switch)
+- Manage multiple playlists — **Xtream Codes**, **M3U/M3U8**, and **Stalker portals** (add / edit / delete / switch)
 - M3U support: URL-based playlists, local file import, URL-tvg EPG auto-detection
+- Stalker portal support: MAC-address authentication (with a generated default MAC), with short-lived stream URLs resolved on demand at playback time
 - Server info at a glance: status, active connections, expiry
 - Background **content sync** with step-by-step progress, which **prunes stale titles** the provider has dropped so the local catalog stays in step
 - Scheduled **auto-sync** (every 6 hours, daily, every 3 days, or weekly)
@@ -158,11 +159,12 @@ Downloads always play in Lume, and playback falls back to the built-in player wh
 the selected app is not installed.
 
 Send playback to the TV with **AirPlay** and **Chromecast** — both sit in the player
-overlay. AirPlay works on iOS, iPadOS, and macOS: full-screen video is delivered
-through Apple's AVPlayer, so picking a receiver while on the KSPlayer or VLCKit engine
-hands the current stream to AVPlayer for the cast and resumes where it left off
-(formats AVPlayer can't decode fall back to audio-only). **Chromecast** (iOS / iPadOS)
-is powered by the bundled Google Cast SDK — see [`Docs/Chromecast.md`](Docs/Chromecast.md).
+overlay. AirPlay video is delivered through Apple's AVPlayer: on iOS and iPadOS,
+picking a receiver while on the KSPlayer or VLCKit engine hands the current stream to
+AVPlayer for the cast and resumes where it left off (formats AVPlayer can't decode
+fall back to audio-only). On macOS the picker appears on the AVPlayer engine, which
+routes the picked receiver directly. **Chromecast** (iOS / iPadOS) is powered by the
+bundled Google Cast SDK — see [`Docs/Chromecast.md`](Docs/Chromecast.md).
 
 ---
 
@@ -177,6 +179,7 @@ Lume follows a clean, layered SwiftUI architecture:
 │  Services         — networking, sync, playback, images   │
 │    ├─ XtreamClient        Xtream Codes API + DTOs         │
 │    ├─ M3UClient/Parser    M3U/M3U8 playlist import       │
+│    ├─ StalkerClient       Stalker portal (MAC auth)       │
 │    ├─ TMDBClient          metadata / artwork enrichment   │
 │    ├─ OMDBClient          IMDb / RT / Metacritic ratings  │
 │    ├─ TraktService        OAuth device flow + scrobbling  │
@@ -244,7 +247,7 @@ The easiest way to use Lume is to [**download it from the App Store**](https://a
 ### Requirements
 
 - **Xcode 26.4** or later
-- An **Xtream Codes** account (server URL, username, password) or an **M3U/M3U8 playlist URL**
+- An **Xtream Codes** account (server URL, username, password), an **M3U/M3U8 playlist URL**, or a **Stalker portal** (portal URL + MAC address)
 - *(Optional)* a [TMDB](https://www.themoviedb.org/settings/api) API access token for metadata enrichment
 - *(Optional)* a [Trakt](https://trakt.tv/oauth/applications) application for scrobbling
 - *(Optional)* an [OMDb](https://www.omdbapi.com/apikey.aspx) API key for IMDb / Rotten Tomatoes / Metacritic ratings

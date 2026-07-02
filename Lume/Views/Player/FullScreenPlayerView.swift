@@ -38,6 +38,13 @@ struct FullScreenPlayerView: View {
     /// engine preference. See `engine` / `castService`.
     @State private var castService = CastService.shared
 
+    /// Id of a stream AVPlayer couldn't start while casting over AirPlay (a codec
+    /// or container AVPlayer can't open — common for MPEG-TS / MKV IPTV that only
+    /// KSPlayer/VLCKit handle). Once set, the AirPlay-forces-AVPlayer override is
+    /// dropped for that stream so it plays on the user's engine locally with the
+    /// audio still on the receiver, instead of a dead "stream offline" error.
+    @State private var airPlayVideoUnsupported: String?
+
     /// The only high-frequency playback state. An `@Observable` the host owns
     /// but never reads in its own body, so playback ticks invalidate just the
     /// scrubber/time labels rather than re-rendering the whole player tree. See
@@ -53,6 +60,17 @@ struct FullScreenPlayerView: View {
     /// The stream currently playing. Starts as `media` but can be swapped when
     /// the viewer picks another episode from the in-player episode rail (tvOS).
     @State private var activeMedia: PlayableMedia
+
+    /// The Stalker-resolved stand-in for `activeMedia`. Stalker streams arrive as
+    /// a `lumestalker://` placeholder whose real URL is fetched via `create_link`
+    /// at playback time; this holds the resolved copy once it lands. `nil` while
+    /// resolution is in flight (the loading indicator shows). Engines that play a
+    /// directly usable URL (Xtream / m3u) bypass this entirely — see `displayMedia`.
+    @State private var resolvedMedia: PlayableMedia?
+
+    /// Set when Stalker `create_link` resolution fails, so the host shows the
+    /// failure overlay instead of an endless spinner.
+    @State private var resolveError: String?
 
     /// The episode queued to play after `activeMedia`, resolved whenever the
     /// active stream changes. Drives both the in-player Next Episode button and
@@ -94,9 +112,13 @@ struct FullScreenPlayerView: View {
     }
 
     /// True when AirPlay is active and the user's engine isn't already AVPlayer,
-    /// so the stream is being force-routed through AVPlayer for the cast.
+    /// so the stream is being force-routed through AVPlayer for the cast. Drops
+    /// back to the user's engine once AVPlayer has proven it can't play the
+    /// current stream (`airPlayVideoUnsupported`).
     private var isAirPlayOverride: Bool {
-        castService.isAirPlayActive && priorityEngine != .avPlayer
+        castService.isAirPlayActive
+            && priorityEngine != .avPlayer
+            && airPlayVideoUnsupported != activeMedia.id
     }
 
     /// Whether another engine remains to fall back to after the current one.
@@ -117,6 +139,35 @@ struct FullScreenPlayerView: View {
         let failed = engine
         engineAttempt += 1
         Logger.player.log("engine \(failed.rawValue, privacy: .public) could not start the stream; falling back to \(engine.rawValue, privacy: .public)")
+    }
+
+    /// An engine reported it can't start the stream. During an AirPlay override
+    /// this means AVPlayer can't cast this particular stream's video, so drop the
+    /// override and let the user's engine play it locally (audio keeps routing to
+    /// the receiver) rather than surfacing a misleading "offline" error. Outside a
+    /// cast it's the normal engine-fallback path.
+    private func handlePlaybackFailure() {
+        guard isAirPlayOverride else {
+            fallBackToNextEngine()
+            return
+        }
+        Logger.player.log("AirPlay: AVPlayer can't play this stream; reverting to \(priorityEngine.rawValue, privacy: .public) locally with audio-only AirPlay")
+        airPlayVideoUnsupported = activeMedia.id
+        // Resume the local engine where the cast attempt left off (VOD only).
+        if !activeMedia.isLive, clock.current > 1 {
+            resumeActiveMedia(at: clock.current)
+        }
+    }
+
+    /// Rebase the active stream to resume at `position`. Also rebases the
+    /// Stalker-resolved stand-in: it shares `activeMedia`'s id, so `displayMedia`
+    /// keeps returning it (and `.task(id:)` won't re-resolve) — without this the
+    /// engine taking over would start from the stand-in's stale `startTime`.
+    private func resumeActiveMedia(at position: TimeInterval) {
+        activeMedia = activeMedia.resuming(at: position)
+        if let resolved = resolvedMedia, resolved.id == activeMedia.id {
+            resolvedMedia = resolved.resuming(at: position)
+        }
     }
 
     var body: some View {
@@ -153,6 +204,11 @@ struct FullScreenPlayerView: View {
             #if os(macOS)
                 enterMacFullScreen()
             #endif
+        }
+        .task(id: activeMedia.id) {
+            // Resolve a deferred Stalker placeholder into a real (short-lived)
+            // stream URL before the engine loads it. No-op for Xtream / m3u.
+            await resolveActiveMedia()
         }
         .task(id: activeMedia.id) {
             // Resolve the next episode for the active stream. Runs on appear and
@@ -206,14 +262,23 @@ struct FullScreenPlayerView: View {
                 if phase == .background { closePlayer() }
             #endif
         }
-        .onChange(of: castService.isAirPlayActive) { _, _ in
+        .onChange(of: castService.isAirPlayActive) { _, isActive in
+            // While the audio-only sentinel is set the engine stays on the
+            // user's choice for both route directions — reassigning the media
+            // would only restart a stream that is already playing locally.
+            let engineSwaps = airPlayVideoUnsupported != activeMedia.id
+            if !isActive {
+                // The route is gone; a future cast (possibly to a different,
+                // more capable receiver) should retry AVPlayer video first.
+                airPlayVideoUnsupported = nil
+            }
             // Toggling AirPlay swaps the engine (see `engine`), which rebuilds the
             // player. Carry the current position across so a VOD stream resumes
             // where it was rather than jumping back to the saved resume point.
             // Live streams have no position, and if the user is already on
             // AVPlayer there's no swap to bridge.
-            guard priorityEngine != .avPlayer, !activeMedia.isLive, clock.current > 1 else { return }
-            activeMedia = activeMedia.resuming(at: clock.current)
+            guard engineSwaps, priorityEngine != .avPlayer, !activeMedia.isLive, clock.current > 1 else { return }
+            resumeActiveMedia(at: clock.current)
         }
         .onDisappear {
             // Capture the clock synchronously, then flush off the main thread.
@@ -223,45 +288,100 @@ struct FullScreenPlayerView: View {
         }
     }
 
+    /// The media to hand the engine. For a directly playable stream (Xtream /
+    /// m3u) this is `activeMedia` itself, so playback starts with no extra step.
+    /// For a Stalker placeholder it is the resolved copy, gated on its identity
+    /// matching the active stream so a stale resolution from the previous stream
+    /// never reaches the engine during a channel/episode switch.
+    private var displayMedia: PlayableMedia? {
+        guard StalkerLink.isPlaceholder(activeMedia.url) else { return activeMedia }
+        guard let resolvedMedia, resolvedMedia.id == activeMedia.id else { return nil }
+        return resolvedMedia
+    }
+
     @ViewBuilder
     private var playerView: some View {
+        if let media = displayMedia {
+            engineView(for: media)
+        } else if resolveError != nil {
+            // Stalker `create_link` failed — surface the failure with a retry
+            // rather than spinning forever.
+            PlayerErrorIndicator(title: activeMedia.title, onRetry: retryResolve, onClose: closePlayer)
+        } else {
+            // Resolving the Stalker stream URL before the engine can load it.
+            PlayerLoadingIndicator(title: activeMedia.title)
+        }
+    }
+
+    @ViewBuilder
+    private func engineView(for media: PlayableMedia) -> some View {
         // Keyed on the engine attempt so falling back tears the failed engine
         // down and builds the next one fresh, rather than reusing in-flight state.
         switch engine {
         case .avPlayer:
             AVPlayerEngineView(
-                media: activeMedia,
+                media: media,
                 clock: clock,
                 nextUpMedia: nextUpMedia,
                 skipSegments: skipSegments,
-                fallbackAvailable: hasFallbackEngine,
-                onPlaybackFailed: fallBackToNextEngine,
+                // During an AirPlay override there's no next engine to try, but
+                // report failure anyway so `handlePlaybackFailure` can revert to
+                // local playback instead of AVPlayer raising its offline overlay.
+                // The cast attempt keeps the full startup window: giving up
+                // early would drop slow-to-start streams to audio-only when a
+                // few more seconds would have cast them fine.
+                reportsStartupFailure: isAirPlayOverride || hasFallbackEngine,
+                usesQuickStartupTimeout: hasFallbackEngine,
+                onPlaybackFailed: handlePlaybackFailure,
                 onSelectMedia: switchMedia
             )
             .id(engineAttempt)
         case .ksPlayer:
             KSPlayerEngineView(
-                media: activeMedia,
+                media: media,
                 clock: clock,
                 nextUpMedia: nextUpMedia,
                 skipSegments: skipSegments,
-                fallbackAvailable: hasFallbackEngine,
+                reportsStartupFailure: hasFallbackEngine,
+                usesQuickStartupTimeout: hasFallbackEngine,
                 onPlaybackFailed: fallBackToNextEngine,
                 onSelectMedia: switchMedia
             )
             .id(engineAttempt)
         case .vlcKit:
             VLCPlayerEngineView(
-                media: activeMedia,
+                media: media,
                 clock: clock,
                 nextUpMedia: nextUpMedia,
                 skipSegments: skipSegments,
-                fallbackAvailable: hasFallbackEngine,
+                reportsStartupFailure: hasFallbackEngine,
+                usesQuickStartupTimeout: hasFallbackEngine,
                 onPlaybackFailed: fallBackToNextEngine,
                 onSelectMedia: switchMedia
             )
             .id(engineAttempt)
         }
+    }
+
+    /// Resolves the active Stalker placeholder into a playable URL. A no-op for
+    /// directly playable streams. Re-runs whenever the active stream changes
+    /// (open, channel surf, next episode), so each switch resolves a fresh,
+    /// short-lived URL.
+    private func resolveActiveMedia() async {
+        guard StalkerLink.isPlaceholder(activeMedia.url) else { return }
+        resolvedMedia = nil
+        resolveError = nil
+        do {
+            resolvedMedia = try await StalkerStreamResolver.resolve(activeMedia, container: modelContext.container)
+        } catch {
+            resolveError = error.localizedDescription
+            Logger.player.error("Stalker stream resolution failed: \(error.localizedDescription, privacy: .public)")
+        }
+    }
+
+    private func retryResolve() {
+        engineAttempt = 0
+        Task { await resolveActiveMedia() }
     }
 
     /// Persist the outgoing stream's progress, then swap in a new one. The
