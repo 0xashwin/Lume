@@ -42,9 +42,9 @@ enum SyncStep: Int, CaseIterable, Identifiable {
         switch sourceType {
         case .xtream: xtreamSteps
         case .m3u: m3uSteps
-        // Stalker maps onto the same catalog kinds as Xtream (auth, categories,
-        // movies, series, live), so it walks the same progress steps.
-        case .stalker: xtreamSteps
+        // Stalker and Stremio map onto the same catalog kinds as Xtream (auth,
+        // categories, movies, series, live), so they walk the same progress steps.
+        case .stalker, .stremio: xtreamSteps
         }
     }
 

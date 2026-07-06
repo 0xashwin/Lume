@@ -30,12 +30,17 @@ struct PlaylistDetailView: View {
         playlist.sourceType == .stalker
     }
 
+    private var isStremio: Bool {
+        playlist.sourceType == .stremio
+    }
+
     /// The localized section heading for the connection fields.
     private var connectionSectionTitle: LocalizedStringKey {
         switch playlist.sourceType {
         case .xtream: "Server"
         case .m3u: "M3U Playlist"
         case .stalker: "Stalker Portal"
+        case .stremio: "Stremio Addon"
         }
     }
 
@@ -140,7 +145,7 @@ struct PlaylistDetailView: View {
                     if !playlist.username.isEmpty {
                         LabeledContent("Username", value: playlist.username)
                     }
-                } else {
+                } else if !isStremio {
                     LabeledContent("Username", value: playlist.username)
                     LabeledContent("Password") {
                         Text("••••••••")
@@ -188,7 +193,7 @@ struct PlaylistDetailView: View {
                         .textContentType(.username)
                     SecureField("Password (optional)", text: $editPassword)
                         .textContentType(.password)
-                } else {
+                } else if !isStremio {
                     TextField("Username", text: $editUsername)
                     #if os(iOS)
                         .textInputAutocapitalization(.never)
@@ -242,6 +247,7 @@ struct PlaylistDetailView: View {
         case .xtream: "Server URL"
         case .m3u: "Playlist URL"
         case .stalker: "Portal URL"
+        case .stremio: "Addon URL"
         }
     }
 
@@ -290,7 +296,7 @@ struct PlaylistDetailView: View {
                             TVSettingsField(title: "MAC Address", placeholder: "00:1A:79:xx:xx:xx", text: $editMacAddress, contentType: nil)
                             TVSettingsField(title: "Username (optional)", placeholder: "Username", text: $editUsername, contentType: .username)
                             TVSettingsField(title: "Password (optional)", placeholder: "Password", text: $editPassword, isSecure: true, contentType: .password)
-                        } else {
+                        } else if !isStremio {
                             TVSettingsField(title: "Username", placeholder: "Username", text: $editUsername, contentType: .username)
                             TVSettingsField(title: "Password", placeholder: "Password", text: $editPassword, isSecure: true, contentType: .password)
                         }
@@ -314,7 +320,7 @@ struct PlaylistDetailView: View {
                             if !playlist.username.isEmpty {
                                 TVSettingsValueRow("Username", value: playlist.username)
                             }
-                        } else {
+                        } else if !isStremio {
                             TVSettingsValueRow("Username", value: playlist.username)
                             TVSettingsValueRow("Password") { Text("••••••••") }
                         }
@@ -432,6 +438,8 @@ struct PlaylistDetailView: View {
             playlist.macAddress = editMacAddress.trimmingCharacters(in: .whitespacesAndNewlines).uppercased()
             playlist.username = editUsername.trimmingCharacters(in: .whitespacesAndNewlines)
             playlist.password = editPassword
+        } else if isStremio {
+            playlist.serverURL = StremioManifestURL.normalized(playlist.serverURL)
         } else {
             playlist.username = editUsername.trimmingCharacters(in: .whitespacesAndNewlines)
             playlist.password = editPassword
