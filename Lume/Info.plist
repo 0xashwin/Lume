@@ -55,7 +55,7 @@
 	</array>
 	<key>NSLocalNetworkUsageDescription</key>
 	<string>Lume uses the local network to find and stream to Chromecast devices.</string>
-	<key>OMDBAPIKey</key>
+	<key>MDBListAPIKey</key>
 	<string></string>
 	<key>TMDBAccessToken</key>
 	<string></string>
