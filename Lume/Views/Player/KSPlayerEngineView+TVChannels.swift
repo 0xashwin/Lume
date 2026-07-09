@@ -53,7 +53,7 @@
             switch direction {
             case .up, .down:
                 let sort = ContentSortOption(rawValue: liveContentSortRaw) ?? .playlist
-                target = LiveChannelNavigator.adjacentMedia(
+                target = channelSurfer.adjacentMedia(
                     for: media, offset: direction == .up ? 1 : -1, sort: sort, in: modelContext
                 )
             case .right:

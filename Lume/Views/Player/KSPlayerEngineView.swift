@@ -120,6 +120,10 @@ struct KSPlayerEngineView: View {
         /// surfing follows the same order the viewer saw in the list.
         @AppStorage(SortStorageKey.liveContent)
         var liveContentSortRaw: String = ContentSortOption.playlist.rawValue
+        /// Cached channel order for in-player surfing, so up/down steps an
+        /// in-memory list instead of re-fetching and re-sorting the whole
+        /// category on each press.
+        @State var channelSurfer = LiveChannelSurfer()
         @Environment(\.modelContext) var modelContext
     #endif
 

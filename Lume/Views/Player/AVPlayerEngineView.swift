@@ -70,6 +70,9 @@ struct AVPlayerEngineView: View {
         /// surfing follows the same order the viewer saw in the list.
         @AppStorage(SortStorageKey.liveContent)
         private var liveContentSortRaw: String = ContentSortOption.playlist.rawValue
+        /// Caches the channel order so up/down surfing steps an in-memory list
+        /// instead of re-fetching and sorting the whole category each press.
+        @State private var channelSurfer = LiveChannelSurfer()
         @Environment(\.modelContext) private var modelContext
     #endif
 
@@ -296,7 +299,7 @@ struct AVPlayerEngineView: View {
             switch direction {
             case .up, .down:
                 let sort = ContentSortOption(rawValue: liveContentSortRaw) ?? .playlist
-                target = LiveChannelNavigator.adjacentMedia(
+                target = channelSurfer.adjacentMedia(
                     for: media, offset: direction == .up ? 1 : -1, sort: sort, in: modelContext
                 )
             case .right:

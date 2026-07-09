@@ -3,7 +3,8 @@
 //  LumeTests
 //
 //  Covers in-player live channel resolution — the next/previous channel surfing
-//  the tvOS player performs on up/down (`LiveChannelNavigator.adjacentMedia`).
+//  the tvOS player performs on up/down (`LiveChannelSurfer.adjacentMedia`, backed
+//  by `LiveChannelNavigator.orderedChannelIds` + `media(forStreamId:)`).
 //
 
 import Foundation
@@ -71,7 +72,7 @@ struct LiveChannelNavigatorTests {
         let (context, playlist) = try makeWorld(streams: threeChannels)
         let bravo = try media(forStreamId: 101, playlist: playlist, in: context)
 
-        let next = LiveChannelNavigator.adjacentMedia(for: bravo, offset: 1, sort: .playlist, in: context)
+        let next = LiveChannelSurfer().adjacentMedia(for: bravo, offset: 1, sort: .playlist, in: context)
         #expect(next?.contentRef == liveRef(102, playlist)) // Charlie
     }
 
@@ -79,7 +80,7 @@ struct LiveChannelNavigatorTests {
         let (context, playlist) = try makeWorld(streams: threeChannels)
         let bravo = try media(forStreamId: 101, playlist: playlist, in: context)
 
-        let previous = LiveChannelNavigator.adjacentMedia(for: bravo, offset: -1, sort: .playlist, in: context)
+        let previous = LiveChannelSurfer().adjacentMedia(for: bravo, offset: -1, sort: .playlist, in: context)
         #expect(previous?.contentRef == liveRef(100, playlist)) // Alpha
     }
 
@@ -89,7 +90,7 @@ struct LiveChannelNavigatorTests {
         let (context, playlist) = try makeWorld(streams: threeChannels)
         let charlie = try media(forStreamId: 102, playlist: playlist, in: context)
 
-        let next = LiveChannelNavigator.adjacentMedia(for: charlie, offset: 1, sort: .playlist, in: context)
+        let next = LiveChannelSurfer().adjacentMedia(for: charlie, offset: 1, sort: .playlist, in: context)
         #expect(next?.contentRef == liveRef(100, playlist)) // Alpha
     }
 
@@ -97,7 +98,7 @@ struct LiveChannelNavigatorTests {
         let (context, playlist) = try makeWorld(streams: threeChannels)
         let alpha = try media(forStreamId: 100, playlist: playlist, in: context)
 
-        let previous = LiveChannelNavigator.adjacentMedia(for: alpha, offset: -1, sort: .playlist, in: context)
+        let previous = LiveChannelSurfer().adjacentMedia(for: alpha, offset: -1, sort: .playlist, in: context)
         #expect(previous?.contentRef == liveRef(102, playlist)) // Charlie
     }
 
@@ -109,7 +110,7 @@ struct LiveChannelNavigatorTests {
         let (context, playlist) = try makeWorld(streams: threeChannels)
         let bravo = try media(forStreamId: 101, playlist: playlist, in: context)
 
-        let next = LiveChannelNavigator.adjacentMedia(for: bravo, offset: 1, sort: .nameDescending, in: context)
+        let next = LiveChannelSurfer().adjacentMedia(for: bravo, offset: 1, sort: .nameDescending, in: context)
         #expect(next?.contentRef == liveRef(100, playlist)) // Alpha
     }
 
@@ -125,7 +126,7 @@ struct LiveChannelNavigatorTests {
         ])
         let bravo = try media(forStreamId: 101, playlist: playlist, in: context)
 
-        let next = LiveChannelNavigator.adjacentMedia(for: bravo, offset: 1, sort: .playlist, in: context)
+        let next = LiveChannelSurfer().adjacentMedia(for: bravo, offset: 1, sort: .playlist, in: context)
         #expect(next == nil)
     }
 
@@ -135,8 +136,8 @@ struct LiveChannelNavigatorTests {
         ])
         let alpha = try media(forStreamId: 100, playlist: playlist, in: context)
 
-        #expect(LiveChannelNavigator.adjacentMedia(for: alpha, offset: 1, sort: .playlist, in: context) == nil)
-        #expect(LiveChannelNavigator.adjacentMedia(for: alpha, offset: -1, sort: .playlist, in: context) == nil)
+        #expect(LiveChannelSurfer().adjacentMedia(for: alpha, offset: 1, sort: .playlist, in: context) == nil)
+        #expect(LiveChannelSurfer().adjacentMedia(for: alpha, offset: -1, sort: .playlist, in: context) == nil)
     }
 
     // MARK: - Non-live input
@@ -148,6 +149,6 @@ struct LiveChannelNavigatorTests {
             playlist: Playlist(name: "P", serverURL: "http://e.com", username: "u", password: "p")
         ))
 
-        #expect(LiveChannelNavigator.adjacentMedia(for: movie, offset: 1, sort: .playlist, in: context) == nil)
+        #expect(LiveChannelSurfer().adjacentMedia(for: movie, offset: 1, sort: .playlist, in: context) == nil)
     }
 }
