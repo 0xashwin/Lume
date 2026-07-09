@@ -20,6 +20,14 @@
         @Query private var playlists: [Playlist]
 
         @State private var selectedSeason: Int = 1
+        /// Distinct season numbers and the per-season episode lists, cached so the
+        /// body (season selector, hero meta, episode rail) doesn't rebuild a Set
+        /// and re-filter/sort the whole episodes relationship on every render — a
+        /// real cost on shows with hundreds of episodes, hit on each watched-toggle.
+        /// Recomputed only when the episode set changes (see `recomputeSeasons`),
+        /// mirroring the iOS `SeriesDetailView`.
+        @State private var availableSeasons: [Int] = []
+        @State private var episodesBySeason: [Int: [Episode]] = [:]
         @State private var isLoadingEpisodes = false
         @State private var playingMedia: PlayableMedia?
         @State private var similar: [HomeMediaItem] = []
@@ -89,6 +97,7 @@
             }
             .onChange(of: series.similarTMDBIds) { resolveSimilar() }
             .onChange(of: refreshToken) { resolveSimilar() }
+            .onChange(of: series.episodes.count) { recomputeSeasons() }
         }
 
         private var content: some View {
@@ -355,8 +364,14 @@
             availableSeasons.count == 1 ? "1 Season" : "\(availableSeasons.count) Seasons"
         }
 
-        private var availableSeasons: [Int] {
-            Set(series.episodes.map(\.seasonNum)).sorted()
+        /// Rebuilds the cached season list and per-season episode grouping from the
+        /// current episodes. Season/episode numbers are immutable identifiers, so
+        /// this only needs to run when episodes are added or removed — not when an
+        /// episode's watched state toggles.
+        private func recomputeSeasons() {
+            availableSeasons = Set(series.episodes.map(\.seasonNum)).sorted()
+            episodesBySeason = Dictionary(grouping: series.episodes, by: \.seasonNum)
+                .mapValues { $0.sorted { $0.episodeNum < $1.episodeNum } }
         }
 
         private func determineDefaultSeason() -> Int {
@@ -376,9 +391,7 @@
         }
 
         private var seasonEpisodes: [Episode] {
-            series.episodes
-                .filter { $0.seasonNum == selectedSeason }
-                .sorted { $0.episodeNum < $1.episodeNum }
+            episodesBySeason[selectedSeason] ?? []
         }
 
         /// Play button target — see `SeriesEpisodeProgress.nextEpisode`. Read
@@ -406,6 +419,7 @@
             if series.episodes.isEmpty {
                 await loadEpisodes()
             }
+            recomputeSeasons()
             selectedSeason = determineDefaultSeason()
         }
 
