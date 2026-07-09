@@ -26,13 +26,20 @@ enum NextEpisodeResolver {
         guard let current = try? context.fetch(descriptor).first,
               let series = current.series else { return nil }
 
-        let ordered = series.episodes.sorted {
-            ($0.seasonNum, $0.episodeNum) < ($1.seasonNum, $1.episodeNum)
+        // Single linear pass for the immediate successor — the smallest
+        // (season, episode) strictly greater than the current one — instead of
+        // sorting the whole relationship (O(n) with no allocated copy vs the old
+        // O(n log n) + full sorted array). Materialising `series.episodes` once is
+        // unavoidable either way; the sort and its copy were the avoidable cost.
+        let currentKey = (current.seasonNum, current.episodeNum)
+        var next: Episode?
+        for episode in series.episodes {
+            let key = (episode.seasonNum, episode.episodeNum)
+            guard key > currentKey else { continue }
+            if let best = next, (best.seasonNum, best.episodeNum) <= key { continue }
+            next = episode
         }
-        guard let index = ordered.firstIndex(where: { $0.id == current.id }),
-              index + 1 < ordered.count else { return nil }
-
-        let next = ordered[index + 1]
+        guard let next else { return nil }
         guard let playlist = playlist(for: series, in: context) else { return nil }
         return PlayableMedia.from(episode: next, playlist: playlist, client: client)
     }

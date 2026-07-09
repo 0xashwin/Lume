@@ -225,17 +225,32 @@ struct FullScreenPlayerView: View {
             // Resolve the next episode for the active stream. Runs on appear and
             // whenever the stream swaps (manual pick or auto-advance), so the
             // queued episode always trails the one on screen.
-            nextUpMedia = activeMedia.isLive
-                ? nil
-                : NextEpisodeResolver.nextMedia(after: activeMedia.contentRef, in: modelContext)
+            //
+            // Deferred until playback is actually advancing: `nextMedia` walks the
+            // whole episodes relationship and fetches playlists on the main actor,
+            // and running that during the engine's first-frame setup contended with
+            // decode (part of the "stream loading lags" report). The Next Episode
+            // button / auto-advance only matter well into the episode, so resolving
+            // a beat after start costs the user nothing.
+            nextUpMedia = nil
+            guard !activeMedia.isLive else { return }
+            await waitForPlaybackStart()
+            guard !Task.isCancelled else { return }
+            nextUpMedia = NextEpisodeResolver.nextMedia(after: activeMedia.contentRef, in: modelContext)
         }
         .task(id: activeMedia.id) {
             // Resolve the IntroDB skip windows for the active episode. Runs on
             // appear and whenever the stream swaps. Gated on the user setting so
-            // a disabled feature makes no network call. Resolving the lookup key
-            // touches SwiftData on the main actor; the fetch itself is off it.
+            // a disabled feature makes no network call. Like Next Episode above,
+            // the SwiftData lookup is deferred past the first-frame window so it
+            // doesn't contend with decode; skip windows are seconds in at the
+            // earliest. Resolving the lookup key touches SwiftData on the main
+            // actor; the segments fetch itself is off it.
             skipSegments = nil
-            guard PremiumManager.shared.isPremium, PlayerSettings.Playback.showSkipIntroButton, !activeMedia.isLive,
+            guard PremiumManager.shared.isPremium, PlayerSettings.Playback.showSkipIntroButton, !activeMedia.isLive
+            else { return }
+            await waitForPlaybackStart()
+            guard !Task.isCancelled,
                   let lookup = IntroSkipResolver.lookup(for: activeMedia.contentRef, in: modelContext)
             else { return }
             skipSegments = try? await IntroDBClient.shared.segments(
@@ -393,6 +408,20 @@ struct FullScreenPlayerView: View {
     private func retryResolve() {
         engineAttempt = 0
         Task { await resolveActiveMedia() }
+    }
+
+    /// Suspends until playback is actually advancing (`clock.current` ticks past
+    /// zero from the engine's play callback), with a ~6 s fallback so a stream
+    /// that never starts still lets its deferred work run. Polling the clock here
+    /// is safe: this runs inside a `.task`, not the view body, so it doesn't
+    /// register the observation dependency that would re-invalidate the host on
+    /// every tick (see `PlaybackClock`).
+    private func waitForPlaybackStart() async {
+        for _ in 0 ..< 40 {
+            if clock.current > 0 { return }
+            try? await Task.sleep(for: .milliseconds(150))
+            if Task.isCancelled { return }
+        }
     }
 
     /// Persist the outgoing stream's progress, then swap in a new one. The
