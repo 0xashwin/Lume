@@ -51,6 +51,8 @@ import SwiftUI
                     VLCEngineSettingsTVDetail()
                 case .ksPlayer:
                     KSEngineSettingsTVDetail()
+                case .lumeEngine:
+                    LumeEngineSettingsTVDetail()
                 case .avPlayer:
                     Text("AVPlayer has no configurable options.")
                         .font(.system(size: 20))
@@ -120,7 +122,7 @@ import SwiftUI
                 }
 
                 // swiftlint:disable:next line_length
-                Text("Artwork, ratings and details are provided by TMDB, the OMDb API, and Trakt, and intro/recap skip data by IntroDB. This product uses the TMDB API but is not endorsed or certified by TMDB.")
+                Text("Artwork, ratings and details are provided by TMDB, MDBList, and Trakt, and intro/recap skip data by IntroDB. This product uses the TMDB API but is not endorsed or certified by TMDB.")
                     .font(.system(size: 22))
                     .foregroundStyle(.secondary)
                     .padding(.horizontal, TVSettingsMetrics.rowHPadding)

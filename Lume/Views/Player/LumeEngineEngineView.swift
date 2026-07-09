@@ -1,4 +1,5 @@
-import AVFoundation
+import LumeEngine
+import OSLog
 import SwiftData
 import SwiftUI
 
@@ -8,20 +9,22 @@ import SwiftUI
     import AppKit
 #endif
 
-/// AVPlayer-backed video host with custom Apple-style controls.
+/// LumeEngine (FFmpeg) video host with the shared Apple-style player controls.
 ///
-/// This used to wrap `AVPlayerViewController` and lean on AVKit's built-in
-/// transport. To match the VLCKit and KSPlayer engines — which both draw their
-/// own auto-hiding overlay — it now renders straight into an `AVPlayerLayer`
-/// (`AVPlayerVideoContainer`) and layers the very same controls on top: the
-/// shared `TVPlayerControlsOverlay` on tvOS, and `AVPlayerControlsOverlay` on
-/// iOS / macOS. State (`AVPlayerCoordinator`), the tap-catcher, the auto-hide
-/// timer and live-channel surfing all mirror `VLCPlayerEngineView`.
-struct AVPlayerEngineView: View {
+/// On tvOS it hosts the shared `TVPlayerControlsOverlay` — the very same
+/// Apple-TV-style overlay the VLCKit and KSPlayer engines use — via the
+/// `TVPlaybackEngine` conformance on `LumeEngineCoordinator`, so every engine
+/// presents an identical player UI. On iOS / macOS it layers the matching
+/// `LumeEngineControlsOverlay`. The engine renders its own subtitle cues, drawn
+/// here above the video surface.
+struct LumeEngineEngineView: View {
     let media: PlayableMedia
     /// High-frequency playback clock, held as the `@Observable` object rather
-    /// than as `@Binding` scalars — see `VLCPlayerEngineView` for why this keeps
-    /// the engine view off the per-tick re-render path.
+    /// than as `@Binding` scalars. A `@Binding` whose root is an `@Observable`
+    /// makes the *holding* view re-render on every change — so binding the clock
+    /// here would rebuild the controls overlay / menus on every playback tick.
+    /// Holding the object and never reading `current`/`duration` in this body
+    /// keeps the engine view off the tick path; only the scrubber leaf reads it.
     @Bindable var clock: PlaybackClock
     /// The episode queued after `media`, resolved by the host. Drives the
     /// end-of-episode Next Up affordances; `nil` when there is nothing to play
@@ -31,24 +34,27 @@ struct AVPlayerEngineView: View {
     /// in-player Skip Intro button. `nil` when there is nothing to skip.
     var skipSegments: IntroSegments?
     /// When true, an initial-load failure reports to the host via
-    /// `onPlaybackFailed` (which decides what to try next — another engine, or
-    /// reverting an AirPlay override) instead of raising this engine's own
-    /// error overlay.
+    /// `onPlaybackFailed` (which decides what to try next) instead of raising
+    /// this engine's own error overlay.
     var reportsStartupFailure = false
     /// Use the shorter fallback startup window before declaring failure, so a
     /// switch to the next engine is prompt. Off for attempts that should wait
-    /// out the full startup timeout (last resort, or an AirPlay cast attempt).
+    /// out the full startup timeout.
     var usesQuickStartupTimeout = false
     /// Invoked on an initial-load failure when `reportsStartupFailure` is set.
     var onPlaybackFailed: (() -> Void)?
     /// Invoked when the viewer picks a different stream (another episode, or a
-    /// live channel via the Siri remote) from the in-player overlay.
+    /// live channel via the Siri remote) from the in-player overlay. The host
+    /// swaps `media` in response.
     var onSelectMedia: ((PlayableMedia) -> Void)?
 
-    @StateObject private var coordinator = AVPlayerCoordinator()
+    @StateObject private var coordinator = LumeEngineCoordinator()
+    /// Drives bounded backoff reconnects when the stream drops mid-playback.
+    @State private var reconnector = PlaybackRetryController()
     @State private var isControlsVisible = true
     /// Set once the stream is given up on (initial-load failure with no fallback
-    /// left). Swaps the player for the `PlayerErrorIndicator` (Try Again / Back).
+    /// left, or the reconnect budget spent). Swaps the player for the
+    /// `PlayerErrorIndicator` (Try Again / Back).
     @State private var loadFailed = false
     @State private var isSeeking = false
     @State private var seekPosition: TimeInterval = 0
@@ -66,7 +72,7 @@ struct AVPlayerEngineView: View {
         /// Drives focus onto the transparent tap-catcher once the controls
         /// auto-hide, so the Siri remote can summon them again.
         @FocusState private var catcherFocused: Bool
-        /// Live-content sort the channel browser uses — so in-player channel
+        /// Live-content sort the channel browser uses — read so in-player channel
         /// surfing follows the same order the viewer saw in the list.
         @AppStorage(SortStorageKey.liveContent)
         private var liveContentSortRaw: String = ContentSortOption.playlist.rawValue
@@ -80,29 +86,32 @@ struct AVPlayerEngineView: View {
     #endif
 
     private let autoHideInterval: TimeInterval = 4
-    /// How long to wait for playback before declaring a stream dead when this is
-    /// the last engine in the priority list.
-    private let startupTimeout: TimeInterval = 40
-    /// Shorter startup timeout used when a fallback engine is available, so a
-    /// hanging engine hands off promptly rather than stalling on a black screen.
-    private let fallbackStartupTimeout: TimeInterval = 15
 
     var body: some View {
         ZStack {
             Color.black
                 .ignoresSafeArea()
 
-            AVPlayerVideoContainer(coordinator: coordinator)
+            LumeEngineVideoSurface(coordinator: coordinator)
                 .ignoresSafeArea()
 
+            // The engine decodes the selected subtitle into `subtitleCues`; the
+            // bare video surface draws only video, so this leaf renders those
+            // cues. It observes the standalone cue model (not the coordinator),
+            // so per-cue updates invalidate this leaf alone — never this body
+            // (which would rebuild the controls overlay / open track menus).
+            LumeEngineSubtitleOverlay(cues: coordinator.subtitleCues, controlsVisible: isControlsVisible)
+
             // Always-present transparent layer that reliably catches taps over
-            // the player surface, mirroring the VLCKit/KSPlayer hosts. Full
-            // bleed: the host keeps the overlays inside the safe area on iOS,
-            // but a tap at the very edges should still summon the controls.
+            // the engine's render layer, which can otherwise swallow touches
+            // before SwiftUI's gesture sees them.
             tapCatcher
                 .ignoresSafeArea()
 
-            if isControlsVisible, !loadFailed {
+            // Hold the controls back until the stream starts, so the loading
+            // indicator stands in for a player that would otherwise look paused
+            // behind its Play button.
+            if isControlsVisible, coordinator.hasStartedPlayback, !loadFailed {
                 controlsOverlay
                     .transition(.opacity.animation(.easeInOut(duration: 0.2)))
             }
@@ -138,6 +147,11 @@ struct AVPlayerEngineView: View {
                 }
             #endif
 
+            if coordinator.isBuffering, !loadFailed {
+                PlayerLoadingIndicator(title: coordinator.hasStartedPlayback ? nil : media.title)
+                    .transition(.opacity)
+            }
+
             if loadFailed {
                 PlayerErrorIndicator(
                     title: media.title,
@@ -149,46 +163,55 @@ struct AVPlayerEngineView: View {
         }
         .preferredColorScheme(.dark)
         .onAppear {
-            coordinator.onTime = { current in
-                if !isSeeking, current.isFinite { clock.current = current }
-            }
-            coordinator.onDuration = { total in
-                if total.isFinite, total > 0 { clock.duration = total }
-            }
-            coordinator.onPlaybackFailure = { reportFailure() }
-            coordinator.startupTimeout = usesQuickStartupTimeout ? fallbackStartupTimeout : startupTimeout
+            wireCoordinator()
+            coordinator.startupTimeout = usesQuickStartupTimeout ? 15 : 40
+            clock.reset()
             coordinator.configure(media: media)
             scheduleHide()
         }
         .onDisappear {
             hideTask?.cancel()
             hoverHideTask?.cancel()
+            reconnector.cancel()
             coordinator.tearDown()
         }
         .onChange(of: coordinator.isPlaying) { _, _ in
             resetHideTimer()
         }
+        .onChange(of: coordinator.hasStartedPlayback) { _, started in
+            // Once the first frame lands the controls become eligible; start the
+            // auto-hide countdown so they don't linger.
+            if started { resetHideTimer() }
+        }
         .onChange(of: scenePhase) { _, phase in
             // The Home button backgrounds the app without calling onDisappear,
             // so pause here to stop audio when the player loses focus.
-            if phase != .active { coordinator.pauseForBackground() }
+            if phase != .active, coordinator.isPlaying { coordinator.togglePlay() }
         }
         .onChange(of: media) { _, newMedia in
             // The host swapped the stream (e.g. a new episode). Reset local
-            // scrubbing state and hand the new media to the live player.
+            // scrubbing state and hand the new media to the engine.
             isSeeking = false
             seekPosition = 0
             isPanelOpen = false
             loadFailed = false
-            coordinator.reload(media: newMedia)
+            reconnector.reset()
+            clock.reset()
+            coordinator.configure(media: newMedia)
             resetHideTimer()
         }
         .onChange(of: isControlsVisible) { _, visible in
             #if os(tvOS)
+                // Hand focus to the tap-catcher once the controls vanish so the
+                // remote can bring them back.
                 if !visible { Task { @MainActor in catcherFocused = true } }
             #endif
         }
+        // Handle the Menu/back button at the player root so it reliably overrides
+        // the fullScreenCover's default dismiss-on-Menu.
         .onMenuPress { handleMenuPress() }
+        // The Siri Remote's dedicated Play/Pause button is a distinct press type
+        // from a click-pad Select, so the on-screen button never sees it.
         .onPlayPausePress { togglePlay() }
         #if os(macOS)
             .onContinuousHover(coordinateSpace: .local) { phase in
@@ -215,21 +238,50 @@ struct AVPlayerEngineView: View {
         #endif
     }
 
+    // MARK: - Coordinator wiring
+
+    private func wireCoordinator() {
+        coordinator.onTime = { current, duration in
+            if !isSeeking, current.isFinite { clock.current = current }
+            if duration.isFinite, duration > 0 { clock.duration = duration }
+        }
+        coordinator.onPlaybackFailure = {
+            Logger.player.error("LumeEngine startup failure → \(reportsStartupFailure && !coordinator.hasStartedPlayback ? "falling back to next engine" : "failure overlay", privacy: .public)")
+            reportFailure()
+        }
+        coordinator.onStalled = {
+            // Mid-stream drop: bounded exponential backoff, then give up loudly.
+            if reconnector.hasGivenUp {
+                Logger.player.error("LumeEngine stall retries exhausted → failure overlay")
+                withAnimation(.easeInOut(duration: 0.25)) { loadFailed = true }
+            } else {
+                Logger.player.warning("LumeEngine stalled → scheduling engine reload")
+                reconnector.scheduleRetry { coordinator.reload() }
+            }
+        }
+        coordinator.onRecovered = { reconnector.reset() }
+    }
+
     // MARK: - Tap Catcher
 
     @ViewBuilder
     private var tapCatcher: some View {
         #if os(tvOS)
+            // tvOS has no touch surface: drive the overlay from the Siri remote.
+            // The catcher only takes focus while controls are hidden, so the
+            // control buttons stay reachable otherwise.
             Button(action: showControls) {
                 Color.clear.contentShape(Rectangle())
             }
-            .buttonStyle(AVInvisibleButtonStyle())
+            .buttonStyle(InvisibleButtonStyle())
             // Yield focus to the failure overlay's buttons when a stream dies.
             .disabled(isControlsVisible || isChannelBrowserOpen || loadFailed)
             .focused($catcherFocused)
             .onMoveCommand { direction in
-                // Left opens the channel browser; up/down surf adjacent
-                // channels; right recalls the last channel watched.
+                // Watching live TV with the controls hidden, left opens the
+                // channel browser, up/down surf adjacent channels and right
+                // recalls the last channel watched. Any other move summons the
+                // controls.
                 if media.isLive, direction == .left {
                     openChannelBrowser()
                 } else if media.isLive, direction == .up || direction == .down || direction == .right {
@@ -262,13 +314,12 @@ struct AVPlayerEngineView: View {
                 onSwitchChannel: { switchLiveChannel($0) }
             )
         #else
-            AVPlayerControlsOverlay(
+            LumeEngineControlsOverlay(
                 coordinator: coordinator,
                 media: media,
                 isSeeking: $isSeeking,
                 seekPosition: $seekPosition,
-                currentTime: $clock.current,
-                duration: $clock.duration,
+                clock: clock,
                 hideTask: $hideTask,
                 onClose: { closePlayer() },
                 onTogglePlay: { togglePlay() },
@@ -286,10 +337,10 @@ struct AVPlayerEngineView: View {
     }
 
     #if os(tvOS)
-        /// Change the live channel from the Siri Remote — up/down surf to the
-        /// adjacent channel, right recalls the channel watched just before this
-        /// one. Falls back to summoning the controls when there's nothing to
-        /// jump to.
+        /// Change the live channel from the Siri Remote. Up/Down surf to the
+        /// adjacent channel (a TV remote's channel rocker); Right recalls the
+        /// channel watched just before this one. Falls back to summoning the
+        /// controls when there's nothing to jump to.
         private func switchLiveChannel(_ direction: MoveCommandDirection) {
             guard media.isLive else { return }
             let target: PlayableMedia?
@@ -430,14 +481,48 @@ struct AVPlayerEngineView: View {
     /// Re-prepare the current stream after a failure (the Try Again button).
     private func retryPlayback() {
         withAnimation(.easeInOut(duration: 0.25)) { loadFailed = false }
-        coordinator.retryAfterFailure()
+        reconnector.reset()
+        coordinator.reload()
+    }
+}
+
+// MARK: - Engine-rendered subtitles
+
+/// Draws the engine's active subtitle cues over the video. A leaf that observes
+/// only the standalone `SubtitleCueModel`, so per-cue changes invalidate this
+/// view alone — never the engine view above it, and never the controls overlay
+/// (both of which observe the coordinator, whose `objectWillChange` therefore
+/// no longer fires at tick rate). Keeping the cue text off the coordinator is
+/// what stops an open track menu flickering and dropping taps.
+private struct LumeEngineSubtitleOverlay: View {
+    @ObservedObject var cues: SubtitleCueModel
+    /// Lifts the cues above the controls' scrubber while they're showing.
+    let controlsVisible: Bool
+
+    var body: some View {
+        if let text = cues.text, !text.isEmpty {
+            VStack {
+                Spacer()
+                Text(text)
+                    .font(.title3.weight(.medium))
+                    .multilineTextAlignment(.center)
+                    .foregroundStyle(.white)
+                    .shadow(color: .black.opacity(0.9), radius: 2, x: 0, y: 1)
+                    .padding(.horizontal, 12)
+                    .padding(.vertical, 6)
+                    .background(.black.opacity(0.45), in: RoundedRectangle(cornerRadius: 8))
+                    .padding(.bottom, controlsVisible ? 120 : 40)
+            }
+            .allowsHitTesting(false)
+        }
     }
 }
 
 #if os(tvOS)
-    /// Draws only its (clear) label so the full-screen tap-catcher stays
-    /// invisible even while it holds focus with the controls hidden.
-    private struct AVInvisibleButtonStyle: ButtonStyle {
+    /// Draws only its (clear) label — no focus highlight, scale or background —
+    /// so the full-screen tap-catcher stays invisible even while it holds focus
+    /// with the controls hidden.
+    private struct InvisibleButtonStyle: ButtonStyle {
         func makeBody(configuration: Configuration) -> some View {
             configuration.label
         }
@@ -466,91 +551,4 @@ private extension View {
             self
         #endif
     }
-}
-
-// MARK: - Video Container (AVPlayerLayer bridge)
-
-// Hosts a view whose backing layer is an `AVPlayerLayer`. The coordinator owns
-// the `AVPlayer` and is handed the layer once it mounts so it can drive content
-// gravity and Picture in Picture.
-#if os(macOS)
-    private struct AVPlayerVideoContainer: NSViewRepresentable {
-        let coordinator: AVPlayerCoordinator
-
-        func makeNSView(context _: Context) -> AVPlayerHostNSView {
-            let view = AVPlayerHostNSView()
-            coordinator.attach(layer: view.playerLayer)
-            return view
-        }
-
-        func updateNSView(_: AVPlayerHostNSView, context _: Context) {}
-    }
-
-    /// AppKit has no `layerClass` hook, so the `AVPlayerLayer` is created and
-    /// kept in sync with the view's bounds manually.
-    private final class AVPlayerHostNSView: NSView {
-        let playerLayer = AVPlayerLayer()
-
-        override init(frame frameRect: NSRect) {
-            super.init(frame: frameRect)
-            wantsLayer = true
-            playerLayer.frame = bounds
-            layer?.addSublayer(playerLayer)
-            layer?.backgroundColor = NSColor.black.cgColor
-        }
-
-        @available(*, unavailable)
-        required init?(coder _: NSCoder) {
-            fatalError("init(coder:) has not been implemented")
-        }
-
-        override func layout() {
-            super.layout()
-            playerLayer.frame = bounds
-        }
-    }
-#else
-    private struct AVPlayerVideoContainer: UIViewRepresentable {
-        let coordinator: AVPlayerCoordinator
-
-        func makeUIView(context _: Context) -> AVPlayerHostUIView {
-            let view = AVPlayerHostUIView()
-            view.backgroundColor = .black
-            coordinator.attach(layer: view.playerLayer)
-            return view
-        }
-
-        func updateUIView(_: AVPlayerHostUIView, context _: Context) {}
-    }
-
-    /// `layerClass` makes the view's backing layer an `AVPlayerLayer`, so it
-    /// resizes with the view automatically.
-    private final class AVPlayerHostUIView: UIView {
-        // swiftlint:disable:next static_over_final_class
-        override class var layerClass: AnyClass {
-            AVPlayerLayer.self
-        }
-
-        var playerLayer: AVPlayerLayer {
-            // swiftlint:disable:next force_cast
-            layer as! AVPlayerLayer
-        }
-    }
-#endif
-
-#Preview {
-    AVPlayerEngineView(
-        media: PlayableMedia(
-            id: "preview",
-            url: URL(string: "https://example.com/stream.m3u8")!,
-            title: "Sample Video",
-            subtitle: nil,
-            posterURL: nil,
-            kind: .vod,
-            startTime: 0,
-            contentRef: .movie("preview")
-        ),
-        clock: PlaybackClock()
-    )
-    .preferredColorScheme(.dark)
 }

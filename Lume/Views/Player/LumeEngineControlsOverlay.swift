@@ -1,22 +1,33 @@
 import SwiftData
 import SwiftUI
 
-// Native iOS-style controls overlay for the AVPlayer engine.
+// MARK: - Controls Overlay (iOS / macOS)
+
+// Native iOS-style controls overlay for the LumeEngine (FFmpeg) backend.
 //
-// A line-for-line counterpart to `VLCPlayerControlsOverlay` and
-// `KSPlayerControlsOverlay`: a center transport cluster (skip · large
-// play/pause · skip) in Liquid Glass, a title block paired with a grouped
-// glass pill of track controls (subtitles · audio · speed · aspect), and a
-// clean full-width scrubber. tvOS uses the shared `TVPlayerControlsOverlay`
-// instead (see `AVPlayerEngineView`).
+// Visually identical to the VLCKit and KSPlayer overlays: a center transport
+// cluster (skip · large play/pause · skip) rendered in Liquid Glass, a title
+// block paired with a grouped glass pill of track controls (subtitles · audio ·
+// speed · PiP · favorite), and a clean full-width scrubber. tvOS uses the shared
+// `TVPlayerControlsOverlay` instead (see `LumeEngineEngineView.tvBody`).
+//
+// The engine reports tracks through the neutral `PlayerTrackOption` surface on
+// `LumeEngineCoordinator`, so the menus stay engine-agnostic. Only the
+// `PlaybackTimeline` leaf reads the 10 Hz `PlaybackClock` — this body never
+// does, so a playback tick invalidates that leaf alone and an open track `Menu`
+// stays stable and tappable (see the note on the `clock` property).
 #if !os(tvOS)
-    struct AVPlayerControlsOverlay: View {
-        @ObservedObject var coordinator: AVPlayerCoordinator
+    struct LumeEngineControlsOverlay: View {
+        @ObservedObject var coordinator: LumeEngineCoordinator
         let media: PlayableMedia
         @Binding var isSeeking: Bool
         @Binding var seekPosition: TimeInterval
-        @Binding var currentTime: TimeInterval
-        @Binding var duration: TimeInterval
+        /// The 10 Hz playback clock. Deliberately the `@Observable` object, not
+        /// `$clock.current` bindings: reading a tick-driven value in this body
+        /// would re-render the whole overlay — and an open `Menu` whose host
+        /// keeps re-rendering flickers its items and cancels in-flight taps.
+        /// Only the `PlaybackTimeline` leaf reads the clock; this body must never.
+        let clock: PlaybackClock
         @Binding var hideTask: Task<Void, Never>?
         var onClose: () -> Void
         var onTogglePlay: () -> Void
@@ -80,7 +91,7 @@ import SwiftUI
 
                 Spacer()
 
-                AirPlayRouteButton(player: coordinator.player)
+                AirPlayRouteButton()
             }
             .padding(.horizontal, 20)
             .padding(.top, 12)
@@ -151,8 +162,12 @@ import SwiftUI
                 if media.isLive {
                     liveIndicator
                 } else {
-                    scrubber
-                    timeLabels
+                    PlaybackTimeline(
+                        clock: clock,
+                        isSeeking: $isSeeking,
+                        seekPosition: $seekPosition,
+                        onEditingChanged: onSliderEditingChanged
+                    )
                 }
             }
             .padding(.horizontal, 20)
@@ -191,11 +206,14 @@ import SwiftUI
         // MARK: - Secondary Controls (grouped glass pill)
 
         private var secondaryControls: some View {
-            HStack(spacing: 4) {
-                if !coordinator.textTrackOptions.isEmpty { subtitleMenu }
-                if coordinator.audioTrackOptions.count > 1 { audioTrackMenu }
-                if !media.isLive { playbackRateMenu }
-                contentModeButton
+            let hasAudio = coordinator.audioTrackOptions.count > 1
+            let hasText = !coordinator.textTrackOptions.isEmpty
+            let hasRate = !media.isLive
+
+            return HStack(spacing: 4) {
+                if hasText { subtitleMenu }
+                if hasAudio { audioTrackMenu }
+                if hasRate { playbackRateMenu }
                 favoriteButton
             }
             .padding(.horizontal, 4)
@@ -276,43 +294,7 @@ import SwiftUI
             .menuIndicator(.hidden)
         }
 
-        private var contentModeButton: some View {
-            Button {
-                coordinator.isScaleAspectFill.toggle()
-                onResetHideTimer()
-            } label: {
-                pillGlyph(coordinator.isScaleAspectFill ? "rectangle.fill" : "rectangle.arrowtriangle.2.inward")
-            }
-            .buttonStyle(.plain)
-            .accessibilityLabel(coordinator.isScaleAspectFill ? "Fit video" : "Fill screen")
-        }
-
         // MARK: - Scrubber
-
-        private var scrubber: some View {
-            Slider(
-                value: Binding<TimeInterval>(
-                    get: { isSeeking ? seekPosition : (currentTime.isFinite ? currentTime : 0) },
-                    set: { seekPosition = $0 }
-                ),
-                in: 0 ... max(duration.isFinite ? duration : 1, 1),
-                onEditingChanged: onSliderEditingChanged
-            )
-            .tint(.white)
-        }
-
-        private var timeLabels: some View {
-            HStack {
-                Text(timeString(from: isSeeking ? seekPosition : currentTime))
-                    .contentTransition(.numericText())
-                    .foregroundStyle(.white)
-                Spacer()
-                Text(timeString(from: max(duration, 0)))
-                    .foregroundStyle(.white.opacity(0.7))
-            }
-            .font(.caption.monospacedDigit())
-            .shadow(color: .black.opacity(0.35), radius: 3, y: 1)
-        }
 
         private func onSliderEditingChanged(editing: Bool) {
             isSeeking = editing
@@ -320,7 +302,7 @@ import SwiftUI
                 hideTask?.cancel()
             } else {
                 coordinator.seek(to: seekPosition)
-                currentTime = seekPosition
+                clock.current = seekPosition
                 onScheduleHide()
             }
         }
@@ -344,7 +326,8 @@ import SwiftUI
         }
 
         /// A white glyph sized for the grouped track pill. Carries no glass of
-        /// its own — the enclosing capsule is the single glass surface.
+        /// its own — the enclosing capsule is the single glass surface, so
+        /// stacking per-icon glass (prohibited) is avoided.
         private func pillGlyph(_ systemName: String, dimmed: Bool = false) -> some View {
             Image(systemName: systemName)
                 .font(.system(size: 16, weight: .semibold))
@@ -365,6 +348,42 @@ import SwiftUI
             } else {
                 Text(title)
             }
+        }
+    }
+
+    // MARK: - Playback Timeline (tick-following leaf)
+
+    /// The scrubber and time labels — the only part of the overlay that follows
+    /// the 10 Hz playback clock. Isolated in its own view so each tick
+    /// invalidates just this leaf: the overlay above (menus, buttons) never
+    /// re-renders with it, which is what keeps an open track menu stable.
+    private struct PlaybackTimeline: View {
+        var clock: PlaybackClock
+        @Binding var isSeeking: Bool
+        @Binding var seekPosition: TimeInterval
+        var onEditingChanged: (Bool) -> Void
+
+        var body: some View {
+            Slider(
+                value: Binding<TimeInterval>(
+                    get: { isSeeking ? seekPosition : (clock.current.isFinite ? clock.current : 0) },
+                    set: { seekPosition = $0 }
+                ),
+                in: 0 ... max(clock.duration.isFinite ? clock.duration : 1, 1),
+                onEditingChanged: onEditingChanged
+            )
+            .tint(.white)
+
+            HStack {
+                Text(timeString(from: isSeeking ? seekPosition : clock.current))
+                    .contentTransition(.numericText())
+                    .foregroundStyle(.white)
+                Spacer()
+                Text(timeString(from: max(clock.duration, 0)))
+                    .foregroundStyle(.white.opacity(0.7))
+            }
+            .font(.caption.monospacedDigit())
+            .shadow(color: .black.opacity(0.35), radius: 3, y: 1)
         }
 
         private func timeString(from time: TimeInterval) -> String {
