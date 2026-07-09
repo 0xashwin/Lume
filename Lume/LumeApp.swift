@@ -204,8 +204,11 @@ struct LumeApp: App {
 
                     // Restore a previously connected Trakt session (refreshing
                     // the token if stale) so watched-sync and the watchlist work
-                    // from launch.
-                    await TraktService.shared.restore()
+                    // from launch. Fired independently rather than awaited: it's
+                    // up to two sequential network round-trips and nothing below
+                    // depends on it, so blocking the launch chain on it delayed
+                    // the profile chooser and the fresh-install sync gate.
+                    Task { await TraktService.shared.restore() }
 
                     // Resolve the active profile and claim any pre-profiles
                     // content state before the first sync, so the catalog the

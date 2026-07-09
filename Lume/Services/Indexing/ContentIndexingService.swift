@@ -69,7 +69,12 @@ final class ContentIndexingService {
     func kick(after delay: Duration = .zero) {
         guard let container, task == nil, state != .unavailable else { return }
         let indexer = ContentIndexer(modelContainer: container)
-        task = Task {
+        // `.utility` so the embedding passes (each chunk decodes an
+        // NLContextualEmbedding vector per title) run below the UI's QoS and are
+        // preempted by browsing/scrolling — matching `EPGSyncService`. Without
+        // this the pass inherited the caller's `.userInitiated` QoS and its
+        // per-chunk CPU bursts competed head-to-head with the main thread.
+        task = Task(priority: .utility) {
             defer { task = nil }
             if delay > .zero {
                 try? await Task.sleep(for: delay)
