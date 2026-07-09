@@ -293,8 +293,14 @@ final class LumeEngineCoordinator: NSObject, ObservableObject {
                 onRecovered?()
             }
             if state == .failed {
-                Logger.player.error("LumeEngine failed (hasStartedPlayback: \(hasStartedPlayback))")
-                if hasStartedPlayback {
+                // Bind to a local before the os_log interpolation: referencing a
+                // property directly inside the autoclosure needs an explicit
+                // `self.`, which SwiftFormat's redundantSelf rule then strips and
+                // re-breaks the build (see the recurring "explicit self in os_log"
+                // fixups). A local sidesteps the conflict for good.
+                let hasStarted = hasStartedPlayback
+                Logger.player.error("LumeEngine failed (hasStartedPlayback: \(hasStarted))")
+                if hasStarted {
                     onStalled?()
                 } else {
                     reportFailure()
