@@ -105,6 +105,8 @@ Metacritic, Trakt, Letterboxd), and your viewing activity can be scrobbled to **
 - **Skip Intro / Recap** overlay during playback, powered by IntroDB skip windows
 - Optional **Trakt** scrobbling — plus one-tap import of your existing Trakt watched history — and **TMDB** metadata enrichment
 - **Clear watch history** from Settings to reset progress, watched markers, and last-watched dates across all content
+- **Now Playing integration** — lock-screen / Control Center metadata, artwork, and remote controls on every engine; playback on Apple TV surfaces on your iPhone's Apple TV remote
+- **Live Activity + Dynamic Island** (iOS) — glanceable now & next programme with live progress on the Lock Screen; tap to jump straight back into playback
 
 #### 👤 Profiles
 - Multiple **user profiles**, each with its own watch history, progress, and favorites

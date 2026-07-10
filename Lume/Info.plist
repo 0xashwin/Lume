@@ -40,6 +40,8 @@
 		<string>infuse</string>
 		<string>vlc-x-callback</string>
 	</array>
+	<key>NSSupportsLiveActivities</key>
+	<true/>
 	<key>NSAppTransportSecurity</key>
 	<dict>
 		<key>NSAllowsArbitraryLoads</key>

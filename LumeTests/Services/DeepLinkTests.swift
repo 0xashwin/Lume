@@ -23,6 +23,16 @@ struct DeepLinkTests {
         #expect(DeepLink(url: url) == .series(tmdbId: 77))
     }
 
+    @Test func `parses resume link`() throws {
+        let url = try #require(URL(string: "lume://resume"))
+        #expect(DeepLink(url: url) == .resume)
+    }
+
+    @Test func `resume is case insensitive and ignores a path`() throws {
+        let url = try #require(URL(string: "lume://RESUME/anything"))
+        #expect(DeepLink(url: url) == .resume)
+    }
+
     @Test func `rejects a foreign scheme`() throws {
         let url = try #require(URL(string: "https://movie/603"))
         #expect(DeepLink(url: url) == nil)
