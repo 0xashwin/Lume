@@ -26,6 +26,14 @@ struct MainTabView: View {
     /// `onOpenURL` deep link can switch tabs and push a detail screen.
     @State private var router = DeepLinkRouter()
 
+    /// The stream a `lume://resume` deep link (a Live Activity tap) asked to
+    /// reopen. Presented directly here, independent of any tab's own player
+    /// cover.
+    @State private var resumeMedia: PlayableMedia?
+    #if os(macOS)
+        @Environment(\.openWindow) private var openWindow
+    #endif
+
     /// Playlists waiting to be auto-synced, and the one currently shown in the
     /// blocking progress cover. Auto-sync is presented (not silent) so the user
     /// sees progress and waits for it to finish — most importantly right after
@@ -68,6 +76,11 @@ struct MainTabView: View {
             .onOpenURL { url in
                 handleDeepLink(url)
             }
+        #if !os(macOS)
+            .fullScreenCover(item: $resumeMedia) { media in
+                FullScreenPlayerView(media: media)
+            }
+        #endif
             .task(id: playlists.count) {
                 // On launch (and whenever a playlist is added) sync any playlist that
                 // is due per the configured frequency.
@@ -206,6 +219,17 @@ struct MainTabView: View {
             router.selectedTab = .series
             router.seriesPath = NavigationPath()
             router.seriesPath.append(series)
+        case .resume:
+            // The Live Activity was tapped. When a player session is already
+            // up, foregrounding the app is all that's needed; otherwise reopen
+            // the last played stream where it left off.
+            guard NowPlayingService.shared.currentMedia == nil,
+                  let media = PlaybackResumeStore.load() else { return }
+            #if os(macOS)
+                openWindow(id: "player", value: media)
+            #else
+                resumeMedia = media
+            #endif
         }
     }
 

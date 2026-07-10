@@ -262,6 +262,7 @@ struct KSPlayerEngineView: View {
             .preferredColorScheme(.dark)
             .onAppear {
                 engine.attach(coordinator: coordinator)
+                attachNowPlayingTransport()
                 scheduleHide()
                 startStartupWatchdog()
             }
@@ -271,6 +272,7 @@ struct KSPlayerEngineView: View {
                 cancelStartupWatchdog()
                 cancelStallWatchdog()
                 PlaybackQoE.shared.endSession()
+                NowPlayingService.shared.detachTransport(owner: coordinator)
                 coordinator.resetPlayer()
             }
             .onChange(of: engine.isPlaying) { _, _ in
@@ -444,6 +446,7 @@ struct KSPlayerEngineView: View {
             }
             .preferredColorScheme(.dark)
             .onAppear {
+                attachNowPlayingTransport()
                 scheduleHide()
                 observePipState()
                 startStartupWatchdog()
@@ -456,6 +459,7 @@ struct KSPlayerEngineView: View {
                 cancelStartupWatchdog()
                 cancelStallWatchdog()
                 PlaybackQoE.shared.endSession()
+                NowPlayingService.shared.detachTransport(owner: coordinator)
                 coordinator.resetPlayer()
             }
             .onTapGesture {
@@ -519,6 +523,18 @@ struct KSPlayerEngineView: View {
     #endif
 
     // MARK: - Actions (shared)
+
+    /// Hands the session's remote-command transport to `NowPlayingService`.
+    /// KSPlayer's own remote-command registration is disabled (see
+    /// `makeOptions`), so this is the only handler set.
+    private func attachNowPlayingTransport() {
+        NowPlayingService.shared.attachTransport(.init(
+            isPlaying: { [weak coordinator] in coordinator?.playerLayer?.state.isPlaying ?? false },
+            play: { [weak coordinator] in coordinator?.playerLayer?.play() },
+            pause: { [weak coordinator] in coordinator?.playerLayer?.pause() },
+            seek: { [weak coordinator] in coordinator?.seek(time: $0) }
+        ), owner: coordinator)
+    }
 
     private func togglePlay() {
         let playing: Bool

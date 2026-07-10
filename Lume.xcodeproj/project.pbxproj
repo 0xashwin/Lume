@@ -8,6 +8,7 @@
 
 /* Begin PBXBuildFile section */
 		C66C81672FC5A59D0048468D /* KSPlayer in Frameworks */ = {isa = PBXBuildFile; productRef = C66C81682FC5A59D0048468D /* KSPlayer */; };
+		C6AA310B2FDD00020000AB0B /* LumeWidgets.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = C6AA31012FDD00020000AB01 /* LumeWidgets.appex */; platformFilter = ios; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
 		C6AA10012FDD00010000AA01 /* LumeEngine in Frameworks */ = {isa = PBXBuildFile; productRef = C6AA10022FDD00010000AA02 /* LumeEngine */; };
 		C6AA10042FDD00010000AA04 /* LumeEngine in Embed Frameworks */ = {isa = PBXBuildFile; productRef = C6AA10022FDD00010000AA02 /* LumeEngine */; settings = {ATTRIBUTES = (CodeSignOnCopy, ); }; };
 		C6FF000A2FC5A59D00484601 /* VLCKit in Frameworks */ = {isa = PBXBuildFile; productRef = C6FF000B2FC5A59D00484602 /* VLCKit */; };
@@ -27,6 +28,13 @@
 			proxyType = 1;
 			remoteGlobalIDString = C67C02BF2F880F2200842DBA;
 			remoteInfo = Lume;
+		};
+		C6AA310D2FDD00020000AB0D /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = C67C02B82F880F2200842DBA /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = C6AA31032FDD00020000AB03;
+			remoteInfo = LumeWidgets;
 		};
 		C6BE110000000000000000A7 /* PBXContainerItemProxy */ = {
 			isa = PBXContainerItemProxy;
@@ -49,6 +57,17 @@
 			name = "Embed Frameworks";
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		C6AA310C2FDD00020000AB0C /* Embed Foundation Extensions */ = {
+			isa = PBXCopyFilesBuildPhase;
+			buildActionMask = 2147483647;
+			dstPath = "";
+			dstSubfolderSpec = 13;
+			files = (
+				C6AA310B2FDD00020000AB0B /* LumeWidgets.appex in Embed Foundation Extensions */,
+			);
+			name = "Embed Foundation Extensions";
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXCopyFilesBuildPhase section */
 
 /* Begin PBXFileReference section */
@@ -56,6 +75,7 @@
 		C67C02C02F880F2200842DBA /* Lume.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Lume.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		C67C02D12F880F2400842DBA /* LumeTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = LumeTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		C67C02DB2F880F2400842DBA /* LumeUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = LumeUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		C6AA31012FDD00020000AB01 /* LumeWidgets.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = LumeWidgets.appex; sourceTree = BUILT_PRODUCTS_DIR; };
 		C6BE110000000000000000A1 /* LumePerformanceTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = LumePerformanceTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
@@ -64,6 +84,20 @@
 			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
 			membershipExceptions = (
 				Info.plist,
+			);
+			target = C67C02BF2F880F2200842DBA /* Lume */;
+		};
+		C6AA310F2FDD00020000AB0F /* Exceptions for "LumeWidgets" folder in "LumeWidgets" target */ = {
+			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
+			membershipExceptions = (
+				Info.plist,
+			);
+			target = C6AA31032FDD00020000AB03 /* LumeWidgets */;
+		};
+		C6AA31102FDD00020000AB10 /* Exceptions for "LumeWidgets" folder in "Lume" target */ = {
+			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
+			membershipExceptions = (
+				PlaybackActivityAttributes.swift,
 			);
 			target = C67C02BF2F880F2200842DBA /* Lume */;
 		};
@@ -86,6 +120,15 @@
 		C67C02DE2F880F2400842DBA /* LumeUITests */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
 			path = LumeUITests;
+			sourceTree = "<group>";
+		};
+		C6AA31022FDD00020000AB02 /* LumeWidgets */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			exceptions = (
+				C6AA310F2FDD00020000AB0F /* Exceptions for "LumeWidgets" folder in "LumeWidgets" target */,
+				C6AA31102FDD00020000AB10 /* Exceptions for "LumeWidgets" folder in "Lume" target */,
+			);
+			path = LumeWidgets;
 			sourceTree = "<group>";
 		};
 		C6BE110000000000000000A2 /* LumePerformanceTests */ = {
@@ -120,6 +163,13 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		C6AA31052FDD00020000AB05 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 		C6BE110000000000000000A3 /* Frameworks */ = {
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
@@ -135,6 +185,7 @@
 			children = (
 				C6339AC72FE20238008DDD93 /* Lume.storekit */,
 				C67C02C22F880F2200842DBA /* Lume */,
+				C6AA31022FDD00020000AB02 /* LumeWidgets */,
 				C67C02D42F880F2400842DBA /* LumeTests */,
 				C67C02DE2F880F2400842DBA /* LumeUITests */,
 				C6BE110000000000000000A2 /* LumePerformanceTests */,
@@ -146,6 +197,7 @@
 			isa = PBXGroup;
 			children = (
 				C67C02C02F880F2200842DBA /* Lume.app */,
+				C6AA31012FDD00020000AB01 /* LumeWidgets.appex */,
 				C67C02D12F880F2400842DBA /* LumeTests.xctest */,
 				C67C02DB2F880F2400842DBA /* LumeUITests.xctest */,
 				C6BE110000000000000000A1 /* LumePerformanceTests.xctest */,
@@ -165,11 +217,13 @@
 				C67C02BD2F880F2200842DBA /* Frameworks */,
 				C67C02BE2F880F2200842DBA /* Resources */,
 				C6AA10052FDD00010000AA05 /* Embed Frameworks */,
+				C6AA310C2FDD00020000AB0C /* Embed Foundation Extensions */,
 				C6FEED020000000000000002 /* Inject .env secrets */,
 			);
 			buildRules = (
 			);
 			dependencies = (
+				C6AA310E2FDD00020000AB0E /* PBXTargetDependency */,
 			);
 			fileSystemSynchronizedGroups = (
 				C67C02C22F880F2200842DBA /* Lume */,
@@ -206,6 +260,28 @@
 			productName = LumeTests;
 			productReference = C67C02D12F880F2400842DBA /* LumeTests.xctest */;
 			productType = "com.apple.product-type.bundle.unit-test";
+		};
+		C6AA31032FDD00020000AB03 /* LumeWidgets */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = C6AA31072FDD00020000AB07 /* Build configuration list for PBXNativeTarget "LumeWidgets" */;
+			buildPhases = (
+				C6AA31042FDD00020000AB04 /* Sources */,
+				C6AA31052FDD00020000AB05 /* Frameworks */,
+				C6AA31062FDD00020000AB06 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			fileSystemSynchronizedGroups = (
+				C6AA31022FDD00020000AB02 /* LumeWidgets */,
+			);
+			name = LumeWidgets;
+			packageProductDependencies = (
+			);
+			productName = LumeWidgets;
+			productReference = C6AA31012FDD00020000AB01 /* LumeWidgets.appex */;
+			productType = "com.apple.product-type.app-extension";
 		};
 		C67C02DA2F880F2400842DBA /* LumeUITests */ = {
 			isa = PBXNativeTarget;
@@ -274,6 +350,9 @@
 						CreatedOnToolsVersion = 26.4;
 						TestTargetID = C67C02BF2F880F2200842DBA;
 					};
+					C6AA31032FDD00020000AB03 = {
+						CreatedOnToolsVersion = 26.4;
+					};
 					C6BE110000000000000000A6 = {
 						TestTargetID = C67C02BF2F880F2200842DBA;
 					};
@@ -307,6 +386,7 @@
 			projectRoot = "";
 			targets = (
 				C67C02BF2F880F2200842DBA /* Lume */,
+				C6AA31032FDD00020000AB03 /* LumeWidgets */,
 				C67C02D02F880F2400842DBA /* LumeTests */,
 				C67C02DA2F880F2400842DBA /* LumeUITests */,
 				C6BE110000000000000000A6 /* LumePerformanceTests */,
@@ -330,6 +410,13 @@
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 		C67C02D92F880F2400842DBA /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		C6AA31062FDD00020000AB06 /* Resources */ = {
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
@@ -410,6 +497,13 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		C6AA31042FDD00020000AB04 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 		C6BE110000000000000000A4 /* Sources */ = {
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
@@ -430,6 +524,12 @@
 			target = C67C02BF2F880F2200842DBA /* Lume */;
 			targetProxy = C67C02DC2F880F2400842DBA /* PBXContainerItemProxy */;
 		};
+		C6AA310E2FDD00020000AB0E /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			platformFilter = ios;
+			target = C6AA31032FDD00020000AB03 /* LumeWidgets */;
+			targetProxy = C6AA310D2FDD00020000AB0D /* PBXContainerItemProxy */;
+		};
 		C6BE110000000000000000A8 /* PBXTargetDependency */ = {
 			isa = PBXTargetDependency;
 			target = C67C02BF2F880F2200842DBA /* Lume */;
@@ -445,6 +545,8 @@
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				ASSETCATALOG_COMPILER_INCLUDE_ALL_APPICON_ASSETS = NO;
 				CODE_SIGN_ENTITLEMENTS = Lume/Lume.entitlements;
+				"CODE_SIGN_ENTITLEMENTS[sdk=iphoneos*]" = "Lume/Lume-iOS.entitlements";
+				"CODE_SIGN_ENTITLEMENTS[sdk=iphonesimulator*]" = "Lume/Lume-iOS.entitlements";
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 15;
 				DEVELOPMENT_TEAM = CHG45F8MCL;
@@ -498,6 +600,8 @@
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				ASSETCATALOG_COMPILER_INCLUDE_ALL_APPICON_ASSETS = NO;
 				CODE_SIGN_ENTITLEMENTS = Lume/Lume.entitlements;
+				"CODE_SIGN_ENTITLEMENTS[sdk=iphoneos*]" = "Lume/Lume-iOS.entitlements";
+				"CODE_SIGN_ENTITLEMENTS[sdk=iphonesimulator*]" = "Lume/Lume-iOS.entitlements";
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 15;
 				DEVELOPMENT_TEAM = CHG45F8MCL;
@@ -762,6 +866,93 @@
 			};
 			name = Release;
 		};
+		C6AA31082FDD00020000AB08 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_ENTITLEMENTS = LumeWidgets/LumeWidgets.entitlements;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 12;
+				DEVELOPMENT_TEAM = CHG45F8MCL;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = LumeWidgets/Info.plist;
+				INFOPLIST_KEY_CFBundleDisplayName = Lume;
+				IPHONEOS_DEPLOYMENT_TARGET = 18.0;
+				LD_RUNPATH_SEARCH_PATHS = "@executable_path/Frameworks @executable_path/../../Frameworks";
+				MARKETING_VERSION = 1.4.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.bilipp.lume.LumeWidgets;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				REGISTER_APP_GROUPS = YES;
+				SDKROOT = iphoneos;
+				SKIP_INSTALL = YES;
+				STRING_CATALOG_GENERATE_SYMBOLS = NO;
+				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Debug;
+		};
+		C6AA31092FDD00020000AB09 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_ENTITLEMENTS = LumeWidgets/LumeWidgets.entitlements;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 12;
+				DEVELOPMENT_TEAM = CHG45F8MCL;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = LumeWidgets/Info.plist;
+				INFOPLIST_KEY_CFBundleDisplayName = Lume;
+				IPHONEOS_DEPLOYMENT_TARGET = 18.0;
+				LD_RUNPATH_SEARCH_PATHS = "@executable_path/Frameworks @executable_path/../../Frameworks";
+				MARKETING_VERSION = 1.4.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.bilipp.lume.LumeWidgets;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				REGISTER_APP_GROUPS = YES;
+				SDKROOT = iphoneos;
+				SKIP_INSTALL = YES;
+				STRING_CATALOG_GENERATE_SYMBOLS = NO;
+				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Release;
+		};
+		C6AA310A2FDD00020000AB0A /* Sideload */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_ENTITLEMENTS = LumeWidgets/LumeWidgets.entitlements;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 12;
+				DEVELOPMENT_TEAM = CHG45F8MCL;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = LumeWidgets/Info.plist;
+				INFOPLIST_KEY_CFBundleDisplayName = Lume;
+				IPHONEOS_DEPLOYMENT_TARGET = 18.0;
+				LD_RUNPATH_SEARCH_PATHS = "@executable_path/Frameworks @executable_path/../../Frameworks";
+				MARKETING_VERSION = 1.4.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.bilipp.lume.LumeWidgets;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				REGISTER_APP_GROUPS = YES;
+				SDKROOT = iphoneos;
+				SKIP_INSTALL = YES;
+				STRING_CATALOG_GENERATE_SYMBOLS = NO;
+				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Sideload;
+		};
 		C67C02F12F880F2400842DBA /* Sideload */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
@@ -824,6 +1015,8 @@
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				ASSETCATALOG_COMPILER_INCLUDE_ALL_APPICON_ASSETS = NO;
 				CODE_SIGN_ENTITLEMENTS = Lume/Lume.entitlements;
+				"CODE_SIGN_ENTITLEMENTS[sdk=iphoneos*]" = "Lume/Lume-iOS.entitlements";
+				"CODE_SIGN_ENTITLEMENTS[sdk=iphonesimulator*]" = "Lume/Lume-iOS.entitlements";
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 15;
 				DEVELOPMENT_TEAM = CHG45F8MCL;
@@ -1217,6 +1410,16 @@
 				C67C02EB2F880F2400842DBA /* Release */,
 				C67C02F32F880F2400842DBA /* Sideload */,
 				C6BE110000000000000000B3 /* Benchmark */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		C6AA31072FDD00020000AB07 /* Build configuration list for PBXNativeTarget "LumeWidgets" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				C6AA31082FDD00020000AB08 /* Debug */,
+				C6AA31092FDD00020000AB09 /* Release */,
+				C6AA310A2FDD00020000AB0A /* Sideload */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
