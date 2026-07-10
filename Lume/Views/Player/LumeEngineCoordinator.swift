@@ -293,8 +293,11 @@ final class LumeEngineCoordinator: NSObject, ObservableObject {
                 onRecovered?()
             }
             if state == .failed {
-                Logger.player.error("LumeEngine failed (hasStartedPlayback: \(hasStartedPlayback))")
-                if hasStartedPlayback {
+                // Local copy: os_log's autoclosure needs explicit self for the
+                // property, which swiftformat's redundantSelf keeps stripping.
+                let started = hasStartedPlayback
+                Logger.player.error("LumeEngine failed (hasStartedPlayback: \(started))")
+                if started {
                     onStalled?()
                 } else {
                     reportFailure()
