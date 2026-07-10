@@ -173,6 +173,16 @@ struct LumeApp: App {
 
     @Environment(\.scenePhase) private var scenePhase
 
+    /// Rebuilds the shared widget snapshot off the main actor. Cheap enough to
+    /// run on every launch and backgrounding: a handful of bounded fetches.
+    private func exportWidgetSnapshot() {
+        let container = catalogContainer
+        let isChild = profileManager.activeProfileIsChild
+        Task.detached(priority: .utility) {
+            WidgetSnapshotExporter.export(container: container, isChildProfile: isChild)
+        }
+    }
+
     var body: some Scene {
         WindowGroup {
             ContentView()
@@ -228,6 +238,10 @@ struct LumeApp: App {
                     // the content sync. No-ops when no guide is due yet.
                     EPGSyncService.shared.configure(container: catalogContainer)
                     EPGSyncService.shared.syncIfDue()
+
+                    // Seed the widget / Top Shelf snapshot once services are up
+                    // (after profile bootstrap, so the catalog is profile-scoped).
+                    exportWidgetSnapshot()
                 }
                 .onChange(of: scenePhase) { _, phase in
                     cloudSync.handleScenePhaseChange(to: phase)
@@ -242,6 +256,11 @@ struct LumeApp: App {
                             ImageMemoryCache.shared.purge(reason: "app backgrounded")
                         }
                     #endif
+                    // Leaving the foreground is the natural refresh point for
+                    // widgets: progress/favorites changed while the app was open.
+                    if phase == .background {
+                        exportWidgetSnapshot()
+                    }
                 }
         }
         .modelContainer(catalogContainer)

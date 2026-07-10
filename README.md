@@ -89,6 +89,8 @@ Metacritic, Trakt, Letterboxd), and your viewing activity can be scrobbled to **
 - **Immersive full-screen tvOS home** with TMDB backdrop, crossfading hero, and fold-based scroll snapping
 - Continue Watching, Favorites, Recently Watched, and Trending rails
 - **For You** rail — on-device recommendations from your watch history and favorites; thumbs-up / thumbs-down a suggestion to tune what you see next, with your votes syncing across devices via iCloud (can be turned off in Settings)
+- **Home Screen widgets** (iOS/iPadOS/macOS) — Continue Watching, Favorites, and On Now (EPG for favorite channels), each deep-linking straight into playback
+- **tvOS Top Shelf** — Continue Watching, On Now, and Favorites in the marquee row above the app icon
 
 #### 🔎 Discovery & organization
 - Global search across Movies, Series, and Live channels with type filtering
