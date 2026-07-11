@@ -291,6 +291,7 @@ enum PlayerSettings {
     /// everything else.
     enum Lume {
         static let hardwareDecodeKey = "player.lume.hardwareDecode"
+        static let seamlessSwitchingKey = "player.lume.seamlessSwitching"
         static let httpReconnectKey = "player.lume.httpReconnect"
         static let liveBufferKey = "player.lume.liveBuffer"
         static let vodBufferKey = "player.lume.vodBuffer"
@@ -302,6 +303,10 @@ enum PlayerSettings {
         static let analyzeDurationKey = "player.lume.analyzeDuration"
 
         static let hardwareDecodeDefault = true
+        /// Zero-delay switching: keep the current stream playing while the
+        /// next channel/episode opens, then swap layers atomically. Briefly
+        /// holds two provider connections during the switch.
+        static let seamlessSwitchingDefault = true
         static let httpReconnectDefault = true
         /// Buffer target before starting/resuming a live stream, in milliseconds.
         static let liveBufferDefault = 1000
@@ -319,7 +324,8 @@ enum PlayerSettings {
         /// values so each `@AppStorage` binding reverts to its default.
         static var allKeys: [String] {
             [
-                hardwareDecodeKey, httpReconnectKey, liveBufferKey, vodBufferKey,
+                hardwareDecodeKey, seamlessSwitchingKey, httpReconnectKey,
+                liveBufferKey, vodBufferKey,
                 videoQueueDepthKey, audioQueueDepthKey, stallThresholdKey,
                 ioTimeoutKey, probeSizeKey, analyzeDurationKey
             ]

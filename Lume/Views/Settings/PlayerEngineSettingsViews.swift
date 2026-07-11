@@ -189,6 +189,7 @@ import SwiftUI
     /// Lume Engine options as a grouped `Form` section.
     struct LumeEngineSettingsForm: View {
         @AppStorage(PlayerSettings.Lume.hardwareDecodeKey) private var hardwareDecode = PlayerSettings.Lume.hardwareDecodeDefault
+        @AppStorage(PlayerSettings.Lume.seamlessSwitchingKey) private var seamlessSwitching = PlayerSettings.Lume.seamlessSwitchingDefault
         @AppStorage(PlayerSettings.Lume.httpReconnectKey) private var httpReconnect = PlayerSettings.Lume.httpReconnectDefault
         @AppStorage(PlayerSettings.Lume.liveBufferKey) private var liveBuffer = PlayerSettings.Lume.liveBufferDefault
         @AppStorage(PlayerSettings.Lume.vodBufferKey) private var vodBuffer = PlayerSettings.Lume.vodBufferDefault
@@ -211,6 +212,8 @@ import SwiftUI
                 Picker("Audio Queue Depth", selection: $audioQueueDepth) {
                     ForEach(LumeAudioQueuePreset.values, id: \.self) { Text(LumeAudioQueuePreset.label($0)).tag($0) }
                 }
+
+                Toggle("Seamless Switching", isOn: $seamlessSwitching)
 
                 Toggle("HTTP Reconnect", isOn: $httpReconnect)
 
@@ -235,7 +238,9 @@ import SwiftUI
                     ForEach(LumeAnalyzeDuration.allCases) { Text($0.label).tag($0.rawValue) }
                 }
             } footer: {
-                Text("The buffers set how much decoded media is held before playback starts or resumes — raise them if high-bitrate 4K streams stutter. ")
+                Text("Seamless Switching keeps the current stream playing while the next channel or episode opens, then swaps instantly — ")
+                    + Text("it briefly holds two provider connections, so turn it off if your provider allows only one. ")
+                    + Text("The buffers set how much decoded media is held before playback starts or resumes — raise them if high-bitrate 4K streams stutter. ")
                     + Text("Queue depths trade memory for smoothness: decoded 4K video frames are large, so raise the video queue cautiously. Applied the next time playback starts.")
             }
 
@@ -466,6 +471,7 @@ import SwiftUI
     /// Lume Engine options for the tvOS settings detail pane.
     struct LumeEngineSettingsTVDetail: View {
         @AppStorage(PlayerSettings.Lume.hardwareDecodeKey) private var hardwareDecode = PlayerSettings.Lume.hardwareDecodeDefault
+        @AppStorage(PlayerSettings.Lume.seamlessSwitchingKey) private var seamlessSwitching = PlayerSettings.Lume.seamlessSwitchingDefault
         @AppStorage(PlayerSettings.Lume.httpReconnectKey) private var httpReconnect = PlayerSettings.Lume.httpReconnectDefault
         @AppStorage(PlayerSettings.Lume.liveBufferKey) private var liveBuffer = PlayerSettings.Lume.liveBufferDefault
         @AppStorage(PlayerSettings.Lume.vodBufferKey) private var vodBuffer = PlayerSettings.Lume.vodBufferDefault
@@ -493,6 +499,7 @@ import SwiftUI
 
                 VStack(alignment: .leading, spacing: 8) {
                     TVSettingsSectionLabel("Lume Engine — Network & Buffering")
+                    TVOptionToggleRow(title: "Seamless Switching", isOn: $seamlessSwitching)
                     TVOptionToggleRow(title: "HTTP Reconnect", isOn: $httpReconnect)
                     TVOptionCycleRow(title: "Live Buffer", valueLabel: LumeBufferPreset.label(liveBuffer)) {
                         liveBuffer = PlayerOptionCycle.next(liveBuffer, in: LumeBufferPreset.values)
