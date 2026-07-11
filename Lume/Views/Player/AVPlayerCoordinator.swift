@@ -164,7 +164,14 @@ final class AVPlayerCoordinator: NSObject, ObservableObject {
         didReportFailure = false
         startStartupWatchdog()
 
-        let asset = AVURLAsset(url: media.url)
+        // Headers the source requires on the media request (Stremio
+        // `proxyHeaders`). The header-fields key is undocumented but is the
+        // long-standing way to pass them to AVFoundation's loader.
+        var assetOptions: [String: Any] = [:]
+        if let headers = media.httpHeaders, !headers.isEmpty {
+            assetOptions["AVURLAssetHTTPHeaderFieldsKey"] = headers
+        }
+        let asset = AVURLAsset(url: media.url, options: assetOptions)
         let newItem = AVPlayerItem(asset: asset)
         newItem.preferredForwardBufferDuration = media.isLive ? 4 : 8
         item = newItem
