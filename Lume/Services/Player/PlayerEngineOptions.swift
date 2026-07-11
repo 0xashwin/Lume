@@ -382,6 +382,9 @@ struct KSPlayerOptions {
 /// builds its `PlayerConfiguration`.
 struct LumeEngineOptions {
     var hardwareDecode: Bool
+    /// Zero-delay switching: keep the current stream playing while the next
+    /// channel/episode opens through its first frame, then swap atomically.
+    var seamlessSwitching: Bool
     var httpReconnect: Bool
     /// Buffer targets before starting/resuming playback, in milliseconds.
     var liveBuffer: Int
@@ -403,6 +406,7 @@ struct LumeEngineOptions {
         let analyzeDuration = LumeAnalyzeDuration(rawValue: defaults.integer(PlayerSettings.Lume.analyzeDurationKey, default: LumeAnalyzeDuration.auto.rawValue)) ?? .auto
         return LumeEngineOptions(
             hardwareDecode: defaults.bool(PlayerSettings.Lume.hardwareDecodeKey, default: PlayerSettings.Lume.hardwareDecodeDefault),
+            seamlessSwitching: defaults.bool(PlayerSettings.Lume.seamlessSwitchingKey, default: PlayerSettings.Lume.seamlessSwitchingDefault),
             httpReconnect: defaults.bool(PlayerSettings.Lume.httpReconnectKey, default: PlayerSettings.Lume.httpReconnectDefault),
             liveBuffer: defaults.integer(PlayerSettings.Lume.liveBufferKey, default: PlayerSettings.Lume.liveBufferDefault),
             vodBuffer: defaults.integer(PlayerSettings.Lume.vodBufferKey, default: PlayerSettings.Lume.vodBufferDefault),

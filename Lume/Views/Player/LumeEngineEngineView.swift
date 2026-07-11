@@ -121,7 +121,10 @@ struct LumeEngineEngineView: View {
                     nextMedia: nextUpMedia,
                     clock: clock,
                     controlsVisible: isControlsVisible,
-                    onPlayNext: { onSelectMedia?($0) }
+                    onPlayNext: { onSelectMedia?($0) },
+                    // Pre-open the next episode through its first frame so the
+                    // advance swaps with zero delay (seamless switching).
+                    onPrepareNext: { coordinator.prepareNext(media: $0) }
                 )
             }
 

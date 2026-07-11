@@ -24,6 +24,11 @@ struct PlayerNextUpOverlay: View {
     /// (tvOS) or overlap the scrubber (iOS/macOS).
     let controlsVisible: Bool
     let onPlayNext: (PlayableMedia) -> Void
+    /// Invoked once as the episode nears its end (~30 s out), so engines that
+    /// support it can pre-open the next stream through its first frame and
+    /// make the advance zero-delay (Lume Engine's seamless switching). `nil`
+    /// for engines without a prepare hook.
+    var onPrepareNext: ((PlayableMedia) -> Void)?
 
     @AppStorage(PlayerSettings.Playback.autoPlayNextKey)
     private var autoPlayNext = PlayerSettings.Playback.autoPlayNextDefault
@@ -34,6 +39,9 @@ struct PlayerNextUpOverlay: View {
     /// trigger it repeatedly. Reset when the media changes (a new episode swaps
     /// in, possibly reusing this view's identity).
     @State private var didAutoAdvance = false
+    /// Latches once the prepare hook fires, so scrubbing around the trigger
+    /// point doesn't re-prepare on every tick. Reset when the media changes.
+    @State private var didPrepareNext = false
 
     /// The next-up affordances are a Premium feature. Free users never see the
     /// button and never auto-advance, regardless of the stored toggle values.
@@ -66,8 +74,14 @@ struct PlayerNextUpOverlay: View {
             didAutoAdvance = true
             onPlayNext(nextMedia)
         }
+        .onChange(of: shouldPrepareNext) { _, prepare in
+            guard prepare, !didPrepareNext else { return }
+            didPrepareNext = true
+            onPrepareNext?(nextMedia)
+        }
         .onChange(of: nextMedia.id) { _, _ in
             didAutoAdvance = false
+            didPrepareNext = false
             #if os(tvOS)
                 dismissed = false
             #endif
@@ -96,6 +110,16 @@ struct PlayerNextUpOverlay: View {
             if dismissed { return false }
         #endif
         return true
+    }
+
+    /// True close enough to the end that pre-opening the next episode is worth
+    /// two overlapping provider connections: 30 s covers open + first-frame
+    /// decode of any realistic stream while keeping the overlap window short.
+    /// Only when an advance is actually coming (auto-advance or the button).
+    private var shouldPrepareNext: Bool {
+        guard onPrepareNext != nil, premium.isPremium, autoPlayNext || showNextButton,
+              clock.duration > 1, clock.current > 0 else { return false }
+        return clock.duration - clock.current <= 30
     }
 
     /// True as the episode reaches its end: within the last few seconds, or past
