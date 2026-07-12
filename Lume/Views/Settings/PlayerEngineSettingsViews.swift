@@ -238,8 +238,9 @@ import SwiftUI
                     ForEach(LumeAnalyzeDuration.allCases) { Text($0.label).tag($0.rawValue) }
                 }
             } footer: {
-                Text("Seamless Switching keeps the current stream playing while the next channel or episode opens, then swaps instantly — ")
-                    + Text("it briefly holds two provider connections, so turn it off if your provider allows only one. ")
+                Text("Seamless Switching changes channel or episode without ever blanking the screen. ")
+                    + Text("Playlists that allow a second connection keep the current stream playing during the switch; ")
+                    + Text("single-connection playlists freeze the last frame while the stream is swapped, never using more connections than allowed. ")
                     + Text("The buffers set how much decoded media is held before playback starts or resumes — raise them if high-bitrate 4K streams stutter. ")
                     + Text("Queue depths trade memory for smoothness: decoded 4K video frames are large, so raise the video queue cautiously. Applied the next time playback starts.")
             }

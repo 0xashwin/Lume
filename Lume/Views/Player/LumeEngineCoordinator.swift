@@ -82,7 +82,6 @@ final class LumeEngineCoordinator: NSObject, ObservableObject {
     private var session: PlayerSession?
     private var pipBridge: PictureInPictureBridge?
     private var mediaInfo: MediaInfo?
-    private var currentMedia: PlayableMedia?
     private var eventTask: Task<Void, Never>?
     private var tickTask: Task<Void, Never>?
     /// 10 Hz tick counter driving the diagnostics heartbeat cadence.
@@ -95,10 +94,13 @@ final class LumeEngineCoordinator: NSObject, ObservableObject {
     // by `prepareNext` through first-frame-decoded; the generation counters
     // let superseded prepares/switches discard their session instead of
     // installing it (rapid channel zapping cancels in-flight switches).
-    private var preparedNext: (url: String, session: PlayerSession, info: MediaInfo)?
-    private var prepareGeneration = 0
-    private var switchTask: Task<Void, Never>?
-    private var switchGeneration = 0
+    // Internal (not private): the switch flows live in the same-type
+    // extension in LumeEngineCoordinator+Switching.swift.
+    var currentMedia: PlayableMedia?
+    var preparedNext: (url: String, session: PlayerSession, info: MediaInfo)?
+    var prepareGeneration = 0
+    var switchTask: Task<Void, Never>?
+    var switchGeneration = 0
     /// True while a replacement session is opening behind the still-playing
     /// one; gates the old session's stall/failure retries and the clock tick.
     private var switchInFlight = false
@@ -106,18 +108,26 @@ final class LumeEngineCoordinator: NSObject, ObservableObject {
     // MARK: Lifecycle
 
     func configure(media: PlayableMedia) {
-        // Zero-delay switching: while something is already on screen, keep it
-        // playing while the replacement opens through its first decoded
-        // frame, then swap the layers atomically. The cold teardown-first
-        // path remains for the initial configure and when the option is off.
-        if LumeEngineOptions.load().seamlessSwitching, session != nil, hasStartedPlayback {
+        // Zero-delay switching: while something is already on screen, the
+        // replacement opens through its first decoded frame before the layers
+        // swap atomically — overlapped (old keeps playing) when the provider
+        // allows a second connection, sequential (old closes first, its last
+        // frame stays frozen) when it doesn't. The cold teardown-first path
+        // remains for the initial configure and when the option is off.
+        guard LumeEngineOptions.load().seamlessSwitching, session != nil, hasStartedPlayback else {
+            configureCold(media: media)
+            return
+        }
+        if overlapAllowed(with: media) {
             seamlessSwitch(to: media)
         } else {
-            configureCold(media: media)
+            sequentialSwitch(to: media)
         }
     }
 
-    private func configureCold(media: PlayableMedia) {
+    /// The classic teardown-first path (blank surface until the new stream's
+    /// first frame). Internal: the switch flows fall back to it.
+    func configureCold(media: PlayableMedia) {
         tearDown()
         currentMedia = media
         reportedFailure = false
@@ -199,6 +209,90 @@ final class LumeEngineCoordinator: NSObject, ObservableObject {
             media = media.resuming(at: resumeAt)
         }
         configureCold(media: media)
+    }
+
+    // MARK: Zero-delay switching plumbing
+
+    //
+    // The switch flows themselves live in LumeEngineCoordinator+Switching.swift;
+    // the pieces that mutate `private(set)` published state stay here.
+
+    /// Common entry for both switch flavors: supersedes any in-flight switch,
+    /// swaps the target media in, and shows the spinner (over the still-playing
+    /// or frozen outgoing picture). Returns the switch generation the caller
+    /// must re-check after every await.
+    func beginSwitch(to media: PlayableMedia) -> Int {
+        switchGeneration += 1
+        switchTask?.cancel()
+        switchInFlight = true
+        currentMedia = media
+        reportedFailure = false
+        isBuffering = true
+        return switchGeneration
+    }
+
+    /// Stops mirroring the outgoing session and hands it over for shutdown.
+    /// `displayLayer` deliberately keeps pointing at its layer, frozen on the
+    /// last decoded frame, until `adopt` installs the replacement.
+    func detachOutgoingSession() -> PlayerSession? {
+        eventTask?.cancel()
+        tickTask?.cancel()
+        startupTask?.cancel()
+        let outgoing = session
+        session = nil
+        return outgoing
+    }
+
+    /// The atomic swap: the replacement (already holding its first frame)
+    /// becomes the active session, its layer replaces the outgoing one, and
+    /// any old session tears down asynchronously — never blocking the swap on
+    /// data-plane thread joins.
+    func adopt(session next: PlayerSession, info: MediaInfo) {
+        eventTask?.cancel()
+        tickTask?.cancel()
+        startupTask?.cancel()
+        if let old = session {
+            Task { await old.shutdown() }
+        }
+        switchInFlight = false
+        session = next
+        mediaInfo = info
+        displayLayer = next.renderer.displayLayer
+        selectedSubtitleID = nil
+        subtitleCues.update(nil)
+        hasStartedPlayback = false
+        isPipActive = false
+        publishTracks(info: info)
+        publishVideoInfo(info: info)
+        pipBridge = PictureInPictureBridge(session: next, mediaInfo: info)
+
+        eventTask = Task { [events = next.events] in
+            for await event in events {
+                self.handle(event: event)
+            }
+        }
+        tickTask = Task {
+            while !Task.isCancelled {
+                try? await Task.sleep(for: .milliseconds(100))
+                await self.tick()
+            }
+        }
+        startupTask = makeStartupWatchdog()
+
+        let rate = playbackRate
+        Task {
+            if rate != 1.0 { await next.setRate(rate) }
+            await next.play()
+        }
+    }
+
+    /// Shuts down the standby staged by `prepareNext`, if any, and supersedes
+    /// an in-flight prepare.
+    func discardPreparedNext() {
+        prepareGeneration += 1
+        guard let prepared = preparedNext else { return }
+        preparedNext = nil
+        Task { await prepared.session.shutdown() }
     }
 
     func tearDown() {
@@ -286,7 +380,7 @@ final class LumeEngineCoordinator: NSObject, ObservableObject {
 
     /// Builds the session configuration from the stored Lume Engine options
     /// (Settings → Lume Engine Options), re-read on every configure/reload.
-    private func makeConfiguration(for media: PlayableMedia) -> PlayerConfiguration {
+    func makeConfiguration(for media: PlayableMedia) -> PlayerConfiguration {
         let options = LumeEngineOptions.load()
         var configuration = PlayerConfiguration()
         // Resume position goes through the engine (seek-before-first-read):
@@ -296,7 +390,9 @@ final class LumeEngineCoordinator: NSObject, ObservableObject {
             configuration.startPosition = media.startTime
         }
         configuration.hardwareDecode = options.hardwareDecode ? .videoToolbox : .software
-        configuration.seamlessSwitching = options.seamlessSwitching
+        // The coordinator drives PlayerSession directly (switching happens
+        // here, connection-aware); mirrored into the config for coherence.
+        configuration.switchPolicy = options.seamlessSwitching ? .overlapped : .none
         configuration.bufferTarget = Double(media.isLive ? options.liveBuffer : options.vodBuffer) / 1000
         configuration.videoQueueDepth = options.videoQueueDepth
         configuration.audioQueueDepth = options.audioQueueDepth
@@ -437,154 +533,6 @@ final class LumeEngineCoordinator: NSObject, ObservableObject {
         let now = session.renderer.currentTime
         guard let info = mediaInfo, now != .min else { return 0 }
         return max(0, MediaTime.seconds(now - info.startTime))
-    }
-}
-
-// MARK: - Zero-delay switching
-
-/// The seamless-switch machinery. The stored state it drives
-/// (`preparedNext`, the generation counters, `switchInFlight`) lives with
-/// the class; the methods sit here in a same-file extension.
-extension LumeEngineCoordinator {
-    /// Stages the next stream (the queued episode) in a standby session,
-    /// opened through first-frame-decoded but never played. A later
-    /// `configure` for the same URL swaps it in with zero delay. No-op when
-    /// seamless switching is off or the URL is already staged.
-    func prepareNext(media: PlayableMedia) {
-        guard LumeEngineOptions.load().seamlessSwitching else { return }
-        let url = media.url.absoluteString
-        guard preparedNext?.url != url else { return }
-        discardPreparedNext()
-        let generation = prepareGeneration
-
-        Logger.player.info("LumeEngine preparing next stream through first frame")
-        let standby = PlayerSession(configuration: makeConfiguration(for: media))
-        standby.renderer.audioTimePitchAlgorithm = .timeDomain
-        Task {
-            do {
-                let info = try await standby.open(url: url)
-                await standby.waitForFirstFrame(timeout: 10)
-                guard generation == self.prepareGeneration else {
-                    await standby.shutdown()
-                    return
-                }
-                self.preparedNext = (url: url, session: standby, info: info)
-                Logger.player.info("LumeEngine next stream prepared")
-            } catch {
-                Logger.player.warning("LumeEngine prepare-next failed: \(String(describing: error), privacy: .public)")
-                await standby.shutdown()
-            }
-        }
-    }
-
-    /// Opens `media` behind the still-playing session and swaps atomically
-    /// once the replacement holds its first decoded frame — the screen never
-    /// goes black. Consumes a staged standby when the URL matches. On failure
-    /// it falls back to the cold path (which also covers providers that
-    /// refuse a second concurrent connection: teardown-first frees the slot).
-    private func seamlessSwitch(to media: PlayableMedia) {
-        switchGeneration += 1
-        let generation = switchGeneration
-        switchTask?.cancel()
-        switchInFlight = true
-        currentMedia = media
-        reportedFailure = false
-        isBuffering = true // spinner over the still-playing outgoing stream
-
-        // Consume a matching standby; discard one staged for another URL.
-        let staged: (url: String, session: PlayerSession, info: MediaInfo)?
-        if let prepared = preparedNext, prepared.url == media.url.absoluteString {
-            staged = prepared
-            preparedNext = nil
-            prepareGeneration += 1 // supersede any in-flight prepare
-        } else {
-            staged = nil
-            discardPreparedNext()
-        }
-
-        switchTask = Task {
-            var replacement: (session: PlayerSession, info: MediaInfo)?
-            if let staged, await staged.session.state != .failed {
-                replacement = (staged.session, staged.info)
-            } else {
-                if let staged { await staged.session.shutdown() }
-                let session = PlayerSession(configuration: self.makeConfiguration(for: media))
-                session.renderer.audioTimePitchAlgorithm = .timeDomain
-                do {
-                    let info = try await session.open(url: media.url.absoluteString)
-                    await session.waitForFirstFrame(timeout: 10)
-                    replacement = (session, info)
-                } catch {
-                    Logger.player.warning("LumeEngine seamless open failed: \(String(describing: error), privacy: .public)")
-                    await session.shutdown()
-                }
-            }
-
-            guard !Task.isCancelled, generation == self.switchGeneration else {
-                // Superseded by a newer switch or teardown — discard quietly.
-                if let session = replacement?.session {
-                    Task { await session.shutdown() }
-                }
-                return
-            }
-            guard let replacement else {
-                Logger.player.warning("LumeEngine seamless switch failed → cold reload")
-                self.switchInFlight = false
-                self.configureCold(media: media)
-                return
-            }
-            self.adopt(session: replacement.session, info: replacement.info)
-        }
-    }
-
-    /// The atomic swap: the replacement (already holding its first frame)
-    /// becomes the active session, its layer replaces the outgoing one, and
-    /// the old session tears down asynchronously — never blocking the swap on
-    /// data-plane thread joins.
-    private func adopt(session next: PlayerSession, info: MediaInfo) {
-        eventTask?.cancel()
-        tickTask?.cancel()
-        startupTask?.cancel()
-        if let old = session {
-            Task { await old.shutdown() }
-        }
-        switchInFlight = false
-        session = next
-        mediaInfo = info
-        displayLayer = next.renderer.displayLayer
-        selectedSubtitleID = nil
-        subtitleCues.update(nil)
-        hasStartedPlayback = false
-        isPipActive = false
-        publishTracks(info: info)
-        publishVideoInfo(info: info)
-        pipBridge = PictureInPictureBridge(session: next, mediaInfo: info)
-
-        eventTask = Task { [events = next.events] in
-            for await event in events {
-                self.handle(event: event)
-            }
-        }
-        tickTask = Task {
-            while !Task.isCancelled {
-                try? await Task.sleep(for: .milliseconds(100))
-                await self.tick()
-            }
-        }
-        startupTask = makeStartupWatchdog()
-
-        let rate = playbackRate
-        Task {
-            if rate != 1.0 { await next.setRate(rate) }
-            await next.play()
-        }
-    }
-
-    private func discardPreparedNext() {
-        prepareGeneration += 1
-        guard let prepared = preparedNext else { return }
-        preparedNext = nil
-        Task { await prepared.session.shutdown() }
     }
 }
 

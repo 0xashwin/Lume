@@ -95,4 +95,13 @@ extension Playlist {
     var supportsDownloads: Bool {
         sourceType != .stalker
     }
+
+    /// The account's concurrent-connection cap as a number, or `nil` when the
+    /// provider doesn't report one (m3u/stalker) or reports 0 — some panels
+    /// use "0" for unlimited, others for unknown, so 0 is treated as unknown
+    /// and connection budgeting stays conservative.
+    var connectionLimit: Int? {
+        guard let value = maxConnections.flatMap(Int.init), value > 0 else { return nil }
+        return value
+    }
 }
