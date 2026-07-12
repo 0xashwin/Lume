@@ -23,9 +23,27 @@ struct PlayableMedia: Identifiable, Hashable, Codable {
     let kind: Kind
     let startTime: TimeInterval
     let contentRef: ContentRef
+    /// The provider account's concurrent-connection cap, read from the owning
+    /// playlist at construction (Xtream `max_connections`). `nil` when the
+    /// provider doesn't report one (m3u, stalker, local files) — treated as 1
+    /// for connection budgeting, since a wrong overlap can kill both streams.
+    var maxConnections: Int?
 
     var isLive: Bool {
         kind == .live
+    }
+
+    /// The owning playlist's UUID, recovered from the catalog id embedded in
+    /// `contentRef` (ids are "<playlistUUID>-<type>-<streamId>", see
+    /// `ContentSyncManager`). Identifies the provider account two streams
+    /// would share, for connection budgeting during seamless switches.
+    var playlistID: String? {
+        let raw: String = switch contentRef {
+        case let .movie(id), let .episode(id), let .live(id):
+            id
+        }
+        guard raw.count > 36 else { return nil }
+        return String(raw.prefix(36))
     }
 
     /// A copy of this stream that resumes at `position` seconds. Same identity,
@@ -41,7 +59,8 @@ struct PlayableMedia: Identifiable, Hashable, Codable {
             posterURL: posterURL,
             kind: kind,
             startTime: position,
-            contentRef: contentRef
+            contentRef: contentRef,
+            maxConnections: maxConnections
         )
     }
 
@@ -58,7 +77,8 @@ struct PlayableMedia: Identifiable, Hashable, Codable {
             posterURL: posterURL,
             kind: kind,
             startTime: startTime,
-            contentRef: contentRef
+            contentRef: contentRef,
+            maxConnections: maxConnections
         )
     }
 }
@@ -96,7 +116,8 @@ extension PlayableMedia {
             posterURL: URL(string: movie.streamIcon ?? ""),
             kind: .vod,
             startTime: movie.watchProgress,
-            contentRef: .movie(movie.id)
+            contentRef: .movie(movie.id),
+            maxConnections: playlist.connectionLimit
         )
     }
 
@@ -152,7 +173,8 @@ extension PlayableMedia {
             posterURL: URL(string: episode.movieImage ?? ""),
             kind: .vod,
             startTime: episode.watchProgress,
-            contentRef: .episode(episode.id)
+            contentRef: .episode(episode.id),
+            maxConnections: playlist.connectionLimit
         )
     }
 
@@ -174,7 +196,8 @@ extension PlayableMedia {
             posterURL: URL(string: stream.streamIcon ?? ""),
             kind: .live,
             startTime: 0,
-            contentRef: .live(stream.id)
+            contentRef: .live(stream.id),
+            maxConnections: playlist.connectionLimit
         )
     }
 
@@ -215,7 +238,8 @@ extension PlayableMedia {
             posterURL: URL(string: stream.streamIcon ?? ""),
             kind: .vod,
             startTime: 0,
-            contentRef: .live(stream.id)
+            contentRef: .live(stream.id),
+            maxConnections: playlist.connectionLimit
         )
     }
 }
