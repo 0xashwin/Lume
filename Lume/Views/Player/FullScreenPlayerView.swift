@@ -192,8 +192,11 @@ struct FullScreenPlayerView: View {
             // auto-hiding controls overlay — showing a second one here means
             // the user sees duplicate X buttons whenever the controls are
             // visible. Only render our custom close for engines that don't
-            // draw their own controls.
-            if !engine.rendersOwnControls {
+            // draw their own controls — and while Chromecasting, where the
+            // engine (and its overlay) is unmounted and `ChromecastPlaybackView`
+            // deliberately carries no close of its own: this one persists
+            // progress on the way out.
+            if !engine.rendersOwnControls || castService.isProviderCasting {
                 closeButton
                     .padding(.top, 4)
                     .padding(.leading, 4)
@@ -212,6 +215,10 @@ struct FullScreenPlayerView: View {
             // main context and hitch KSPlayer's render loop.
             ContentIndexingService.shared.isPlaybackActive = true
             configureAudioSessionForPlayback()
+            // A Chromecast session can outlive the player (connect, close,
+            // open another title) — if one is already active, cast this
+            // stream instead of playing it locally.
+            loadOntoReceiver()
             #if os(macOS)
                 enterMacFullScreen()
             #endif
@@ -292,19 +299,26 @@ struct FullScreenPlayerView: View {
             resumeActiveMedia(at: clock.current)
         }
         .onChange(of: castService.isProviderCasting) { _, casting in
-            // A Chromecast session connected — hand it the stream being watched,
-            // resuming at the local position. Uses `displayMedia` so a Stalker
-            // stream casts its resolved URL, never the placeholder (if the
-            // resolve is still in flight there is nothing castable yet).
-            guard casting, let media = displayMedia else { return }
-            // The running clock is the position being watched; before the first
-            // tick (session started from the poster screen) fall back to the
-            // stream's resume point.
-            let position = clock.current > 1 ? clock.current : media.startTime
-            castService.castProvider?.beginSession(
-                for: media,
-                startingAt: media.isLive ? 0 : position
-            )
+            if casting {
+                // A Chromecast session connected — hand it the stream being
+                // watched. The engine view unmounts (see `playerView`), which
+                // is a safe boundary to flush the local progress at.
+                persistProgressDetached(force: true)
+                loadOntoReceiver()
+            } else if !activeMedia.isLive, clock.current > 1 {
+                // The session ended. The receiver's last position is in the
+                // clock (`ChromecastPlaybackView` polls it there), so rebase
+                // the stream and let the local engine pick up where the TV
+                // stopped.
+                resumeActiveMedia(at: clock.current)
+            }
+        }
+        .onChange(of: displayMedia?.url) { _, _ in
+            // While casting, follow the stream onto the receiver whenever what's
+            // playable changes: a Stalker resolve landing after the session
+            // connected (the placeholder had nothing castable), or the viewer
+            // switching episode/channel mid-cast.
+            loadOntoReceiver()
         }
         .onDisappear {
             // Capture the clock synchronously, then flush off the main thread.
@@ -325,10 +339,38 @@ struct FullScreenPlayerView: View {
         return resolvedMedia
     }
 
+    /// Cast the current stream onto the connected Chromecast receiver, resuming
+    /// at the position being watched. Safe to call from every "session or media
+    /// may have changed" edge: it no-ops without an active session or castable
+    /// media, and the provider ignores re-loads of the URL already playing.
+    private func loadOntoReceiver() {
+        guard castService.isProviderCasting, let media = displayMedia else { return }
+        // The running clock is the position being watched; before the first
+        // tick (session started from the poster screen) fall back to the
+        // stream's resume point.
+        let position = clock.current > 1 ? clock.current : media.startTime
+        castService.castProvider?.beginSession(
+            for: media,
+            startingAt: media.isLive ? 0 : position
+        )
+    }
+
     @ViewBuilder
     private var playerView: some View {
         if let media = displayMedia {
-            engineView(for: media)
+            // While a Chromecast session is active the receiver is the video
+            // surface: mounting a local engine too would decode the stream a
+            // second time for pixels nobody sees (and fight the receiver over
+            // the transport). The cast stand-in drives the receiver instead.
+            #if os(iOS)
+                if castService.isProviderCasting {
+                    ChromecastPlaybackView(media: media, clock: clock)
+                } else {
+                    engineView(for: media)
+                }
+            #else
+                engineView(for: media)
+            #endif
         } else if resolveError != nil {
             // Stalker `create_link` failed — surface the failure with a retry
             // rather than spinning forever.

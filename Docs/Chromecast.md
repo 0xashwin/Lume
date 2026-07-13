@@ -12,11 +12,12 @@ third-party SDK.
 | Piece | Path | Role |
 |---|---|---|
 | Vendored SDK | `Vendor/GoogleCast/GoogleCast.xcframework` | Google Cast SDK v4.8.4 (dynamic); linked + embedded on iOS only (`platformFilter = ios`) |
-| Casting seam | `Lume/Services/Player/CastService.swift` | `CastProvider` protocol + `configureGoogleCast()` registration |
-| Provider | `Lume/Services/Player/GoogleCastProvider.swift` | `GCKSessionManager` / `GCKRemoteMediaClient` bridge; loads the current `PlayableMedia`, exposes play/pause/seek + a progress callback |
+| Casting seam | `Lume/Services/Player/CastService.swift` | `CastProvider` protocol (session + transport surface) + `configureGoogleCast()` registration |
+| Provider | `Lume/Services/Player/GoogleCastProvider.swift` | `GCKSessionManager` / `GCKRemoteMediaClient` bridge; loads the current `PlayableMedia`, exposes play/pause/seek and polled position/duration/state |
 | Cast button | `Lume/Views/Player/ChromecastButton.swift` | `GCKUICastButton` styled to match the overlay |
+| Casting UI | `Lume/Views/Player/ChromecastPlaybackView.swift` | stands in for the local engine while a session is active; drives the receiver's transport and polls its playhead into the shared `PlaybackClock` |
 | Launch hook | `Lume/LumeApp.swift` | calls `CastService.shared.configureGoogleCast()` |
-| Session → load hook | `Lume/Views/Player/FullScreenPlayerView.swift` | observes `CastService.isProviderCasting`; loads the stream being watched onto the receiver when a session connects |
+| Session → load hook | `Lume/Views/Player/FullScreenPlayerView.swift` | `loadOntoReceiver()` casts the stream on session connect, on player open with a session already active, and on mid-cast media/resolve changes; on session end the local engine resumes at the receiver's position |
 | Discovery keys | `Lume/Info.plist` | `NSBonjourServices`, `NSLocalNetworkUsageDescription`, `NSBluetoothAlwaysUsageDescription` |
 | Usage-description strings | `Lume/InfoPlist.xcstrings` | localizes the two usage descriptions (all catalog languages) |
 
@@ -57,23 +58,33 @@ cp -R GoogleCastSDK-ios-<version>_dynamic_xcframework/GoogleCast.xcframework Ven
 Update `Vendor/GoogleCast/VERSION.txt`. No project changes are needed unless the
 framework layout changes.
 
-## Remaining work (not yet wired)
+## How a cast session behaves
 
-The SDK links, the cast button discovers/starts sessions, and when a session
-connects `FullScreenPlayerView` loads the stream being watched onto the receiver
-(resuming at the local position). The rest of the transport is not yet bridged —
-verify and finish on a real Cast device:
+While a Chromecast session is active, `FullScreenPlayerView` unmounts the local
+engine entirely (no double decode) and mounts `ChromecastPlaybackView` instead:
+poster, receiver name, play/pause/±15s/scrubber that drive the receiver through
+the `CastProvider` seam. The view polls the receiver's playhead into the shared
+`PlaybackClock` every 500 ms (the Cast SDK pushes `GCKMediaStatus` only on
+change), which keeps the scrubber live and — because the host persists watch
+progress from that same clock at the usual boundaries — resume points and the
+90%-watched flow keep working while casting.
 
-- **Transport mirroring:** the overlay's play/pause/seek act on the local engine.
-  Route them to the active `GoogleCastProvider` session and reflect the receiver's
-  `GCKMediaStatus` back into the overlay.
-- **Stream switches mid-cast:** picking another episode/channel while casting
-  keeps playing the old stream on the receiver; re-load on `activeMedia` change
-  (mind Stalker placeholders — reuse the `displayMedia` gate).
-- **Watch progress:** wire `GoogleCastProvider.onProgress` to `WatchProgressWriter`
-  so casting updates resume points and the 90%-watched / NextUp flow.
-- **Engine pause:** pause the on-device engine when a cast session starts so the
-  stream isn't decoded in two places.
+Loading is centralized in `FullScreenPlayerView.loadOntoReceiver()`, invoked on
+session connect, on player open with a session already active, and whenever
+`displayMedia`'s URL changes mid-cast (Stalker resolve landing, episode/channel
+switch). `GoogleCastProvider` ignores re-loads of the URL already playing, so
+those edges can all call it unconditionally. When the session ends, the active
+stream is rebased to the receiver's last position and the local engine resumes
+there.
+
+## Remaining work
+
 - **On-device verification:** the integration is verified to build, link, and
   embed on the iOS simulator, but casting to a physical receiver has not been
-  exercised.
+  exercised end-to-end (discovery, load, transport, session teardown).
+- **Receiver-side finish → NextUp:** when the receiver plays a VOD stream to the
+  end, the session just goes idle; auto-advance to the next episode (the local
+  engines' NextUp flow) isn't triggered from the receiver's `.finished` idle
+  reason yet.
+- **Subtitles/audio tracks on the receiver:** track selection isn't exposed
+  while casting.

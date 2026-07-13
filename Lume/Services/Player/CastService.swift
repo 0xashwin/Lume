@@ -138,8 +138,9 @@ final class CastService {
 /// A casting backend abstraction. AirPlay is handled natively by AVFoundation
 /// and needs no provider; this seam is where the Google Cast (Chromecast)
 /// backend plugs in — see #103. A provider discovers receivers, starts
-/// and ends a session for a given `PlayableMedia`, and mirrors transport state
-/// back to the overlay so watch-progress / NextUp tracking can follow the cast.
+/// and ends a session for a given `PlayableMedia`, and exposes the receiver's
+/// transport so the casting UI can drive it and watch-progress / NextUp
+/// tracking can follow the cast (see `ChromecastPlaybackView`).
 @MainActor
 protocol CastProvider: AnyObject {
     /// Human-readable name of the connected receiver, when connected.
@@ -154,8 +155,33 @@ protocol CastProvider: AnyObject {
 
     /// Begin casting the given media to the selected receiver, seeking the
     /// receiver to `position` seconds so playback resumes where it left off.
+    /// Loading the same URL again is a no-op, so callers can invoke this from
+    /// every "media or session may have changed" edge without restarting the
+    /// receiver's stream.
     func beginSession(for media: PlayableMedia, startingAt position: TimeInterval)
 
     /// End the current cast session.
     func endSession()
+
+    /// The receiver's playhead in seconds, interpolated between status updates.
+    /// `0` while nothing is loaded. Polled by the casting UI — the Cast SDK
+    /// pushes media status only on change, not per tick.
+    var approximatePosition: TimeInterval { get }
+
+    /// The loaded stream's duration in seconds, or `0` when unknown (live, or
+    /// nothing loaded yet).
+    var streamDuration: TimeInterval { get }
+
+    /// Whether the receiver is currently playing (as opposed to paused, idle,
+    /// or still loading).
+    var isReceiverPlaying: Bool { get }
+
+    /// Resume playback on the receiver.
+    func play()
+
+    /// Pause playback on the receiver.
+    func pause()
+
+    /// Seek the receiver to an absolute position in seconds.
+    func seek(to seconds: TimeInterval)
 }

@@ -7,9 +7,6 @@ import OSLog
 // `os(iOS) && canImport(GoogleCast)` so the macOS/tvOS/visionOS builds never
 // compile it. `CastService.configureGoogleCast()` registers this provider on the
 // `CastProvider` seam and the overlay's Chromecast button comes to life.
-//
-// Verified to build/link/embed on the iOS simulator; casting to a physical
-// receiver and full transport/watch-progress bridging remain (see the doc).
 
 #if os(iOS) && canImport(GoogleCast)
     import GoogleCast
@@ -19,15 +16,11 @@ import OSLog
     /// Device discovery and session start/stop are driven by the system
     /// `GCKUICastButton` (see `ChromecastButton`); this type listens for the
     /// resulting session, loads the current `PlayableMedia` onto the receiver,
-    /// and mirrors the receiver's transport state back out via `onProgress`
-    /// so watch-progress / NextUp tracking can follow the cast (#103).
+    /// and exposes the receiver's transport (play/pause/seek + polled
+    /// position/state) for `ChromecastPlaybackView`, which takes the local
+    /// engine's place while the session is active (#103).
     @MainActor
     final class GoogleCastProvider: NSObject, CastProvider {
-        /// Reports `(currentTime, duration)` from the receiver as it plays, so
-        /// the host can keep recording watch progress while casting. Wired by
-        /// `CastService`.
-        var onProgress: ((TimeInterval, TimeInterval) -> Void)?
-
         /// Reports session start/end. `CastService` mirrors this into its
         /// observable `isProviderCasting` so the player UI can react (this
         /// class is not `@Observable`).
@@ -45,8 +38,17 @@ import OSLog
         /// user starts casting before a receiver has finished connecting.
         private var pendingMedia: (media: PlayableMedia, position: TimeInterval)?
 
+        /// URL of the stream this provider last loaded onto the current session,
+        /// so `beginSession` can no-op when asked to cast what is already
+        /// playing (the host re-invokes it on every "may have changed" edge).
+        private var loadedURL: URL?
+
         private var sessionManager: GCKSessionManager {
             GCKCastContext.sharedInstance().sessionManager
+        }
+
+        private var remoteMediaClient: GCKRemoteMediaClient? {
+            sessionManager.currentCastSession?.remoteMediaClient
         }
 
         override init() {
@@ -63,7 +65,8 @@ import OSLog
         // MARK: - CastProvider
 
         func beginSession(for media: PlayableMedia, startingAt position: TimeInterval) {
-            if let client = sessionManager.currentCastSession?.remoteMediaClient {
+            if let client = remoteMediaClient {
+                guard media.url != loadedURL else { return }
                 load(media, at: position, on: client)
             } else {
                 // No receiver yet — remember the media and load once a session
@@ -77,21 +80,42 @@ import OSLog
             sessionManager.endSessionAndStopCasting(true)
         }
 
-        // MARK: - Transport (used by the overlay once cast transport is wired)
+        // MARK: - Transport
+
+        var approximatePosition: TimeInterval {
+            guard let client = remoteMediaClient, client.mediaStatus != nil else { return 0 }
+            let position = client.approximateStreamPosition()
+            return position.isFinite ? max(position, 0) : 0
+        }
+
+        var streamDuration: TimeInterval {
+            let duration = remoteMediaClient?.mediaStatus?.mediaInformation?.streamDuration ?? 0
+            return duration.isFinite ? max(duration, 0) : 0
+        }
+
+        var isReceiverPlaying: Bool {
+            // Buffering/loading count as playing: the receiver will resume by
+            // itself, so the button should keep offering "pause" rather than
+            // flickering to "play" on every rebuffer.
+            switch remoteMediaClient?.mediaStatus?.playerState {
+            case .playing, .buffering, .loading: true
+            default: false
+            }
+        }
 
         func play() {
-            sessionManager.currentCastSession?.remoteMediaClient?.play()
+            remoteMediaClient?.play()
         }
 
         func pause() {
-            sessionManager.currentCastSession?.remoteMediaClient?.pause()
+            remoteMediaClient?.pause()
         }
 
         func seek(to seconds: TimeInterval) {
             let options = GCKMediaSeekOptions()
             options.interval = seconds
-            options.resumeState = .play
-            sessionManager.currentCastSession?.remoteMediaClient?.seek(with: options)
+            options.resumeState = .unchanged
+            remoteMediaClient?.seek(with: options)
         }
 
         // MARK: - Loading
@@ -115,8 +139,8 @@ import OSLog
             requestBuilder.mediaInformation = infoBuilder.build()
             requestBuilder.startTime = media.isLive ? kGCKInvalidTimeInterval : position
 
-            client.add(self)
             client.loadMedia(with: requestBuilder.build())
+            loadedURL = media.url
             Logger.player.log("Chromecast: loading media live=\(media.isLive, privacy: .public)")
         }
 
@@ -136,6 +160,7 @@ import OSLog
 
     extension GoogleCastProvider: GCKSessionManagerListener {
         func sessionManager(_: GCKSessionManager, didStart session: GCKCastSession) {
+            loadedURL = nil
             isCasting = true
             Logger.player.log("Chromecast: session started")
             if let pending = pendingMedia, let client = session.remoteMediaClient {
@@ -149,8 +174,9 @@ import OSLog
         }
 
         func sessionManager(_: GCKSessionManager, didEnd _: GCKCastSession, withError error: Error?) {
-            isCasting = false
+            loadedURL = nil
             pendingMedia = nil
+            isCasting = false
             if let error {
                 Logger.player.error("Chromecast: session ended with error: \(error.localizedDescription, privacy: .public)")
             }
@@ -159,19 +185,10 @@ import OSLog
         func sessionManager(_: GCKSessionManager, didFailToStart _: GCKCastSession, withError error: Error) {
             // The connect attempt died — don't leave the queued media around to
             // auto-load onto some later, unrelated session.
+            loadedURL = nil
             pendingMedia = nil
             isCasting = false
             Logger.player.error("Chromecast: session failed to start: \(error.localizedDescription, privacy: .public)")
-        }
-    }
-
-    // MARK: - GCKRemoteMediaClientListener
-
-    extension GoogleCastProvider: GCKRemoteMediaClientListener {
-        func remoteMediaClient(_: GCKRemoteMediaClient, didUpdate mediaStatus: GCKMediaStatus?) {
-            guard let mediaStatus else { return }
-            let duration = mediaStatus.mediaInformation?.streamDuration ?? 0
-            onProgress?(mediaStatus.streamPosition, duration)
         }
     }
 #endif
