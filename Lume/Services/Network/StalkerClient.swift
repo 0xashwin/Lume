@@ -57,12 +57,21 @@ class StalkerClient {
 
     private nonisolated static func makeSession(timeout: TimeInterval) -> URLSession {
         let config = URLSessionConfiguration.default
-        config.httpMaximumConnectionsPerHost = 1
+        // Matches `walkConcurrency`: catalog pages are fetched in parallel
+        // (portal page size is fixed at ~14 items, so a big catalog is
+        // thousands of ~2s requests — serially that reads as a hung sync).
+        config.httpMaximumConnectionsPerHost = Self.walkConcurrency
         config.timeoutIntervalForRequest = timeout
         config.timeoutIntervalForResource = 120
         config.httpShouldSetCookies = false
         return URLSession(configuration: config)
     }
+
+    /// Ordered-list pages fetched concurrently during a catalog walk.
+    /// Empirically portals serve ~8 parallel middleware requests fine and
+    /// fast-reject with 503 above ~10; 6 leaves headroom, and a portal that
+    /// still 503s gets the retry-with-backoff path.
+    private static let walkConcurrency = 6
 
     /// Cache key isolating one portal+MAC session from another.
     private var sessionKey: String {
@@ -327,10 +336,24 @@ class StalkerClient {
         let complete: Bool
     }
 
+    /// Identifies one ordered list (`get_ordered_list` target) across the
+    /// pages of a walk.
+    private nonisolated struct OrderedListTarget {
+        let type: String
+        let categoryId: String
+        let movieId: String?
+    }
+
     /// Walks every page of an ordered list and returns the combined items.
     /// `maxItems` caps the walk so a runaway `total_items` can't loop forever.
     /// `onPage` reports (items fetched so far, reported total) after each page
     /// so long walks can surface sync progress.
+    ///
+    /// The first page is fetched alone (it validates the session and reports
+    /// the totals that size the walk); the rest are fetched `walkConcurrency`
+    /// pages at a time — the portal's fixed ~14-item page size makes a large
+    /// catalog thousands of ~2s requests, and only the parallelism keeps that
+    /// inside a usable sync duration.
     func getAllOrderedItems(
         type: String,
         categoryId: String,
@@ -338,36 +361,124 @@ class StalkerClient {
         maxItems: Int = 20000,
         onPage: ((Int, Int?) async -> Void)? = nil
     ) async throws -> OrderedListWalk {
-        var all: [StalkerVODItem] = []
-        var page = 1
-        var pageSize = 14
-        var total: Int?
+        let target = OrderedListTarget(type: type, categoryId: categoryId, movieId: movieId)
+        let first = try await getOrderedList(type: type, categoryId: categoryId, page: 1, movieId: movieId)
+        let pageSize = first.pageSize.flatMap { $0 > 0 ? $0 : nil } ?? 14
+        await onPage?(first.items.count, first.totalItems)
+        if first.items.isEmpty {
+            return OrderedListWalk(items: first.items, complete: true)
+        }
+        guard let total = first.totalItems else {
+            // No reported total (rare): fall back to paging serially until a
+            // short page.
+            return try await sequentialWalkTail(
+                target, maxItems: maxItems, pageSize: pageSize, seed: first.items, onPage: onPage
+            )
+        }
+
+        let lastPage = max(1, Int(ceil(Double(total) / Double(pageSize))))
+        let lastFetchedPage = min(lastPage, max(1, Int(ceil(Double(maxItems) / Double(pageSize)))))
+        guard lastFetchedPage >= 2 else {
+            return OrderedListWalk(items: first.items, complete: lastFetchedPage >= lastPage)
+        }
+        let tail = try await parallelWalkTail(
+            target, pages: 2 ... lastFetchedPage, total: total, seedCount: first.items.count, onPage: onPage
+        )
+        return OrderedListWalk(
+            items: first.items + tail.items,
+            complete: tail.complete && lastFetchedPage >= lastPage
+        )
+    }
+
+    /// Fetches pages `pages` of an ordered list, `walkConcurrency` at a time,
+    /// and reassembles them in page order. A page failing mid-walk (after
+    /// `request`'s own retries) doesn't discard the pages already fetched — a
+    /// large catalog is hundreds of requests deep at this point — it just
+    /// marks the walk incomplete.
+    private func parallelWalkTail(
+        _ target: OrderedListTarget,
+        pages pageRange: ClosedRange<Int>,
+        total: Int,
+        seedCount: Int,
+        onPage: ((Int, Int?) async -> Void)?
+    ) async throws -> OrderedListWalk {
+        var pages: [Int: [StalkerVODItem]] = [:]
+        var fetched = seedCount
+        var failed = false
+        do {
+            try await withThrowingTaskGroup(of: (page: Int, items: [StalkerVODItem]).self) { group in
+                var nextPage = pageRange.lowerBound
+                func addNextPage() {
+                    let page = nextPage
+                    nextPage += 1
+                    group.addTask {
+                        let result = try await self.getOrderedList(
+                            type: target.type, categoryId: target.categoryId,
+                            page: page, movieId: target.movieId
+                        )
+                        return (page: page, items: result.items)
+                    }
+                }
+                while nextPage <= pageRange.upperBound,
+                      nextPage < pageRange.lowerBound + Self.walkConcurrency
+                {
+                    addNextPage()
+                }
+                while let result = try await group.next() {
+                    pages[result.page] = result.items
+                    fetched += result.items.count
+                    await onPage?(fetched, total)
+                    if nextPage <= pageRange.upperBound {
+                        addNextPage()
+                    }
+                }
+            }
+        } catch {
+            // Cancellation must abort the sync, not masquerade as a
+            // partially-walked catalog.
+            if error is CancellationError || Task.isCancelled { throw CancellationError() }
+            let count = fetched
+            let type = target.type
+            Logger.network.warning("Stalker: \(type) list page failed mid-walk; keeping \(count) items")
+            failed = true
+        }
+        var items: [StalkerVODItem] = []
+        for page in pages.keys.sorted() {
+            items.append(contentsOf: pages[page] ?? [])
+        }
+        return OrderedListWalk(items: items, complete: !failed)
+    }
+
+    /// Serial page walk used when the portal doesn't report `total_items`, so
+    /// the end of the list is only discoverable by hitting a short page.
+    private func sequentialWalkTail(
+        _ target: OrderedListTarget,
+        maxItems: Int,
+        pageSize: Int,
+        seed: [StalkerVODItem],
+        onPage: ((Int, Int?) async -> Void)?
+    ) async throws -> OrderedListWalk {
+        var all = seed
+        var page = 2
         while all.count < maxItems {
             try Task.checkCancellation()
             let result: (items: [StalkerVODItem], totalItems: Int?, pageSize: Int?)
             do {
-                result = try await getOrderedList(type: type, categoryId: categoryId, page: page, movieId: movieId)
+                result = try await getOrderedList(
+                    type: target.type, categoryId: target.categoryId,
+                    page: page, movieId: target.movieId
+                )
             } catch is CancellationError {
                 throw CancellationError()
             } catch {
-                // A page failing mid-walk (after `request`'s own retries)
-                // shouldn't discard the pages already fetched — a large
-                // catalog is hundreds of requests deep at this point.
-                guard !all.isEmpty else { throw error }
                 let count = all.count
+                let type = target.type
                 Logger.network.warning("Stalker: \(type) list page \(page) failed; keeping \(count) items")
                 return OrderedListWalk(items: all, complete: false)
             }
-            if let size = result.pageSize, size > 0 { pageSize = size }
-            if let reported = result.totalItems { total = reported }
             all.append(contentsOf: result.items)
-            await onPage?(all.count, total)
-
-            if result.items.isEmpty { return OrderedListWalk(items: all, complete: true) }
-            if let total {
-                let lastPage = max(1, Int(ceil(Double(total) / Double(pageSize))))
-                if page >= lastPage { return OrderedListWalk(items: all, complete: true) }
-            } else if result.items.count < pageSize {
+            await onPage?(all.count, nil)
+            if result.items.count < pageSize {
                 return OrderedListWalk(items: all, complete: true)
             }
             page += 1

@@ -118,9 +118,29 @@ struct StalkerOrderedListWalkTests {
         #expect(walk.items.count == 30)
         #expect(walk.complete)
         #expect(walk.items.first?.categoryId == "9")
-        #expect(reported == [14, 28, 30])
+        // Pages complete in any order (they're fetched concurrently), but the
+        // running count must be monotonic and end at the total.
+        #expect(reported.first == 14)
+        #expect(reported.last == 30)
+        #expect(reported == reported.sorted())
         // Exactly one request per page — no re-walk past the last page.
         #expect(StalkerStubProtocol.orderedListRequestCount(host: host) == 3)
+    }
+
+    @Test func `parallel pages reassemble in page order`() async throws {
+        let host = "walk-ordered.test"
+        StalkerStubProtocol.register(host: host, portal: .init(pages: [
+            1: page(ids: 1 ... 14, total: 70),
+            2: page(ids: 15 ... 28, total: 70),
+            3: page(ids: 29 ... 42, total: 70),
+            4: page(ids: 43 ... 56, total: 70),
+            5: page(ids: 57 ... 70, total: 70)
+        ]))
+
+        let walk = try await makeClient(host: host).getAllOrderedItems(type: "vod", categoryId: "*")
+
+        #expect(walk.complete)
+        #expect(walk.items.compactMap(\.id) == (1 ... 70).map(String.init))
     }
 
     @Test func `walk truncated by the item cap is marked incomplete`() async throws {
