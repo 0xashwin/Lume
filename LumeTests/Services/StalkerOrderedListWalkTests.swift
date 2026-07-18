@@ -159,9 +159,12 @@ struct StalkerOrderedListWalkTests {
     }
 
     @Test func `page failure mid-walk keeps earlier pages and is marked incomplete`() async throws {
+        // total 20 ⇒ 2 pages: page 1 (fetched alone) succeeds, the single
+        // tail page fails. A one-page tail keeps the assertion deterministic
+        // despite the tail otherwise being fetched concurrently.
         let host = "walk-midfail.test"
         StalkerStubProtocol.register(host: host, portal: .init(
-            pages: [1: page(ids: 1 ... 14, total: 30)],
+            pages: [1: page(ids: 1 ... 14, total: 20)],
             failPages: [2]
         ))
 

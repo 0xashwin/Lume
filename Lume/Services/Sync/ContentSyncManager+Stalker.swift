@@ -26,7 +26,15 @@ extension ContentSyncManager {
     }
 
     /// The Stalker pipeline: authenticate, then pull categories and content.
-    func performStalkerSync(playlist: Playlist, playlistId: UUID, progress: SyncProgress?, full _: Bool = false) async throws {
+    ///
+    /// `full` selects how much of the VOD/series catalog to pull. The portal
+    /// serves ordered lists at a fixed ~14 items per page and exposes no bulk
+    /// endpoint, so a large catalog (100k+ titles) is thousands of requests —
+    /// tens of minutes. The default (`full == false`) therefore syncs only the
+    /// newest `stalkerRecentSliceLimit` titles per kind (seconds), which fills
+    /// the home rails and browse previews; the full catalog is pulled on
+    /// demand by the "Download full catalog" action (`full == true`).
+    func performStalkerSync(playlist: Playlist, playlistId: UUID, progress: SyncProgress?, full: Bool = false) async throws {
         let client = StalkerClient(configuration: StalkerClient.Configuration(playlist: playlist))
 
         await progress?.start(.authenticating)
@@ -54,9 +62,9 @@ extension ContentSyncManager {
         await progress?.update(detail: "\(genres.count) categories")
         await progress?.complete(.liveCategories)
 
-        try await syncStalkerMovies(client: client, categories: vodCategories, playlistId: playlistId, progress: progress)
+        try await syncStalkerMovies(client: client, categories: vodCategories, playlistId: playlistId, progress: progress, full: full)
         try await Task.sleep(for: .seconds(1))
-        try await syncStalkerSeries(client: client, categories: seriesCategories, playlistId: playlistId, progress: progress)
+        try await syncStalkerSeries(client: client, categories: seriesCategories, playlistId: playlistId, progress: progress, full: full)
         try await Task.sleep(for: .seconds(1))
         try await syncStalkerChannels(client: client, playlistId: playlistId, progress: progress)
 
@@ -95,24 +103,34 @@ extension ContentSyncManager {
 
     // MARK: - Catalog walk (vod / series)
 
+    /// How many newest titles the default (non-full) sync pulls per content
+    /// kind. The portal serves ~14 items per page with no bulk endpoint, so a
+    /// large catalog can't be synced whole in reasonable time; this slice fills
+    /// the home rails and browse previews in seconds. The full catalog is
+    /// available via the "Download full catalog" action (`full == true`).
+    static let stalkerRecentSliceLimit = 3000
+
+    // swiftlint:disable function_parameter_count
     /// Walks a portal's `vod` or `series` catalog and upserts it in fixed-size
     /// batches (mirroring `syncStalkerChannels` and the Xtream/m3u pipelines —
     /// one save, and one main-context merge, per batch rather than per
     /// category). Returns the imported count, every element id seen, and
-    /// whether the walk covered the full catalog.
+    /// whether the walk reached the end of the catalog (vs. stopping at the
+    /// recent-slice cap).
     ///
     /// Ministra portals expose a `*` "All" pseudo-category whose items each
-    /// carry their real `category_id`, so one walk over it fetches the whole
-    /// catalog in ceil(total / page-size) requests. Walking category by
-    /// category instead re-pages the same catalog once per category — at the
-    /// portal's fixed 14-items-per-page that is tens of thousands of
-    /// sequential requests on large portals, i.e. a movie sync that runs for
-    /// hours and looks hung. The per-category walk remains only as the
-    /// fallback for portals without `*`.
+    /// carry their real `category_id`, so one walk over it (newest first)
+    /// covers every category in ceil(total / page-size) requests. Walking
+    /// category by category instead re-pages the same catalog once per
+    /// category — tens of thousands of sequential requests on large portals.
+    /// The per-category walk remains only as the fallback for portals without
+    /// `*`; those can't be recency-sliced across categories, so they ignore
+    /// `limit` and always walk fully (they're small in practice).
     private func syncStalkerCatalog(
         client: StalkerClient,
         type: String,
         categories: [StalkerCategory],
+        limit: Int?,
         progress: SyncProgress?,
         upsert: ([(item: StalkerVODItem, categoryId: String)], inout Set<String>) -> Int
     ) async throws -> (imported: Int, seenIds: Set<String>, complete: Bool) {
@@ -123,16 +141,18 @@ extension ContentSyncManager {
         var walkedFullCatalog = true
 
         if categories.contains(where: { $0.id == "*" }) {
-            let walk = await (try? client.getAllOrderedItems(type: type, categoryId: "*") { count, total in
-                if let total, total > 0 {
-                    await progress?.update(
-                        detail: "\(count) of \(total)",
-                        fraction: Double(count) / Double(total)
-                    )
-                } else {
-                    await progress?.update(detail: "\(count) items")
-                }
+            let cap = limit ?? Int.max
+            let walk = await (try? client.getAllOrderedItems(type: type, categoryId: "*", maxItems: cap) { count, total in
+                // Progress targets the smaller of the reported total and the
+                // slice cap, so the bar fills to 100% on a capped sync.
+                let target = min(total ?? count, cap)
+                await progress?.update(
+                    detail: "\(min(count, target)) of \(target)",
+                    fraction: target > 0 ? Double(min(count, target)) / Double(target) : 0
+                )
             })
+            // A capped walk stops early (complete == false) by design; only a
+            // walk that reached the catalog's end should authorize pruning.
             walkedFullCatalog = walk?.complete ?? false
             pending = (walk?.items ?? []).map { (item: $0, categoryId: $0.categoryId ?? "*") }
         } else {
@@ -165,18 +185,22 @@ extension ContentSyncManager {
         return (imported, seenIds, walkedFullCatalog)
     }
 
+    // swiftlint:enable function_parameter_count
+
     // MARK: - Movies (vod)
 
     private func syncStalkerMovies(
         client: StalkerClient,
         categories: [StalkerCategory],
         playlistId: UUID,
-        progress: SyncProgress?
+        progress: SyncProgress?,
+        full: Bool
     ) async throws {
         await progress?.start(.movies)
         let playlistPrefix = "\(playlistId.uuidString)-\(CategoryType.vod.rawValue)-"
         let result = try await syncStalkerCatalog(
-            client: client, type: "vod", categories: categories, progress: progress
+            client: client, type: "vod", categories: categories,
+            limit: full ? nil : Self.stalkerRecentSliceLimit, progress: progress
         ) { batch, seenIds in
             upsertStalkerMovies(
                 batch, playlistPrefix: playlistPrefix,
@@ -184,14 +208,15 @@ extension ContentSyncManager {
             )
         }
 
-        // Prune only after a complete walk: a truncated one (cap hit, page
-        // failure) has an incomplete `seenIds`, and pruning against it would
-        // delete catalog content that is still on the portal.
+        // Prune only after a full walk reached the catalog's end. A capped
+        // (default) sync stops early, so its `seenIds` is a partial slice —
+        // pruning against it would delete everything outside the newest slice,
+        // including a full catalog a prior "Download full catalog" pulled.
         if result.complete, !result.seenIds.isEmpty {
             pruneStaleMovies(playlistId: playlistId, seenIds: result.seenIds)
         }
         let imported = result.imported
-        Logger.database.info("Stalker: synced \(imported) movies")
+        Logger.database.info("Stalker: synced \(imported) movies (full: \(full))")
         await progress?.complete(.movies)
     }
 
@@ -236,6 +261,7 @@ extension ContentSyncManager {
             movie.plot = item.description
             movie.releaseDate = item.year
             movie.rating = Double(item.rating ?? "") ?? movie.rating
+            movie.added = item.added ?? movie.added
             movie.categoryId = playlistPrefix + categoryId
             movie.directURL = cmd
             imported += 1
@@ -250,12 +276,14 @@ extension ContentSyncManager {
         client: StalkerClient,
         categories: [StalkerCategory],
         playlistId: UUID,
-        progress: SyncProgress?
+        progress: SyncProgress?,
+        full: Bool
     ) async throws {
         await progress?.start(.series)
         let playlistPrefix = "\(playlistId.uuidString)-\(CategoryType.series.rawValue)-"
         let result = try await syncStalkerCatalog(
-            client: client, type: "series", categories: categories, progress: progress
+            client: client, type: "series", categories: categories,
+            limit: full ? nil : Self.stalkerRecentSliceLimit, progress: progress
         ) { batch, seenIds in
             upsertStalkerSeries(
                 batch, playlistPrefix: playlistPrefix,
@@ -263,12 +291,13 @@ extension ContentSyncManager {
             )
         }
 
-        // Prune only after a complete walk — see `syncStalkerMovies`.
+        // Prune only after a full walk reached the catalog's end — see
+        // `syncStalkerMovies`.
         if result.complete, !result.seenIds.isEmpty {
             pruneStaleSeries(playlistId: playlistId, seenIds: result.seenIds)
         }
         let imported = result.imported
-        Logger.database.info("Stalker: synced \(imported) series")
+        Logger.database.info("Stalker: synced \(imported) series (full: \(full))")
         await progress?.complete(.series)
     }
 
@@ -312,6 +341,9 @@ extension ContentSyncManager {
             series.cover = item.screenshot
             series.plot = item.description
             series.releaseDate = item.year
+            // The Recently Added series rail orders by `lastModified`; the
+            // portal's `added` timestamp is the closest equivalent.
+            series.lastModified = item.added ?? series.lastModified
             series.categoryId = playlistPrefix + categoryId
             imported += 1
         }
