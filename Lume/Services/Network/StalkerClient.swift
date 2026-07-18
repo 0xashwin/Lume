@@ -319,32 +319,60 @@ class StalkerClient {
         return (envelope.js.data, envelope.js.totalItems, envelope.js.maxPageItems)
     }
 
+    /// The result of walking an ordered list. `complete` is `false` when the
+    /// walk was truncated — by the `maxItems` cap or a page failing mid-walk —
+    /// in which case `items` is a valid prefix of the catalog, not all of it.
+    nonisolated struct OrderedListWalk {
+        let items: [StalkerVODItem]
+        let complete: Bool
+    }
+
     /// Walks every page of an ordered list and returns the combined items.
     /// `maxItems` caps the walk so a runaway `total_items` can't loop forever.
+    /// `onPage` reports (items fetched so far, reported total) after each page
+    /// so long walks can surface sync progress.
     func getAllOrderedItems(
         type: String,
         categoryId: String,
         movieId: String? = nil,
-        maxItems: Int = 20000
-    ) async throws -> [StalkerVODItem] {
+        maxItems: Int = 20000,
+        onPage: ((Int, Int?) async -> Void)? = nil
+    ) async throws -> OrderedListWalk {
         var all: [StalkerVODItem] = []
         var page = 1
         var pageSize = 14
+        var total: Int?
         while all.count < maxItems {
-            let result = try await getOrderedList(type: type, categoryId: categoryId, page: page, movieId: movieId)
+            try Task.checkCancellation()
+            let result: (items: [StalkerVODItem], totalItems: Int?, pageSize: Int?)
+            do {
+                result = try await getOrderedList(type: type, categoryId: categoryId, page: page, movieId: movieId)
+            } catch is CancellationError {
+                throw CancellationError()
+            } catch {
+                // A page failing mid-walk (after `request`'s own retries)
+                // shouldn't discard the pages already fetched — a large
+                // catalog is hundreds of requests deep at this point.
+                guard !all.isEmpty else { throw error }
+                let count = all.count
+                Logger.network.warning("Stalker: \(type) list page \(page) failed; keeping \(count) items")
+                return OrderedListWalk(items: all, complete: false)
+            }
             if let size = result.pageSize, size > 0 { pageSize = size }
+            if let reported = result.totalItems { total = reported }
             all.append(contentsOf: result.items)
+            await onPage?(all.count, total)
 
-            if result.items.isEmpty { break }
-            if let total = result.totalItems {
+            if result.items.isEmpty { return OrderedListWalk(items: all, complete: true) }
+            if let total {
                 let lastPage = max(1, Int(ceil(Double(total) / Double(pageSize))))
-                if page >= lastPage { break }
+                if page >= lastPage { return OrderedListWalk(items: all, complete: true) }
             } else if result.items.count < pageSize {
-                break
+                return OrderedListWalk(items: all, complete: true)
             }
             page += 1
         }
-        return all
+        return OrderedListWalk(items: all, complete: false)
     }
 
     // MARK: - Stream resolution
