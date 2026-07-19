@@ -59,6 +59,13 @@ final class Category {
     var customOrder: Int?
     var customIcon: String?
     var lastRefreshed: Date?
+    /// When this category's full content was last imported from the portal on
+    /// demand. Stalker playlists don't sync their whole catalog (the portal
+    /// serves ~14 items per request); a default sync only seeds the newest
+    /// titles, so a category is otherwise near-empty until opened. `nil` means
+    /// never imported — opening the category triggers a one-time fetch. Unused
+    /// by Xtream/m3u, whose categories are fully synced up front.
+    var contentImportedAt: Date?
 
     init(apiId: String, name: String, parentId: Int, typeRaw: String, playlist: Playlist? = nil) {
         id = "\(playlist?.id.uuidString ?? "unknown")-\(typeRaw)-\(apiId)"

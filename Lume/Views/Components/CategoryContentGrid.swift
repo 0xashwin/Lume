@@ -259,6 +259,9 @@ struct MovieCategoryView: View {
     @State private var movies: [Movie] = []
     @State private var canLoadMore = true
     @State private var isLoadingPage = false
+    /// True while a Stalker category's content is being fetched from the portal
+    /// on first open — drives the loading overlay.
+    @State private var isImporting = false
     /// The sort the current pages were loaded for. Pushing a detail cancels and
     /// (on pop) re-runs `.task`; reloading page one there would discard the
     /// loaded pages and reset the scroll position. Reload only when this differs.
@@ -273,8 +276,33 @@ struct MovieCategoryView: View {
         ContentSortOption(rawValue: contentSortRaw) ?? .playlist
     }
 
+    /// The playlist when it's a Stalker portal, whose categories are imported
+    /// on demand rather than synced whole.
+    private var stalkerPlaylist: Playlist? {
+        guard let playlist = category.playlist, playlist.sourceType == .stalker else { return nil }
+        return playlist
+    }
+
     var body: some View {
-        CategoryContentGrid(
+        grid
+            .overlay {
+                if isImporting, movies.isEmpty {
+                    ProgressView("Loading…")
+                }
+            }
+            .task(id: contentSortRaw) {
+                guard loadedSort != contentSortRaw else { return }
+                loadedSort = contentSortRaw
+                movies = []
+                canLoadMore = true
+                await importStalkerContentIfNeeded()
+                loadNextPage()
+            }
+    }
+
+    @ViewBuilder
+    private var grid: some View {
+        let base = CategoryContentGrid(
             title: category.name,
             items: movies,
             animationNamespace: animationNamespace,
@@ -285,13 +313,18 @@ struct MovieCategoryView: View {
             onLoadMore: { loadNextPage() },
             card: { MovieCardView(movie: $0) }
         )
-        .task(id: contentSortRaw) {
-            guard loadedSort != contentSortRaw else { return }
-            loadedSort = contentSortRaw
-            movies = []
-            canLoadMore = true
-            loadNextPage()
-        }
+        // Pull-to-refresh re-imports a Stalker category from the portal (its
+        // content is a one-time on-demand fetch, so this is how a user picks up
+        // titles the provider added). Not offered for fully-synced sources.
+        #if !os(tvOS)
+            if stalkerPlaylist != nil {
+                base.refreshable { await reimportStalkerContent() }
+            } else {
+                base
+            }
+        #else
+            base
+        #endif
     }
 
     private func loadNextPage() {
@@ -308,6 +341,28 @@ struct MovieCategoryView: View {
         let page = (try? modelContext.fetch(descriptor)) ?? []
         movies.append(contentsOf: page)
         if page.count < pageSize { canLoadMore = false }
+    }
+
+    /// Imports the category from the portal the first time it's opened (Stalker
+    /// only; other sources are already fully synced).
+    private func importStalkerContentIfNeeded() async {
+        guard let playlist = stalkerPlaylist, category.contentImportedAt == nil else { return }
+        await runStalkerImport(playlist: playlist)
+    }
+
+    private func reimportStalkerContent() async {
+        guard let playlist = stalkerPlaylist else { return }
+        await runStalkerImport(playlist: playlist)
+        movies = []
+        canLoadMore = true
+        loadNextPage()
+    }
+
+    private func runStalkerImport(playlist: Playlist) async {
+        isImporting = true
+        defer { isImporting = false }
+        let manager = ContentSyncManager(modelContainer: modelContext.container)
+        _ = try? await manager.importStalkerCategory(apiId: category.apiId, type: .vod, playlist: playlist)
     }
 }
 
@@ -357,6 +412,9 @@ struct SeriesCategoryView: View {
     @State private var series: [Series] = []
     @State private var canLoadMore = true
     @State private var isLoadingPage = false
+    /// True while a Stalker category's content is being fetched from the portal
+    /// on first open — drives the loading overlay.
+    @State private var isImporting = false
     /// Sort the current pages were loaded for; reload only on change so a pop
     /// back from a detail keeps the loaded pages and scroll position intact.
     @State private var loadedSort: String?
@@ -370,8 +428,33 @@ struct SeriesCategoryView: View {
         ContentSortOption(rawValue: contentSortRaw) ?? .playlist
     }
 
+    /// The playlist when it's a Stalker portal, whose categories are imported
+    /// on demand rather than synced whole.
+    private var stalkerPlaylist: Playlist? {
+        guard let playlist = category.playlist, playlist.sourceType == .stalker else { return nil }
+        return playlist
+    }
+
     var body: some View {
-        CategoryContentGrid(
+        grid
+            .overlay {
+                if isImporting, series.isEmpty {
+                    ProgressView("Loading…")
+                }
+            }
+            .task(id: contentSortRaw) {
+                guard loadedSort != contentSortRaw else { return }
+                loadedSort = contentSortRaw
+                series = []
+                canLoadMore = true
+                await importStalkerContentIfNeeded()
+                loadNextPage()
+            }
+    }
+
+    @ViewBuilder
+    private var grid: some View {
+        let base = CategoryContentGrid(
             title: category.name,
             items: series,
             animationNamespace: animationNamespace,
@@ -382,13 +465,16 @@ struct SeriesCategoryView: View {
             onLoadMore: { loadNextPage() },
             card: { SeriesCardView(series: $0) }
         )
-        .task(id: contentSortRaw) {
-            guard loadedSort != contentSortRaw else { return }
-            loadedSort = contentSortRaw
-            series = []
-            canLoadMore = true
-            loadNextPage()
-        }
+        // Pull-to-refresh re-imports a Stalker category — see `MovieCategoryView`.
+        #if !os(tvOS)
+            if stalkerPlaylist != nil {
+                base.refreshable { await reimportStalkerContent() }
+            } else {
+                base
+            }
+        #else
+            base
+        #endif
     }
 
     private func loadNextPage() {
@@ -405,6 +491,28 @@ struct SeriesCategoryView: View {
         let page = (try? modelContext.fetch(descriptor)) ?? []
         series.append(contentsOf: page)
         if page.count < pageSize { canLoadMore = false }
+    }
+
+    /// Imports the category from the portal the first time it's opened (Stalker
+    /// only; other sources are already fully synced).
+    private func importStalkerContentIfNeeded() async {
+        guard let playlist = stalkerPlaylist, category.contentImportedAt == nil else { return }
+        await runStalkerImport(playlist: playlist)
+    }
+
+    private func reimportStalkerContent() async {
+        guard let playlist = stalkerPlaylist else { return }
+        await runStalkerImport(playlist: playlist)
+        series = []
+        canLoadMore = true
+        loadNextPage()
+    }
+
+    private func runStalkerImport(playlist: Playlist) async {
+        isImporting = true
+        defer { isImporting = false }
+        let manager = ContentSyncManager(modelContainer: modelContext.container)
+        _ = try? await manager.importStalkerCategory(apiId: category.apiId, type: .series, playlist: playlist)
     }
 }
 

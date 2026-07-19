@@ -215,6 +215,11 @@ extension ContentSyncManager {
         if result.complete, !result.seenIds.isEmpty {
             pruneStaleMovies(playlistId: playlistId, seenIds: result.seenIds)
         }
+        // A completed full walk pulled every category's content, so none needs
+        // an on-demand fetch when opened.
+        if full, result.complete {
+            markAllStalkerCategoriesImported(type: .vod, playlistId: playlistId)
+        }
         let imported = result.imported
         Logger.database.info("Stalker: synced \(imported) movies (full: \(full))")
         await progress?.complete(.movies)
@@ -295,6 +300,9 @@ extension ContentSyncManager {
         // `syncStalkerMovies`.
         if result.complete, !result.seenIds.isEmpty {
             pruneStaleSeries(playlistId: playlistId, seenIds: result.seenIds)
+        }
+        if full, result.complete {
+            markAllStalkerCategoriesImported(type: .series, playlistId: playlistId)
         }
         let imported = result.imported
         Logger.database.info("Stalker: synced \(imported) series (full: \(full))")
@@ -392,6 +400,83 @@ extension ContentSyncManager {
             }
         }
         return result
+    }
+
+    // MARK: - On-demand category import
+
+    /// One Stalker VOD/series category's full content, fetched from the portal
+    /// and upserted, with the category marked imported so opening it again
+    /// reads local rows. The default sync only seeds the newest slice across
+    /// all categories (see `stalkerRecentSliceLimit`), so a specific category
+    /// is otherwise near-empty until the user opens it. Returns the number of
+    /// items imported. Marks the category imported only when the walk reached
+    /// its end, so a truncated fetch retries on the next open.
+    @discardableResult
+    func importStalkerCategory(apiId: String, type: CategoryType, playlist: Playlist) async throws -> Int {
+        guard type == .vod || type == .series, !apiId.isEmpty else { return 0 }
+        let client = StalkerClient(configuration: StalkerClient.Configuration(playlist: playlist))
+        let playlistId = playlist.id
+        let walk = try await client.getAllOrderedItems(
+            type: type == .vod ? "vod" : "series", categoryId: apiId
+        )
+        let playlistPrefix = "\(playlistId.uuidString)-\(type.rawValue)-"
+        let entries = walk.items.map { (item: $0, categoryId: apiId) }
+
+        var seen = Set<String>()
+        var imported = 0
+        let batchSize = 2000
+        for start in stride(from: 0, to: entries.count, by: batchSize) {
+            try Task.checkCancellation()
+            let batch = Array(entries[start ..< min(start + batchSize, entries.count)])
+            autoreleasepool {
+                switch type {
+                case .vod:
+                    imported += upsertStalkerMovies(
+                        batch, playlistPrefix: playlistPrefix, playlistId: playlistId, seenIds: &seen
+                    )
+                case .series:
+                    imported += upsertStalkerSeries(
+                        batch, playlistPrefix: playlistPrefix, playlistId: playlistId, seenIds: &seen
+                    )
+                case .live:
+                    break
+                }
+            }
+        }
+        if walk.complete {
+            markStalkerCategoryImported(apiId: apiId, type: type, playlistId: playlistId)
+        }
+        Logger.database.info("Stalker: imported \(imported) items for category \(apiId)")
+        return imported
+    }
+
+    /// Stamps one category's `contentImportedAt`.
+    private func markStalkerCategoryImported(apiId: String, type: CategoryType, playlistId: UUID) {
+        let context = ModelContext(modelContainer)
+        context.autosaveEnabled = false
+        let categoryId = "\(playlistId.uuidString)-\(type.rawValue)-\(apiId)"
+        guard let category = try? context.fetch(
+            FetchDescriptor<Category>(predicate: #Predicate { $0.id == categoryId })
+        ).first else { return }
+        category.contentImportedAt = Date()
+        try? context.save()
+    }
+
+    /// Stamps every category of `type` imported — used after a completed full
+    /// catalog download, which already pulled all of them.
+    private func markAllStalkerCategoriesImported(type: CategoryType, playlistId: UUID) {
+        let context = ModelContext(modelContainer)
+        context.autosaveEnabled = false
+        let typeRaw = type.rawValue
+        let prefix = playlistId.uuidString
+        let cats = (try? context.fetch(
+            FetchDescriptor<Category>(predicate: #Predicate { $0.typeRaw == typeRaw })
+        )) ?? []
+        let now = Date()
+        for category in cats where category.id.hasPrefix(prefix) {
+            category.contentImportedAt = now
+        }
+        try? context.save()
     }
 
     // MARK: - Live channels (itv)
