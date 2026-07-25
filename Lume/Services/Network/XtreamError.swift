@@ -71,16 +71,37 @@ enum XtreamError: LocalizedError {
             return "network error (\(nsError.domain) \(nsError.code))"
         case let .decodingError(error):
             switch error as? DecodingError {
-            case .dataCorrupted: return "undecodable response (not valid JSON)"
-            case .keyNotFound: return "undecodable response (missing key)"
-            case .typeMismatch: return "undecodable response (type mismatch)"
-            case .valueNotFound: return "undecodable response (missing value)"
-            default: return "undecodable response"
+            case .dataCorrupted:
+                return "undecodable response (not valid JSON)"
+            case let .keyNotFound(key, context):
+                return "undecodable response (missing key '\(key.stringValue)' at \(Self.path(context.codingPath)))"
+            case let .typeMismatch(type, context):
+                return "undecodable response (type mismatch: expected \(type) at \(Self.path(context.codingPath)))"
+            case let .valueNotFound(type, context):
+                return "undecodable response (missing \(type) value at \(Self.path(context.codingPath)))"
+            default:
+                return "undecodable response"
             }
         case .invalidResponse:
             return "non-HTTP response"
         case let .serverError(code):
             return "HTTP \(code)"
         }
+    }
+
+    /// Renders a decoding path as e.g. `user_info.exp_date` or
+    /// `[12].category_id` — key names and indexes only, never values, so it
+    /// stays credential-free.
+    private static func path(_ codingPath: [any CodingKey]) -> String {
+        guard !codingPath.isEmpty else { return "response root" }
+        var result = ""
+        for key in codingPath {
+            if let index = key.intValue {
+                result += "[\(index)]"
+            } else {
+                result += result.isEmpty ? key.stringValue : ".\(key.stringValue)"
+            }
+        }
+        return result
     }
 }
