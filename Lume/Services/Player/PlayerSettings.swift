@@ -49,7 +49,7 @@ enum PlayerEngineKind: String, CaseIterable, Identifiable {
     static var defaultValue: PlayerEngineKind {
         #if canImport(KSPlayer)
             return .ksPlayer
-        #elseif canImport(VLCKitSPM)
+        #elseif canImport(VLCKit)
             return .vlcKit
         #else
             return .avPlayer

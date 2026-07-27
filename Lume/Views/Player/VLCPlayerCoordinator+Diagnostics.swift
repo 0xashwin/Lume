@@ -8,7 +8,7 @@
 
 import Foundation
 import OSLog
-import VLCKitSPM
+import VLCKit
 
 extension VLCPlayerCoordinator {
     // MARK: - Diagnostics

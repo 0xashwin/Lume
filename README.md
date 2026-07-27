@@ -206,7 +206,7 @@ Lume follows a clean, layered SwiftUI architecture:
 |---|---|
 | [KSPlayer](https://github.com/kingslay/KSPlayer) | FFmpeg-based playback engine |
 | [FFmpegKit](https://github.com/kingslay/FFmpegKit.git) | Media decoding backend for KSPlayer |
-| [vlckit-spm](https://github.com/virtualox/vlckit-spm) | VLCKit 4 playback engine |
+| [VLCKit](https://code.videolan.org/videolan/VLCKit) | VLCKit 4 playback engine |
 
 ---
 
