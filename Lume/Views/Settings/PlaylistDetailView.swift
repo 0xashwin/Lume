@@ -252,7 +252,11 @@ struct PlaylistDetailView: View {
                     // The portal serves ~14 items per request with no bulk
                     // endpoint, so a default sync only loads the newest titles;
                     // the full catalog is opt-in because it can take a while.
-                    Text("Syncing loads your newest movies and series. Download the full catalog to browse everything — this can take a while on large portals.")
+                    Text("""
+                    Movies and series load as you browse — nothing is prefetched. \
+                    Download the full catalog to make everything available offline and \
+                    searchable at once; this can take a while on large portals.
+                    """)
                 }
             }
         }
@@ -419,11 +423,15 @@ struct PlaylistDetailView: View {
                 }
 
                 if isStalker {
-                    Text("Syncing loads your newest movies and series. Download the full catalog to browse everything — this can take a while on large portals.")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                        .padding(.horizontal, TVSettingsMetrics.rowHPadding)
-                        .padding(.top, 4)
+                    Text("""
+                    Movies and series load as you browse — nothing is prefetched. \
+                    Download the full catalog to make everything available offline and \
+                    searchable at once; this can take a while on large portals.
+                    """)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .padding(.horizontal, TVSettingsMetrics.rowHPadding)
+                    .padding(.top, 4)
                 }
             }
         }

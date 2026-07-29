@@ -305,11 +305,15 @@ class StalkerClient {
 
     /// A single page of an ordered list for `type` (`vod` or `series`) within a
     /// category. Returns the page items and the reported total (for pagination).
+    /// `search`, when set, filters portal-side — the middleware matches it
+    /// against name, original name, actors, director and year — which is how a
+    /// Stalker catalog is searched without a local index.
     func getOrderedList(
         type: String,
         categoryId: String,
         page: Int,
-        movieId: String? = nil
+        movieId: String? = nil,
+        search: String? = nil
     ) async throws -> (items: [StalkerVODItem], totalItems: Int?, pageSize: Int?) {
         var query = [
             URLQueryItem(name: "category", value: categoryId),
@@ -319,6 +323,9 @@ class StalkerClient {
         ]
         if let movieId {
             query.append(URLQueryItem(name: "movie_id", value: movieId))
+        }
+        if let search, !search.isEmpty {
+            query.append(URLQueryItem(name: "search", value: search))
         }
         let envelope: StalkerEnvelope<StalkerPage<StalkerVODItem>> = try await request(
             type: type,
@@ -342,6 +349,7 @@ class StalkerClient {
         let type: String
         let categoryId: String
         let movieId: String?
+        let search: String?
     }
 
     /// Walks every page of an ordered list and returns the combined items.
@@ -358,11 +366,12 @@ class StalkerClient {
         type: String,
         categoryId: String,
         movieId: String? = nil,
+        search: String? = nil,
         maxItems: Int = 20000,
         onPage: ((Int, Int?) async -> Void)? = nil
     ) async throws -> OrderedListWalk {
-        let target = OrderedListTarget(type: type, categoryId: categoryId, movieId: movieId)
-        let first = try await getOrderedList(type: type, categoryId: categoryId, page: 1, movieId: movieId)
+        let target = OrderedListTarget(type: type, categoryId: categoryId, movieId: movieId, search: search)
+        let first = try await getOrderedList(type: type, categoryId: categoryId, page: 1, movieId: movieId, search: search)
         let pageSize = first.pageSize.flatMap { $0 > 0 ? $0 : nil } ?? 14
         await onPage?(first.items.count, first.totalItems)
         if first.items.isEmpty {
@@ -414,7 +423,7 @@ class StalkerClient {
                     group.addTask {
                         let result = try await self.getOrderedList(
                             type: target.type, categoryId: target.categoryId,
-                            page: page, movieId: target.movieId
+                            page: page, movieId: target.movieId, search: target.search
                         )
                         return (page: page, items: result.items)
                     }
@@ -466,7 +475,7 @@ class StalkerClient {
             do {
                 result = try await getOrderedList(
                     type: target.type, categoryId: target.categoryId,
-                    page: page, movieId: target.movieId
+                    page: page, movieId: target.movieId, search: target.search
                 )
             } catch is CancellationError {
                 throw CancellationError()
