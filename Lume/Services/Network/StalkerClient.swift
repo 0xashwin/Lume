@@ -502,9 +502,17 @@ class StalkerClient {
         let envelope: StalkerEnvelope<StalkerCreateLink> = try await request(
             type: type.rawValue,
             action: "create_link",
-            extraQuery: [URLQueryItem(name: "cmd", value: cmd)]
+            extraQuery: [URLQueryItem(name: "cmd", value: cmd)] + StalkerLink.forwardedQueryItems(from: cmd)
         )
         guard let rawCmd = envelope.js.cmd, let url = StalkerLink.resolvedURL(from: rawCmd) else {
+            throw StalkerError.noStreamURL
+        }
+        // An empty `stream=` means the portal minted a link without a channel
+        // id — unplayable (the server 405s). Fail here rather than letting
+        // every engine burn through it.
+        let streamId = URLComponents(url: url, resolvingAgainstBaseURL: false)?
+            .queryItems?.first { $0.name == "stream" }?.value
+        if let streamId, streamId.isEmpty {
             throw StalkerError.noStreamURL
         }
         return url
