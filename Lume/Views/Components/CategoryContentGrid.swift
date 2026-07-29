@@ -311,7 +311,7 @@ struct MovieCategoryView: View {
             emptyDescription: "This category has no movies",
             sortRaw: $contentSortRaw,
             onLoadMore: { loadNextPage() },
-            card: { MovieCardView(movie: $0) }
+            card: { MovieCardView(movie: $0, fillsWidth: true) }
         )
         // Pull-to-refresh re-imports a Stalker category from the portal (its
         // content is a one-time on-demand fetch, so this is how a user picks up
@@ -463,7 +463,7 @@ struct SeriesCategoryView: View {
             emptyDescription: "This category has no series",
             sortRaw: $contentSortRaw,
             onLoadMore: { loadNextPage() },
-            card: { SeriesCardView(series: $0) }
+            card: { SeriesCardView(series: $0, fillsWidth: true) }
         )
         // Pull-to-refresh re-imports a Stalker category — see `MovieCategoryView`.
         #if !os(tvOS)
