@@ -10,7 +10,7 @@
 		C66C81672FC5A59D0048468D /* KSPlayer in Frameworks */ = {isa = PBXBuildFile; productRef = C66C81682FC5A59D0048468D /* KSPlayer */; };
 		C6AA10012FDD00010000AA01 /* LumeEngine in Frameworks */ = {isa = PBXBuildFile; productRef = C6AA10022FDD00010000AA02 /* LumeEngine */; };
 		C6AA10042FDD00010000AA04 /* LumeEngine in Embed Frameworks */ = {isa = PBXBuildFile; productRef = C6AA10022FDD00010000AA02 /* LumeEngine */; settings = {ATTRIBUTES = (CodeSignOnCopy, ); }; };
-		C6FF000A2FC5A59D00484601 /* VLCKitSPM in Frameworks */ = {isa = PBXBuildFile; productRef = C6FF000B2FC5A59D00484602 /* VLCKitSPM */; };
+		C6FF000A2FC5A59D00484601 /* VLCKit in Frameworks */ = {isa = PBXBuildFile; productRef = C6FF000B2FC5A59D00484602 /* VLCKit */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -89,7 +89,7 @@
 			files = (
 				C66C81672FC5A59D0048468D /* KSPlayer in Frameworks */,
 				C6AA10012FDD00010000AA01 /* LumeEngine in Frameworks */,
-				C6FF000A2FC5A59D00484601 /* VLCKitSPM in Frameworks */,
+				C6FF000A2FC5A59D00484601 /* VLCKit in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -156,7 +156,7 @@
 			packageProductDependencies = (
 				C66C81682FC5A59D0048468D /* KSPlayer */,
 				C6AA10022FDD00010000AA02 /* LumeEngine */,
-				C6FF000B2FC5A59D00484602 /* VLCKitSPM */,
+				C6FF000B2FC5A59D00484602 /* VLCKit */,
 			);
 			productName = Lume;
 			productReference = C67C02C02F880F2200842DBA /* Lume.app */;
@@ -250,7 +250,7 @@
 			minimizedProjectReferenceProxies = 1;
 			packageReferences = (
 				C66C81662FC5A59D0048468D /* XCRemoteSwiftPackageReference "KSPlayer" */,
-				C6FF000C2FC5A59D00484603 /* XCRemoteSwiftPackageReference "vlckit-spm" */,
+				C6FF000C2FC5A59D00484603 /* XCRemoteSwiftPackageReference "VLCKit" */,
 				C6AA10032FDD00010000AA03 /* XCLocalSwiftPackageReference "../LumeEngine" */,
 			);
 			preferredProjectObjectVersion = 77;
@@ -378,7 +378,7 @@
 				ASSETCATALOG_COMPILER_INCLUDE_ALL_APPICON_ASSETS = NO;
 				CODE_SIGN_ENTITLEMENTS = Lume/Lume.entitlements;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 13;
+				CURRENT_PROJECT_VERSION = 14;
 				DEVELOPMENT_TEAM = CHG45F8MCL;
 				ENABLE_APP_SANDBOX = YES;
 				"ENABLE_APP_SANDBOX[sdk=macosx*]" = YES;
@@ -404,7 +404,7 @@
 				LD_RUNPATH_SEARCH_PATHS = "@executable_path/Frameworks";
 				"LD_RUNPATH_SEARCH_PATHS[sdk=macosx*]" = "@executable_path/../Frameworks";
 				MACOSX_DEPLOYMENT_TARGET = 15.0;
-				MARKETING_VERSION = 1.5.0;
+				MARKETING_VERSION = 1.5.1;
 				PRODUCT_BUNDLE_IDENTIFIER = com.bilipp.lume;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				REGISTER_APP_GROUPS = YES;
@@ -431,7 +431,7 @@
 				ASSETCATALOG_COMPILER_INCLUDE_ALL_APPICON_ASSETS = NO;
 				CODE_SIGN_ENTITLEMENTS = Lume/Lume.entitlements;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 13;
+				CURRENT_PROJECT_VERSION = 14;
 				DEVELOPMENT_TEAM = CHG45F8MCL;
 				ENABLE_APP_SANDBOX = YES;
 				"ENABLE_APP_SANDBOX[sdk=macosx*]" = YES;
@@ -457,7 +457,7 @@
 				LD_RUNPATH_SEARCH_PATHS = "@executable_path/Frameworks";
 				"LD_RUNPATH_SEARCH_PATHS[sdk=macosx*]" = "@executable_path/../Frameworks";
 				MACOSX_DEPLOYMENT_TARGET = 15.0;
-				MARKETING_VERSION = 1.5.0;
+				MARKETING_VERSION = 1.5.1;
 				PRODUCT_BUNDLE_IDENTIFIER = com.bilipp.lume;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				REGISTER_APP_GROUPS = YES;
@@ -597,12 +597,12 @@
 			buildSettings = {
 				BUNDLE_LOADER = "$(TEST_HOST)";
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 13;
+				CURRENT_PROJECT_VERSION = 14;
 				DEVELOPMENT_TEAM = CHG45F8MCL;
 				GENERATE_INFOPLIST_FILE = YES;
 				IPHONEOS_DEPLOYMENT_TARGET = 18.0;
 				MACOSX_DEPLOYMENT_TARGET = 15.0;
-				MARKETING_VERSION = 1.5.0;
+				MARKETING_VERSION = 1.5.1;
 				PRODUCT_BUNDLE_IDENTIFIER = bilipp.LumeTests;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SDKROOT = auto;
@@ -623,12 +623,12 @@
 			buildSettings = {
 				BUNDLE_LOADER = "$(TEST_HOST)";
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 13;
+				CURRENT_PROJECT_VERSION = 14;
 				DEVELOPMENT_TEAM = CHG45F8MCL;
 				GENERATE_INFOPLIST_FILE = YES;
 				IPHONEOS_DEPLOYMENT_TARGET = 18.0;
 				MACOSX_DEPLOYMENT_TARGET = 15.0;
-				MARKETING_VERSION = 1.5.0;
+				MARKETING_VERSION = 1.5.1;
 				PRODUCT_BUNDLE_IDENTIFIER = bilipp.LumeTests;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SDKROOT = auto;
@@ -648,12 +648,12 @@
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 13;
+				CURRENT_PROJECT_VERSION = 14;
 				DEVELOPMENT_TEAM = CHG45F8MCL;
 				GENERATE_INFOPLIST_FILE = YES;
 				IPHONEOS_DEPLOYMENT_TARGET = 18.0;
 				MACOSX_DEPLOYMENT_TARGET = 15.0;
-				MARKETING_VERSION = 1.5.0;
+				MARKETING_VERSION = 1.5.1;
 				PRODUCT_BUNDLE_IDENTIFIER = bilipp.LumeUITests;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SDKROOT = auto;
@@ -673,12 +673,12 @@
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 13;
+				CURRENT_PROJECT_VERSION = 14;
 				DEVELOPMENT_TEAM = CHG45F8MCL;
 				GENERATE_INFOPLIST_FILE = YES;
 				IPHONEOS_DEPLOYMENT_TARGET = 18.0;
 				MACOSX_DEPLOYMENT_TARGET = 15.0;
-				MARKETING_VERSION = 1.5.0;
+				MARKETING_VERSION = 1.5.1;
 				PRODUCT_BUNDLE_IDENTIFIER = bilipp.LumeUITests;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SDKROOT = auto;
@@ -757,7 +757,7 @@
 				ASSETCATALOG_COMPILER_INCLUDE_ALL_APPICON_ASSETS = NO;
 				CODE_SIGN_ENTITLEMENTS = Lume/Lume.entitlements;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 13;
+				CURRENT_PROJECT_VERSION = 14;
 				DEVELOPMENT_TEAM = CHG45F8MCL;
 				ENABLE_APP_SANDBOX = YES;
 				"ENABLE_APP_SANDBOX[sdk=macosx*]" = NO;
@@ -783,7 +783,7 @@
 				LD_RUNPATH_SEARCH_PATHS = "@executable_path/Frameworks";
 				"LD_RUNPATH_SEARCH_PATHS[sdk=macosx*]" = "@executable_path/../Frameworks";
 				MACOSX_DEPLOYMENT_TARGET = 15.0;
-				MARKETING_VERSION = 1.5.0;
+				MARKETING_VERSION = 1.5.1;
 				PRODUCT_BUNDLE_IDENTIFIER = com.bilipp.lume;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				REGISTER_APP_GROUPS = YES;
@@ -807,12 +807,12 @@
 			buildSettings = {
 				BUNDLE_LOADER = "$(TEST_HOST)";
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 13;
+				CURRENT_PROJECT_VERSION = 14;
 				DEVELOPMENT_TEAM = CHG45F8MCL;
 				GENERATE_INFOPLIST_FILE = YES;
 				IPHONEOS_DEPLOYMENT_TARGET = 18.0;
 				MACOSX_DEPLOYMENT_TARGET = 15.0;
-				MARKETING_VERSION = 1.5.0;
+				MARKETING_VERSION = 1.5.1;
 				PRODUCT_BUNDLE_IDENTIFIER = bilipp.LumeTests;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SDKROOT = auto;
@@ -832,12 +832,12 @@
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 13;
+				CURRENT_PROJECT_VERSION = 14;
 				DEVELOPMENT_TEAM = CHG45F8MCL;
 				GENERATE_INFOPLIST_FILE = YES;
 				IPHONEOS_DEPLOYMENT_TARGET = 18.0;
 				MACOSX_DEPLOYMENT_TARGET = 15.0;
-				MARKETING_VERSION = 1.5.0;
+				MARKETING_VERSION = 1.5.1;
 				PRODUCT_BUNDLE_IDENTIFIER = bilipp.LumeUITests;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SDKROOT = auto;
@@ -914,12 +914,12 @@
 				minimumVersion = 2.3.4;
 			};
 		};
-		C6FF000C2FC5A59D00484603 /* XCRemoteSwiftPackageReference "vlckit-spm" */ = {
+		C6FF000C2FC5A59D00484603 /* XCRemoteSwiftPackageReference "VLCKit" */ = {
 			isa = XCRemoteSwiftPackageReference;
-			repositoryURL = "https://github.com/virtualox/vlckit-spm";
+			repositoryURL = "https://code.videolan.org/videolan/VLCKit.git";
 			requirement = {
-				kind = upToNextMajorVersion;
-				minimumVersion = "4.0.0-alpha.20";
+				kind = exactVersion;
+				version = "4.0.0-a22";
 			};
 		};
 /* End XCRemoteSwiftPackageReference section */
@@ -934,10 +934,10 @@
 			isa = XCSwiftPackageProductDependency;
 			productName = LumeEngine;
 		};
-		C6FF000B2FC5A59D00484602 /* VLCKitSPM */ = {
+		C6FF000B2FC5A59D00484602 /* VLCKit */ = {
 			isa = XCSwiftPackageProductDependency;
-			package = C6FF000C2FC5A59D00484603 /* XCRemoteSwiftPackageReference "vlckit-spm" */;
-			productName = VLCKitSPM;
+			package = C6FF000C2FC5A59D00484603 /* XCRemoteSwiftPackageReference "VLCKit" */;
+			productName = VLCKit;
 		};
 /* End XCSwiftPackageProductDependency section */
 	};

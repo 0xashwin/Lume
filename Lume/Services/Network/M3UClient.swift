@@ -251,19 +251,23 @@ nonisolated class M3UClient {
         return false
     }
 
-    /// Xtream `get.php` links only yield an m3u when `type` is `m3u` or
-    /// `m3u_plus`. Any other value (`gigablue`, `dreambox`, `enigma2`, …)
-    /// returns a set-top-box bouquet that can't be parsed, so rewrite it to
-    /// `m3u_plus`. Non-`get.php` URLs and already-valid types pass through
-    /// untouched. Keeping this in the client means both freshly-added and
-    /// already-stored playlists self-heal on their next fetch.
+    /// Xtream `get.php` links yield a parseable playlist for `type=m3u` and
+    /// `type=m3u_plus`; any other value (`gigablue`, `dreambox`, `enigma2`, …)
+    /// returns a set-top-box bouquet that can't be parsed. We always rewrite to
+    /// `m3u_plus` — including plain `m3u`, which is the canonical `get.php`
+    /// default users paste — because `m3u_plus` is a strict superset: plain
+    /// `m3u` omits the `tvg-logo` / `tvg-id` / `group-title` attributes, so
+    /// posters, channel logos and categories all go missing, while `m3u_plus`
+    /// carries them. Only already-`m3u_plus` URLs and non-`get.php` URLs pass
+    /// through untouched. Keeping this in the client means both freshly-added
+    /// and already-stored playlists self-heal on their next fetch.
     static func normalizedPlaylistURL(_ urlString: String) -> String {
         guard var components = URLComponents(string: urlString),
               components.path.hasSuffix("get.php"),
               var items = components.queryItems,
               let index = items.firstIndex(where: { $0.name == "type" }),
               let type = items[index].value?.lowercased(),
-              type != "m3u", type != "m3u_plus"
+              type != "m3u_plus"
         else { return urlString }
 
         items[index].value = "m3u_plus"

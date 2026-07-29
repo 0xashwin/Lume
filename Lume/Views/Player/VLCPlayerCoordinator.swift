@@ -1,7 +1,7 @@
 import Combine
 import Foundation
 import OSLog
-import VLCKitSPM
+import VLCKit
 
 #if canImport(UIKit)
     import UIKit

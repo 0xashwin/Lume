@@ -125,7 +125,7 @@ struct SearchView: View {
                     await updateResults()
                 }
         }
-        #if os(iOS)
+        #if os(iOS) || os(tvOS)
         .fullScreenCover(item: $playingMedia) { media in
             FullScreenPlayerView(media: media)
         }
