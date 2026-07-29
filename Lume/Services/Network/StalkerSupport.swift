@@ -98,6 +98,27 @@ nonisolated enum StalkerLink {
         return (type, cmd)
     }
 
+    /// Query parameters embedded in a direct-URL `cmd`, re-exposed as top-level
+    /// `create_link` parameters. Xtream-UI-style Stalker emulations hand out
+    /// channel cmds that are full stream URLs
+    /// (`ffmpeg http://host/play/live.php?mac=…&stream=933136&extension=ts&play_token=…`)
+    /// and their `create_link` never parses the percent-encoded `cmd` it
+    /// receives — it reads `stream` / `extension` from the request's own query
+    /// string and answers with an empty `stream=` (an unplayable URL) when
+    /// they're missing. Forwarding the embedded parameters satisfies those
+    /// portals, while genuine Ministra portals resolve the full `cmd` and
+    /// ignore the extras. `mac` and `play_token` stay out — the portal derives
+    /// the MAC from the session and mints a fresh token; the stored one is
+    /// stale by playback time.
+    static func forwardedQueryItems(from cmd: String) -> [URLQueryItem] {
+        guard let url = resolvedURL(from: cmd),
+              url.scheme == "http" || url.scheme == "https",
+              let items = URLComponents(url: url, resolvingAgainstBaseURL: false)?.queryItems
+        else { return [] }
+        let excluded: Set = ["mac", "play_token", "token", "type", "action", "cmd", "JsHttpRequest"]
+        return items.filter { !excluded.contains($0.name) }
+    }
+
     /// Extracts a playable URL from a `create_link` `cmd` response. Portals
     /// commonly prefix the URL with an engine token (`ffmpeg `, `auto `) and may
     /// append params, so we take the first `http(s)` token rather than trusting

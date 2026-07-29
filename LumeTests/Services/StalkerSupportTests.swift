@@ -16,7 +16,7 @@ struct StalkerSupportTests {
     }
 
     @Test func `mac generate produces varying results`() {
-        let macs = Set((0..<10).map { _ in StalkerMAC.generate() })
+        let macs = Set((0 ..< 10).map { _ in StalkerMAC.generate() })
         #expect(macs.count > 1)
     }
 
@@ -54,8 +54,8 @@ struct StalkerSupportTests {
         #expect(StalkerLink.isPlaceholder(url))
     }
 
-    @Test func `link isPlaceholder rejects regular url`() {
-        let url = URL(string: "http://example.com/stream")!
+    @Test func `link isPlaceholder rejects regular url`() throws {
+        let url = try #require(URL(string: "http://example.com/stream"))
         #expect(!StalkerLink.isPlaceholder(url))
     }
 
@@ -66,8 +66,8 @@ struct StalkerSupportTests {
         #expect(decoded.cmd == "auto http://example.com/vod")
     }
 
-    @Test func `link decode returns nil for non placeholder`() {
-        let url = URL(string: "http://example.com")!
+    @Test func `link decode returns nil for non placeholder`() throws {
+        let url = try #require(URL(string: "http://example.com"))
         #expect(StalkerLink.decode(url) == nil)
     }
 
@@ -99,6 +99,29 @@ struct StalkerSupportTests {
     @Test func `link resolvedURL trims whitespace`() {
         let url = StalkerLink.resolvedURL(from: "  https://example.com/stream  ")
         #expect(url?.absoluteString == "https://example.com/stream")
+    }
+
+    @Test func `link forwardedQueryItems exposes embedded stream params`() {
+        let cmd = "ffmpeg http://portal.example.com:80/play/live.php?" +
+            "mac=00:1B:79:FA:12:C5&stream=933136&extension=ts&play_token=q0fg2wkpEy"
+        let items = StalkerLink.forwardedQueryItems(from: cmd)
+        #expect(items.map(\.name) == ["stream", "extension"])
+        #expect(items.first { $0.name == "stream" }?.value == "933136")
+        #expect(items.first { $0.name == "extension" }?.value == "ts")
+    }
+
+    @Test func `link forwardedQueryItems excludes mac and tokens`() {
+        let cmd = "ffmpeg http://portal.example.com/play/live.php?mac=00:1A:79:00:00:01&play_token=abc&token=x"
+        #expect(StalkerLink.forwardedQueryItems(from: cmd).isEmpty)
+    }
+
+    @Test func `link forwardedQueryItems empty for localhost ch cmd`() {
+        #expect(StalkerLink.forwardedQueryItems(from: "ffmpeg http://localhost/ch/933136_").isEmpty)
+    }
+
+    @Test func `link forwardedQueryItems empty for non-url cmd`() {
+        #expect(StalkerLink.forwardedQueryItems(from: "/media/12345.mpg").isEmpty)
+        #expect(StalkerLink.forwardedQueryItems(from: "").isEmpty)
     }
 
     // MARK: - StalkerError
@@ -147,11 +170,11 @@ struct StalkerSupportTests {
 
     // MARK: - StalkerSessionStore
 
-    @Test func `session store round trip`() async {
+    @Test func `session store round trip`() async throws {
         let store = StalkerSessionStore()
-        let session = StalkerSessionStore.Session(
+        let session = try StalkerSessionStore.Session(
             token: "abc123",
-            endpoint: URL(string: "http://portal.example.com/stalker_portal")!
+            endpoint: #require(URL(string: "http://portal.example.com/stalker_portal"))
         )
         await store.store(session, for: "user:mac")
         let fetched = await store.session(for: "user:mac")
@@ -159,11 +182,11 @@ struct StalkerSupportTests {
         #expect(fetched?.endpoint.absoluteString == "http://portal.example.com/stalker_portal")
     }
 
-    @Test func `session store clear removes entry`() async {
+    @Test func `session store clear removes entry`() async throws {
         let store = StalkerSessionStore()
-        let session = StalkerSessionStore.Session(
+        let session = try StalkerSessionStore.Session(
             token: "xyz",
-            endpoint: URL(string: "http://example.com")!
+            endpoint: #require(URL(string: "http://example.com"))
         )
         await store.store(session, for: "key1")
         await store.clear("key1")
@@ -177,10 +200,10 @@ struct StalkerSupportTests {
         #expect(fetched == nil)
     }
 
-    @Test func `session store isolates sessions by key`() async {
+    @Test func `session store isolates sessions by key`() async throws {
         let store = StalkerSessionStore()
-        let sessionA = StalkerSessionStore.Session(token: "A", endpoint: URL(string: "http://a.com")!)
-        let sessionB = StalkerSessionStore.Session(token: "B", endpoint: URL(string: "http://b.com")!)
+        let sessionA = try StalkerSessionStore.Session(token: "A", endpoint: #require(URL(string: "http://a.com")))
+        let sessionB = try StalkerSessionStore.Session(token: "B", endpoint: #require(URL(string: "http://b.com")))
         await store.store(sessionA, for: "keyA")
         await store.store(sessionB, for: "keyB")
         let fetchedA = await store.session(for: "keyA")

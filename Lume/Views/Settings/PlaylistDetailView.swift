@@ -22,6 +22,9 @@ struct PlaylistDetailView: View {
     @State private var editMacAddress = ""
     @State private var showDeleteConfirmation = false
     @State private var showSync = false
+    /// Presents the full-catalog download (Stalker only). Kept separate from
+    /// `showSync` so the two sheets carry different `full` flags.
+    @State private var showFullSync = false
 
     private var isM3U: Bool {
         playlist.sourceType == .m3u
@@ -112,6 +115,9 @@ struct PlaylistDetailView: View {
                 }
                 .sheet(isPresented: $showSync) {
                     SyncProgressView(playlist: playlist)
+                }
+                .sheet(isPresented: $showFullSync) {
+                    SyncProgressView(playlist: playlist, full: true)
                 }
         }
     #endif
@@ -205,7 +211,7 @@ struct PlaylistDetailView: View {
         // MARK: - Sync Section
 
         private var syncSection: some View {
-            Section("Sync") {
+            Section {
                 Toggle("Sync Enabled", isOn: $playlist.syncEnabled)
 
                 if playlist.syncStatus == .syncing {
@@ -232,6 +238,26 @@ struct PlaylistDetailView: View {
                     showSync = true
                 }
                 .disabled(playlist.syncStatus == .syncing)
+
+                if isStalker {
+                    Button("Download Full Catalog") {
+                        showFullSync = true
+                    }
+                    .disabled(playlist.syncStatus == .syncing)
+                }
+            } header: {
+                Text("Sync")
+            } footer: {
+                if isStalker {
+                    // The portal serves ~14 items per request with no bulk
+                    // endpoint, so a default sync only loads the newest titles;
+                    // the full catalog is opt-in because it can take a while.
+                    Text("""
+                    Movies and series load as you browse — nothing is prefetched. \
+                    Download the full catalog to make everything available offline and \
+                    searchable at once; this can take a while on large portals.
+                    """)
+                }
             }
         }
     #endif
@@ -274,6 +300,9 @@ struct PlaylistDetailView: View {
             }
             .fullScreenCover(isPresented: $showSync) {
                 SyncProgressView(playlist: playlist)
+            }
+            .fullScreenCover(isPresented: $showFullSync) {
+                SyncProgressView(playlist: playlist, full: true)
             }
         }
 
@@ -385,6 +414,24 @@ struct PlaylistDetailView: View {
                     Button("Sync Now") { showSync = true }
                         .buttonStyle(TVSettingsRowButtonStyle())
                         .disabled(playlist.syncStatus == .syncing)
+
+                    if isStalker {
+                        Button("Download Full Catalog") { showFullSync = true }
+                            .buttonStyle(TVSettingsRowButtonStyle())
+                            .disabled(playlist.syncStatus == .syncing)
+                    }
+                }
+
+                if isStalker {
+                    Text("""
+                    Movies and series load as you browse — nothing is prefetched. \
+                    Download the full catalog to make everything available offline and \
+                    searchable at once; this can take a while on large portals.
+                    """)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .padding(.horizontal, TVSettingsMetrics.rowHPadding)
+                    .padding(.top, 4)
                 }
             }
         }
@@ -406,10 +453,12 @@ struct PlaylistDetailView: View {
             .padding(.top, 12)
         }
     #endif
+}
 
-    // MARK: - Actions
+// MARK: - Actions
 
-    private func startEditing() {
+private extension PlaylistDetailView {
+    func startEditing() {
         editName = playlist.name
         editServerURL = playlist.serverURL
         editUsername = playlist.username
@@ -419,11 +468,11 @@ struct PlaylistDetailView: View {
         withAnimation { isEditing = true }
     }
 
-    private func cancelEditing() {
+    func cancelEditing() {
         withAnimation { isEditing = false }
     }
 
-    private func saveChanges() {
+    func saveChanges() {
         playlist.name = editName.trimmingCharacters(in: .whitespacesAndNewlines)
         playlist.serverURL = editServerURL.trimmingCharacters(in: .whitespacesAndNewlines)
         if isM3U {
@@ -444,7 +493,7 @@ struct PlaylistDetailView: View {
         withAnimation { isEditing = false }
     }
 
-    private func deletePlaylist() {
+    func deletePlaylist() {
         // Route through the sync engine so the deletion also clears the
         // CloudKit mirror and shadow baseline — deleting on the view context
         // alone leaves a surviving mirror that resurrects the last playlist
