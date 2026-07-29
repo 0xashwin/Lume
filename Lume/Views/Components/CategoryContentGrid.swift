@@ -283,7 +283,7 @@ struct MovieCategoryView: View {
             emptyDescription: "This category has no movies",
             sortRaw: $contentSortRaw,
             onLoadMore: { loadNextPage() },
-            card: { MovieCardView(movie: $0) }
+            card: { MovieCardView(movie: $0, fillsWidth: true) }
         )
         .task(id: contentSortRaw) {
             guard loadedSort != contentSortRaw else { return }
@@ -380,7 +380,7 @@ struct SeriesCategoryView: View {
             emptyDescription: "This category has no series",
             sortRaw: $contentSortRaw,
             onLoadMore: { loadNextPage() },
-            card: { SeriesCardView(series: $0) }
+            card: { SeriesCardView(series: $0, fillsWidth: true) }
         )
         .task(id: contentSortRaw) {
             guard loadedSort != contentSortRaw else { return }
