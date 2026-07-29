@@ -297,6 +297,7 @@ struct MovieCategoryView: View {
                 canLoadMore = true
                 await importStalkerContentIfNeeded()
                 loadNextPage()
+                await revalidateStalkerContentIfStale()
             }
     }
 
@@ -313,9 +314,9 @@ struct MovieCategoryView: View {
             onLoadMore: { loadNextPage() },
             card: { MovieCardView(movie: $0, fillsWidth: true) }
         )
-        // Pull-to-refresh re-imports a Stalker category from the portal (its
-        // content is a one-time on-demand fetch, so this is how a user picks up
-        // titles the provider added). Not offered for fully-synced sources.
+        // Pull-to-refresh re-imports a Stalker category from the portal without
+        // waiting out `Category.stalkerContentTTL`. Not offered for fully-synced
+        // sources.
         #if !os(tvOS)
             if stalkerPlaylist != nil {
                 base.refreshable { await reimportStalkerContent() }
@@ -350,12 +351,40 @@ struct MovieCategoryView: View {
         await runStalkerImport(playlist: playlist)
     }
 
+    /// Re-imports a previously imported category once its content outlives
+    /// `Category.stalkerContentTTL`, then swaps the refreshed rows in beneath
+    /// the grid. Runs after the local pages are already showing, so the user
+    /// browses the cached snapshot while the portal walk happens — the only
+    /// refresh path on tvOS, which has no pull-to-refresh.
+    private func revalidateStalkerContentIfStale() async {
+        guard let playlist = stalkerPlaylist,
+              category.contentImportedAt != nil, category.stalkerContentStale else { return }
+        await runStalkerImport(playlist: playlist)
+        reloadLoadedPages()
+    }
+
     private func reimportStalkerContent() async {
         guard let playlist = stalkerPlaylist else { return }
         await runStalkerImport(playlist: playlist)
         movies = []
         canLoadMore = true
         loadNextPage()
+    }
+
+    /// Re-fetches the already-loaded window in place. Row identity is stable
+    /// (persistent model ids), so unchanged items keep the scroll position;
+    /// only added/removed titles shift.
+    private func reloadLoadedPages() {
+        let categoryId = category.id
+        var descriptor = FetchDescriptor<Movie>(
+            predicate: #Predicate { $0.categoryId == categoryId },
+            sortBy: contentSort.movieDescriptors
+        )
+        let window = max(movies.count, pageSize)
+        descriptor.fetchLimit = window
+        let rows = (try? modelContext.fetch(descriptor)) ?? []
+        canLoadMore = rows.count == window
+        movies = rows
     }
 
     private func runStalkerImport(playlist: Playlist) async {
@@ -449,6 +478,7 @@ struct SeriesCategoryView: View {
                 canLoadMore = true
                 await importStalkerContentIfNeeded()
                 loadNextPage()
+                await revalidateStalkerContentIfStale()
             }
     }
 
@@ -500,12 +530,36 @@ struct SeriesCategoryView: View {
         await runStalkerImport(playlist: playlist)
     }
 
+    /// Background revalidation of content older than `Category.stalkerContentTTL`
+    /// — see `MovieCategoryView.revalidateStalkerContentIfStale`.
+    private func revalidateStalkerContentIfStale() async {
+        guard let playlist = stalkerPlaylist,
+              category.contentImportedAt != nil, category.stalkerContentStale else { return }
+        await runStalkerImport(playlist: playlist)
+        reloadLoadedPages()
+    }
+
     private func reimportStalkerContent() async {
         guard let playlist = stalkerPlaylist else { return }
         await runStalkerImport(playlist: playlist)
         series = []
         canLoadMore = true
         loadNextPage()
+    }
+
+    /// Re-fetches the already-loaded window in place — see
+    /// `MovieCategoryView.reloadLoadedPages`.
+    private func reloadLoadedPages() {
+        let categoryId = category.id
+        var descriptor = FetchDescriptor<Series>(
+            predicate: #Predicate { $0.categoryId == categoryId },
+            sortBy: contentSort.seriesDescriptors
+        )
+        let window = max(series.count, pageSize)
+        descriptor.fetchLimit = window
+        let rows = (try? modelContext.fetch(descriptor)) ?? []
+        canLoadMore = rows.count == window
+        series = rows
     }
 
     private func runStalkerImport(playlist: Playlist) async {
