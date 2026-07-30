@@ -138,6 +138,7 @@ struct FullScreenPlayerView: View {
         guard hasFallbackEngine else { return }
         let failed = engine
         engineAttempt += 1
+        PlaybackQoE.shared.noteEngineFallback(to: engine)
         Logger.player.log("engine \(failed.rawValue, privacy: .public) could not start the stream; falling back to \(engine.rawValue, privacy: .public)")
     }
 

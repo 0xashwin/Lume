@@ -44,6 +44,37 @@ Every test `ModelConfiguration` must set `cloudKitDatabase: .none` — `@Attribu
 
 ---
 
+## Performance testing
+
+Benchmarks live in their own target (`LumePerformanceTests`), scheme
+(`LumePerformance`), test plan (`Performance.xctestplan`) and build configuration
+(**Benchmark** = Release + `ENABLE_TESTABILITY`). They are *not* in the `Lume`
+scheme, so a normal `xcodebuild test` never runs them.
+
+```bash
+Scripts/run-performance-tests.sh                    # whole suite + measurements
+Scripts/run-performance-tests.sh ParsingBenchmarks  # one suite
+```
+
+- Never benchmark in Debug — `-Onone` makes parser/import numbers fiction. That's
+  what the Benchmark configuration exists for.
+- Store benchmarks use **on-disk** containers (`PerfStore`); in-memory skips
+  SQLite, the very cost being measured.
+- Fixtures are generated per run from a fixed seed (`PerfFixtures`), never
+  committed.
+- App-defined phases are named once in `Services/Diagnostics/PerformanceSignposts.swift`
+  (`Perf.begin`/`Perf.end`). Those names are a contract with `SignpostBenchmarks`
+  and feed Instruments' Points of Interest lane — rename one and update both.
+- Field layer, in the shipping app: `AppPerformanceMetrics` (MetricKit; compiled
+  out on tvOS) and `PlaybackQoE` (join time, rebuffer ratio, exits before video
+  start, engine fallbacks). Both surface in the exported diagnostic report.
+- `PlaybackQoE` flushes to `UserDefaults` at session boundaries only — never
+  periodically, which is what used to hitch KSPlayer.
+
+See `LumePerformanceTests/README.md` for baselines and why there is no CI gate.
+
+---
+
 ## Architecture
 
 ```
@@ -54,6 +85,7 @@ Lume/
 │   ├── Network/             XtreamClient, M3UClient, TMDBClient, MDBListClient, TraktService
 │   ├── Sync/                ContentSyncManager (background catalog indexing + enrichment)
 │   ├── Player/              PlayerSettings, PlayerHistory, NextUp resolver
+│   ├── Diagnostics/         Perf signposts, PlaybackQoE, MetricKit subscriber
 │   └── Images/              CachedAsyncImage, ImagePipeline
 └── Views/                   SwiftUI, platform-adaptive
     ├── Home/                Hero carousel, rails, tvOS fold
