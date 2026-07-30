@@ -190,6 +190,14 @@ struct LumeApp: App {
                 .environment(playlistSwitch)
                 .environment(parentalControls)
                 .task {
+                    // Subscribe to MetricKit before anything else: payloads for a
+                    // previous run are delivered shortly after launch, and one
+                    // missed registration loses a day of field data. Compiles out
+                    // on tvOS, where MetricKit doesn't exist.
+                    #if canImport(MetricKit) && !os(tvOS)
+                        AppPerformanceMetrics.shared.start()
+                    #endif
+
                     // Give DownloadManager access to the model container so it
                     // can persist download state from its delegate callbacks.
                     #if !os(tvOS)

@@ -11,6 +11,31 @@ import OSLog
 import VLCKit
 
 extension VLCPlayerCoordinator {
+    // MARK: - State logging
+
+    /// Log player state transitions. Buffering is no longer a discrete state in
+    /// VLCKit 4 — its duration is measured separately in
+    /// ``mediaPlayerBufferingChanged(_:)``, which also feeds `PlaybackQoE`.
+    ///
+    /// Lives here rather than beside its caller purely for file size; it is
+    /// called from `mediaPlayerStateChanged(_:)` on the main queue.
+    func logStateChange() {
+        let state = mediaPlayer.state
+        let name = VLCMediaPlayerStateToString(state)
+        guard name != lastStateName else { return }
+        lastStateName = name
+
+        Logger.player.log("state → \(name, privacy: .public)")
+
+        // Re-assert deinterlace once a vout exists: the runtime setting doesn't
+        // survive the output being (re)created, e.g. across a stream reload.
+        if state == .playing { applyDeinterlace() }
+
+        if state == .error {
+            Logger.player.error("player entered error state")
+        }
+    }
+
     // MARK: - Diagnostics
 
     private static var didInstallLogBridge = false

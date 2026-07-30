@@ -96,6 +96,9 @@ final class LumeEngineCoordinator: NSObject, ObservableObject {
         tearDown()
         currentMedia = media
         reportedFailure = false
+        // After `tearDown` (which closes any previous session) so a reload counts
+        // as its own startup attempt rather than extending the last one.
+        PlaybackQoE.shared.beginStartup(engine: .lumeEngine, isLive: media.isLive)
 
         let session = PlayerSession(configuration: makeConfiguration(for: media))
         self.session = session
@@ -175,6 +178,7 @@ final class LumeEngineCoordinator: NSObject, ObservableObject {
     }
 
     func tearDown() {
+        PlaybackQoE.shared.endSession()
         eventTask?.cancel()
         tickTask?.cancel()
         startupTask?.cancel()
@@ -288,8 +292,14 @@ final class LumeEngineCoordinator: NSObject, ObservableObject {
             Logger.player.info("LumeEngine state → \(String(describing: state), privacy: .public)")
             isPlaying = state == .playing
             isBuffering = state == .buffering || state == .opening
+            if isBuffering {
+                PlaybackQoE.shared.noteStallBegan()
+            } else {
+                PlaybackQoE.shared.noteStallEnded()
+            }
             if state == .playing {
                 hasStartedPlayback = true
+                PlaybackQoE.shared.noteFirstFrame()
                 onRecovered?()
             }
             if state == .failed {
@@ -382,6 +392,9 @@ final class LumeEngineCoordinator: NSObject, ObservableObject {
     private func reportFailure() {
         guard !reportedFailure else { return }
         reportedFailure = true
+        if !hasStartedPlayback {
+            PlaybackQoE.shared.noteStartupFailure()
+        }
         onPlaybackFailure?()
     }
 
