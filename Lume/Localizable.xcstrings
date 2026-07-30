@@ -5376,6 +5376,58 @@
         }
       }
     },
+    "Clear Recently Watched" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Kürzlich gesehen löschen"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Borrar vistos recientemente"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Effacer les éléments vus récemment"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Cancella visti di recente"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "最近視聴した項目を消去"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "최근 시청함 지우기"
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Limpar Assistidos Recentemente"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "清除最近观看"
+          }
+        }
+      }
+    },
     "Clear Watch History" : {
       "localizations" : {
         "de" : {
@@ -29475,6 +29527,58 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "此类别中无剧集"
+          }
+        }
+      }
+    },
+    "This clears the list of channels you've recently watched. Your favorites and the channels themselves aren't affected." : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Die Liste der kürzlich gesehenen Sender wird geleert. Favoriten und die Sender selbst sind nicht betroffen."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Se borrará la lista de canales vistos recientemente. Los favoritos y los canales en sí no se verán afectados."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "La liste des chaînes vues récemment sera effacée. Les favoris et les chaînes elles-mêmes ne sont pas affectés."
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "L’elenco dei canali guardati di recente verrà cancellato. I preferiti e i canali stessi non verranno modificati."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "最近視聴したチャンネルのリストが消去されます。お気に入りやチャンネル自体には影響しません。"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "최근에 시청한 채널 목록이 지워집니다. 즐겨찾기와 채널 자체에는 영향을 주지 않습니다."
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "A lista de canais assistidos recentemente será apagada. Os favoritos e os próprios canais não serão afetados."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "最近观看的频道列表将被清除。收藏和频道本身不受影响。"
           }
         }
       }
