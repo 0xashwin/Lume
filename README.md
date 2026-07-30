@@ -11,6 +11,10 @@ Browse, search, and stream your Xtream Codes or **M3U/M3U8** playlists with a cl
 <a href="https://apps.apple.com/us/app/lume-iptv-player/id6779551584">
   <img src="https://toolbox.marketingtools.apple.com/api/v2/badges/download-on-the-app-store/black/en-us?releaseDate=1700000000" alt="Download Lume on the App Store" height="48">
 </a>
+&nbsp;&nbsp;
+<a href="https://discord.gg/DMnQfr69Ug">
+  <img src="https://img.shields.io/badge/Join_the_Community-5865F2?style=for-the-badge&logo=discord&logoColor=white" alt="Join the Lume Discord" height="48">
+</a>
 
 <br><br>
 
@@ -20,7 +24,6 @@ Browse, search, and stream your Xtream Codes or **M3U/M3U8** playlists with a cl
 [![SwiftUI](https://img.shields.io/badge/UI-SwiftUI-0A84FF)](https://developer.apple.com/xcode/swiftui/)
 [![SwiftData](https://img.shields.io/badge/Persistence-SwiftData-30B0C7)](https://developer.apple.com/documentation/swiftdata)
 [![Issues](https://img.shields.io/github/issues/bilipp/Lume?color=F9EE00&labelColor=1f1f2e)](https://github.com/bilipp/Lume/issues)
-[![Discord](https://img.shields.io/badge/chat-Discord-5865F2?logo=discord&logoColor=white&labelColor=1f1f2e)](https://discord.gg/DMnQfr69Ug)
 [![License](https://img.shields.io/badge/license-AGPL--3.0-blue?labelColor=1f1f2e)](LICENSE)
 
 </div>
@@ -30,6 +33,7 @@ Browse, search, and stream your Xtream Codes or **M3U/M3U8** playlists with a cl
 ## Table of contents
 
 - [Overview](#overview)
+- [Screenshots](#screenshots)
 - [Features](#features)
 - [Supported platforms](#supported-platforms)
 - [Playback engines](#playback-engines)
@@ -39,6 +43,7 @@ Browse, search, and stream your Xtream Codes or **M3U/M3U8** playlists with a cl
 - [Configuration](#configuration)
 - [Testing](#testing)
 - [Roadmap](#roadmap)
+- [Community](#community)
 - [Contributing](#contributing)
 - [Anti-piracy](#anti-piracy)
 - [License](#license)
@@ -63,6 +68,51 @@ Metacritic, Trakt, Letterboxd), and your viewing activity can be scrobbled to **
 > of its own. You bring your own Xtream Codes credentials or M3U playlist from a
 > provider you are entitled to use. We do not condone piracy — please read the
 > [**Anti-Piracy Policy**](ANTI_PIRACY.md).
+
+---
+
+## Screenshots
+
+<div align="center">
+
+<img src="Assets/Screenshots/tvOS/1-home.jpeg" alt="Lume on Apple TV — immersive home screen with hero carousel and trending rail" width="880">
+
+**Apple TV** — immersive full-screen home with a crossfading TMDB hero and fold-based scroll snapping
+
+<br>
+
+<img src="Assets/Screenshots/tvOS/4-movie-hero.jpeg" alt="Lume movie detail on Apple TV with logo artwork, ratings and cast" width="880">
+
+**Apple TV** — movie detail with TMDB backdrop, logo treatment, ratings, and metadata
+
+<br>
+
+<img src="Assets/Screenshots/macOS/01-home.png" alt="Lume on macOS showing the home dashboard in a window" width="880">
+
+**Mac** — the same catalog in a resizable window, with profile switching in the toolbar
+
+<br>
+
+<table>
+  <tr>
+    <td align="center" width="33%"><img src="Assets/Screenshots/iOS/1-home.jpeg" alt="Home dashboard on iPhone" width="250"></td>
+    <td align="center" width="33%"><img src="Assets/Screenshots/iOS/7-movies-overview.jpeg" alt="Movies browsing on iPhone" width="250"></td>
+    <td align="center" width="33%"><img src="Assets/Screenshots/iOS/4-live-epg.jpeg" alt="Live TV program guide on iPhone" width="250"></td>
+  </tr>
+  <tr>
+    <td align="center"><sub>Home</sub></td>
+    <td align="center"><sub>Movies</sub></td>
+    <td align="center"><sub>Live TV guide</sub></td>
+  </tr>
+</table>
+
+**iPhone & iPad** — a hero carousel, poster rails, and a scrollable EPG timeline, all
+adapted per size class
+
+<sub>More shots — including iPad, the players, and the tvOS guide — live in
+[`Assets/Screenshots/`](Assets/Screenshots).</sub>
+
+</div>
 
 ---
 
@@ -382,10 +432,37 @@ Planned features and enhancements are tracked as
 
 ---
 
+## Community
+
+<div align="center">
+
+<a href="https://discord.gg/DMnQfr69Ug">
+  <img src="https://img.shields.io/badge/Join_the_Lume_Discord-5865F2?style=for-the-badge&logo=discord&logoColor=white" alt="Join the Lume Discord" height="44">
+</a>
+
+### [discord.gg/DMnQfr69Ug](https://discord.gg/DMnQfr69Ug)
+
+</div>
+
+The Discord is the fastest way to get help and the best place to follow where Lume is
+going:
+
+- 🛟 **Support** — playlist, EPG, and playback troubleshooting with people running the
+  same providers and devices
+- 🐞 **Bug reports** — quick triage before (or alongside) a [GitHub issue](https://github.com/bilipp/Lume/issues)
+- 🗺️ **Feature requests** — help shape what gets built next
+- 🚀 **Releases** — every new version announced as it ships, plus beta feedback
+- 💬 **Just hanging out** — talk to the maintainer and other users directly
+
+One rule: **no piracy talk** — no requests for, or sharing of, streams, playlists, or
+credentials. See the [**Anti-Piracy Policy**](ANTI_PIRACY.md).
+
+---
+
 ## Contributing
 
-> 💬 Have a question, want to share feedback, or just hang out? Join the community on
-> **[Discord](https://discord.gg/DMnQfr69Ug)**.
+> 💬 Question or feedback? The **[Discord](https://discord.gg/DMnQfr69Ug)** is usually
+> faster than an issue — see [Community](#community).
 
 Contributions are welcome! The short version:
 
@@ -444,4 +521,6 @@ PARTICULAR PURPOSE. See the GNU Affero General Public License for more details.
 <div align="center">
 <br>
 <sub>Built with SwiftUI for iPhone, iPad, Mac, Apple TV & Vision Pro.</sub>
+<br>
+<sub>Questions, ideas, or bugs? <a href="https://discord.gg/DMnQfr69Ug"><b>Join us on Discord</b></a>.</sub>
 </div>
