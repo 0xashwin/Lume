@@ -3377,6 +3377,58 @@
         }
       }
     },
+    "Automatic plays channels at the URL the playlist lists. Choose HLS or MPEG-TS to request that container instead; channels served through another kind of URL are unaffected." : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "„Automatisch“ spielt Kanäle über die in der Playlist angegebene URL ab. Wähle HLS oder MPEG-TS, um stattdessen dieses Format anzufordern; Kanäle mit einer anderen Art von URL bleiben unverändert."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "«Automático» reproduce los canales con la URL indicada en la lista. Elige HLS o MPEG-TS para solicitar ese contenedor en su lugar; los canales con otro tipo de URL no se ven afectados."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "« Automatique » lit les chaînes à l’URL indiquée dans la playlist. Choisissez HLS ou MPEG-TS pour demander ce conteneur à la place ; les chaînes diffusées via un autre type d’URL ne sont pas concernées."
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "«Automatico» riproduce i canali all’URL indicato nella playlist. Scegli HLS o MPEG-TS per richiedere invece quel contenitore; i canali distribuiti con un altro tipo di URL non vengono modificati."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "「自動」はプレイリストに記載された URL でチャンネルを再生します。HLS または MPEG-TS を選ぶと、そのコンテナで要求します。別の形式の URL で配信されているチャンネルには影響しません。"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "‘자동’은 재생 목록에 기재된 URL로 채널을 재생합니다. HLS 또는 MPEG-TS를 선택하면 해당 컨테이너로 요청합니다. 다른 형태의 URL로 제공되는 채널은 영향을 받지 않습니다."
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "«Automático» reproduz os canais no URL indicado na lista. Escolha HLS ou MPEG-TS para pedir esse contentor em vez disso; os canais servidos através de outro tipo de URL não são afetados."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "“自动”会使用播放列表中给出的 URL 播放频道。选择 HLS 或 MPEG-TS 可改为请求该封装格式；通过其他类型 URL 提供的频道不受影响。"
+          }
+        }
+      }
+    },
     "Automatic Refresh" : {
       "localizations" : {
         "de" : {
@@ -3425,6 +3477,58 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "自动刷新"
+          }
+        }
+      }
+    },
+    "Automatic requests live channels as HLS. Choose MPEG-TS if channels stutter, refuse to start, or drop out — servers often serve one container more reliably than the other." : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "„Automatisch“ fordert Live-Kanäle als HLS an. Wähle MPEG-TS, wenn Kanäle stocken, nicht starten oder abbrechen – Server liefern oft eines der beiden Formate zuverlässiger."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "«Automático» solicita los canales en directo como HLS. Elige MPEG-TS si los canales se cortan, no arrancan o se interrumpen: los servidores suelen ofrecer un contenedor con más fiabilidad que el otro."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "« Automatique » demande les chaînes en direct en HLS. Choisissez MPEG-TS si les chaînes saccadent, ne démarrent pas ou s’interrompent : les serveurs diffusent souvent l’un des deux conteneurs de manière plus fiable."
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "«Automatico» richiede i canali live come HLS. Scegli MPEG-TS se i canali scattano, non partono o si interrompono: i server offrono spesso un contenitore in modo più affidabile dell’altro."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "「自動」はライブチャンネルを HLS で要求します。映像が途切れる、再生が始まらない、途中で止まる場合は MPEG-TS を選んでください。サーバーによってどちらか一方のコンテナが安定していることがよくあります。"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "‘자동’은 라이브 채널을 HLS로 요청합니다. 채널이 끊기거나 재생이 시작되지 않거나 도중에 멈추면 MPEG-TS를 선택하세요. 서버에 따라 한쪽 컨테이너가 더 안정적인 경우가 많습니다."
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "«Automático» pede os canais ao vivo em HLS. Escolha MPEG-TS se os canais engasgarem, não iniciarem ou caírem — os servidores costumam fornecer um dos contentores de forma mais fiável do que o outro."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "“自动”会以 HLS 请求直播频道。如果频道卡顿、无法开始播放或中断，请选择 MPEG-TS——服务器往往对其中一种封装格式的支持更稳定。"
           }
         }
       }
@@ -14904,6 +15008,58 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "直播缓冲"
+          }
+        }
+      }
+    },
+    "Live Stream Format" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Format für Livestreams"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Formato de canales en directo"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Format des flux en direct"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Formato dei flussi live"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ライブ配信のフォーマット"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "라이브 스트림 형식"
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Formato de transmissão ao vivo"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "直播流格式"
           }
         }
       }
