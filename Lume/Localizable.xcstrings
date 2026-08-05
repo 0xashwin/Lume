@@ -12817,6 +12817,58 @@
         }
       }
     },
+    "iCloud is busy. Sync will retry automatically." : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "iCloud ist ausgelastet. Die Synchronisierung wird automatisch wiederholt."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "iCloud está ocupado. La sincronización se reintentará automáticamente."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "iCloud est occupé. La synchronisation sera relancée automatiquement."
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "iCloud è occupato. La sincronizzazione verrà ritentata automaticamente."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "iCloudが混雑しています。同期は自動的に再試行されます。"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "iCloud가 사용 중입니다. 동기화를 자동으로 다시 시도합니다."
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "O iCloud está ocupado. A sincronização será tentada novamente automaticamente."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "iCloud 繁忙。将自动重试同步。"
+          }
+        }
+      }
+    },
     "iCloud is restricted on this device (e.g. by Screen Time or a profile)." : {
       "localizations" : {
         "de" : {
@@ -12917,6 +12969,58 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "iCloud暂时不可用。同步将自动恢复。"
+          }
+        }
+      }
+    },
+    "iCloud rejected some changes. Export a diagnostic report for details." : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "iCloud hat einige Änderungen abgelehnt. Exportiere einen Diagnosebericht für Details."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "iCloud rechazó algunos cambios. Exporta un informe de diagnóstico para ver los detalles."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "iCloud a refusé certaines modifications. Exportez un rapport de diagnostic pour en savoir plus."
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "iCloud ha rifiutato alcune modifiche. Esporta un report diagnostico per i dettagli."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "iCloudが一部の変更を拒否しました。詳細は診断レポートを書き出してください。"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "iCloud가 일부 변경을 거부했습니다. 자세한 내용은 진단 보고서를 내보내세요."
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "O iCloud rejeitou algumas alterações. Exporte um relatório de diagnóstico para ver os detalhes."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "iCloud 拒绝了部分更改。请导出诊断报告以查看详情。"
           }
         }
       }
@@ -18831,6 +18935,58 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "无频道"
+          }
+        }
+      }
+    },
+    "No connection to iCloud. Sync resumes when you’re back online." : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Keine Verbindung zu iCloud. Die Synchronisierung wird fortgesetzt, sobald du wieder online bist."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sin conexión con iCloud. La sincronización se reanudará cuando vuelvas a estar en línea."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Aucune connexion à iCloud. La synchronisation reprendra dès que vous serez de nouveau en ligne."
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Nessuna connessione a iCloud. La sincronizzazione riprende quando torni online."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "iCloudに接続できません。オンラインに戻ると同期が再開されます。"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "iCloud에 연결할 수 없습니다. 다시 온라인 상태가 되면 동기화가 재개됩니다."
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sem ligação ao iCloud. A sincronização é retomada quando voltar a estar online."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "无法连接到 iCloud。恢复联网后将继续同步。"
           }
         }
       }
@@ -26953,6 +27109,58 @@
         }
       }
     },
+    "Sign in to iCloud to resume syncing." : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Melde dich bei iCloud an, um die Synchronisierung fortzusetzen."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Inicia sesión en iCloud para reanudar la sincronización."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Connectez-vous à iCloud pour reprendre la synchronisation."
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Accedi a iCloud per riprendere la sincronizzazione."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "同期を再開するにはiCloudにサインインしてください。"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "동기화를 재개하려면 iCloud에 로그인하세요."
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Inicie sessão no iCloud para retomar a sincronização."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "请登录 iCloud 以继续同步。"
+          }
+        }
+      }
+    },
     "Skip back 15 seconds" : {
       "comment" : "A button that skips back 15 seconds.",
       "isCommentAutoGenerated" : true,
@@ -29517,6 +29725,58 @@
         }
       }
     },
+    "The same item changed on another device. Sync merges it on the next pass." : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Dasselbe Element wurde auf einem anderen Gerät geändert. Die Synchronisierung führt es beim nächsten Durchlauf zusammen."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "El mismo elemento cambió en otro dispositivo. La sincronización lo combinará en la siguiente pasada."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Le même élément a été modifié sur un autre appareil. La synchronisation le fusionnera au prochain passage."
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Lo stesso elemento è stato modificato su un altro dispositivo. La sincronizzazione lo unirà al passaggio successivo."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "同じ項目が別のデバイスで変更されました。次回の同期で統合されます。"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "같은 항목이 다른 기기에서 변경되었습니다. 다음 동기화에서 병합됩니다."
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "O mesmo item foi alterado noutro dispositivo. A sincronização vai uni-lo na próxima passagem."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "同一项目已在其他设备上更改。下次同步时将合并。"
+          }
+        }
+      }
+    },
     "The TV guide refreshes automatically in the background at this interval." : {
       "localizations" : {
         "de" : {
@@ -29825,6 +30085,58 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "最近观看的频道列表将被清除。收藏和频道本身不受影响。"
+          }
+        }
+      }
+    },
+    "This iCloud account isn’t permitted to sync." : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Dieser iCloud-Account darf nicht synchronisieren."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Esta cuenta de iCloud no tiene permiso para sincronizar."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ce compte iCloud n’est pas autorisé à synchroniser."
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Questo account iCloud non è autorizzato a sincronizzare."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "このiCloudアカウントは同期を許可されていません。"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "이 iCloud 계정은 동기화할 수 없습니다."
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Esta conta iCloud não tem permissão para sincronizar."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "此 iCloud 账户不允许同步。"
           }
         }
       }
@@ -33016,6 +33328,110 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "您的凭据存储在此设备本地。"
+          }
+        }
+      }
+    },
+    "Your iCloud account is temporarily unavailable. Sync resumes automatically." : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Dein iCloud-Account ist vorübergehend nicht verfügbar. Die Synchronisierung wird automatisch fortgesetzt."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tu cuenta de iCloud no está disponible temporalmente. La sincronización se reanudará automáticamente."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Votre compte iCloud est temporairement indisponible. La synchronisation reprendra automatiquement."
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Il tuo account iCloud non è temporaneamente disponibile. La sincronizzazione riprende automaticamente."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "iCloudアカウントを一時的に利用できません。同期は自動的に再開されます。"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "iCloud 계정을 일시적으로 사용할 수 없습니다. 동기화는 자동으로 재개됩니다."
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "A sua conta iCloud está temporariamente indisponível. A sincronização é retomada automaticamente."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "你的 iCloud 账户暂时不可用。同步将自动恢复。"
+          }
+        }
+      }
+    },
+    "Your iCloud storage is full. Free up space or upgrade your plan to resume syncing." : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Dein iCloud-Speicher ist voll. Gib Speicher frei oder erweitere deinen Plan, um die Synchronisierung fortzusetzen."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tu almacenamiento de iCloud está lleno. Libera espacio o amplía tu plan para reanudar la sincronización."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Votre stockage iCloud est saturé. Libérez de l’espace ou changez de forfait pour reprendre la synchronisation."
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Lo spazio su iCloud è esaurito. Libera spazio o passa a un piano superiore per riprendere la sincronizzazione."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "iCloudストレージが満杯です。空き容量を作るかプランをアップグレードすると同期が再開されます。"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "iCloud 저장 공간이 가득 찼습니다. 공간을 확보하거나 요금제를 업그레이드하면 동기화가 다시 시작됩니다."
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "O seu armazenamento do iCloud está cheio. Liberte espaço ou faça upgrade do plano para retomar a sincronização."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "iCloud 存储空间已满。请释放空间或升级方案以恢复同步。"
           }
         }
       }
