@@ -445,6 +445,7 @@ struct MovieDetailView: View {
                 ToolbarItem(placement: .primaryAction) {
                     Button { toggleWatched() } label: {
                         Image(systemName: movie.isWatched ? "checkmark.circle.fill" : "checkmark.circle")
+                            .symbolReplaceTransition(value: movie.isWatched)
                     }
                     .help(movie.isWatched ? "Mark as Unwatched" : "Mark as Watched")
                 }
@@ -452,6 +453,7 @@ struct MovieDetailView: View {
                     Button { toggleFavorite() } label: {
                         Image(systemName: movie.isFavorite ? "heart.fill" : "heart")
                             .foregroundStyle(movie.isFavorite ? .red : .primary)
+                            .symbolReplaceTransition(value: movie.isFavorite)
                     }
                     .help(movie.isFavorite ? "Remove from Favorites" : "Add to Favorites")
                 }

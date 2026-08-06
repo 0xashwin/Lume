@@ -330,6 +330,8 @@ import SwiftUI
         /// stacking per-icon glass (prohibited) is avoided.
         private func pillGlyph(_ systemName: String, dimmed: Bool = false) -> some View {
             Image(systemName: systemName)
+                // Covers every toggling glyph in the bar — play/pause, mute, heart.
+                .symbolReplaceTransition(value: systemName)
                 .font(.system(size: 16, weight: .semibold))
                 .foregroundStyle(dimmed ? .white.opacity(0.55) : .white)
                 .frame(width: 44, height: 44)

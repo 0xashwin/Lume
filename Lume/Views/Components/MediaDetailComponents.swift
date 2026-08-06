@@ -20,6 +20,19 @@ extension View {
             self
         }
     }
+
+    /// Morphs between the two SF Symbols of a toggle (favorite, watched) instead of
+    /// hard-cutting when `value` flips.
+    ///
+    /// `contentTransition` only animates inside a transaction that carries an
+    /// animation. The toggle actions mutate their SwiftData model directly rather
+    /// than through `withAnimation` — deliberately, since wrapping a model mutation
+    /// would animate every view observing it — so the scoped `.animation` supplies
+    /// the transaction here instead.
+    func symbolReplaceTransition(value: some Equatable) -> some View {
+        contentTransition(.symbolEffect(.replace))
+            .animation(.smooth(duration: 0.25), value: value)
+    }
 }
 
 // MARK: - Layout metrics
@@ -248,6 +261,9 @@ struct GlassIconButton: View {
     var body: some View {
         Button(action: action) {
             Image(systemName: systemImage)
+                // Toggle callers (favorite, watched, download) swap their glyph in
+                // place; constant-symbol callers such as Back are unaffected.
+                .symbolReplaceTransition(value: systemImage)
                 .font(.system(size: 15, weight: .semibold))
                 .foregroundStyle(.white)
                 .frame(width: 34, height: 34)

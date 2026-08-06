@@ -274,6 +274,7 @@
 
                 Button(action: onTogglePlay) {
                     Image(systemName: coordinator.isPlaying ? "pause.fill" : "play.fill")
+                        .symbolReplaceTransition(value: coordinator.isPlaying)
                 }
                 .buttonStyle(TVPlayerCircleButtonStyle(diameter: 78, glyphSize: 30))
                 .focused($focus, equals: .transport)
@@ -348,6 +349,7 @@
         private var favoriteButton: some View {
             Button(action: toggleFavorite) {
                 Image(systemName: isFavorite ? "heart.fill" : "heart")
+                    .symbolReplaceTransition(value: isFavorite)
             }
             .buttonStyle(TVPlayerCircleButtonStyle())
             .focused($focus, equals: .favorite)
