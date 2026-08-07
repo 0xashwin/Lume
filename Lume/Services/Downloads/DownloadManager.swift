@@ -209,6 +209,39 @@ final class DownloadManager: NSObject {
             at: downloadsDirectory,
             withIntermediateDirectories: true
         )
+        Self.excludeFromBackup(downloadsDirectory)
+    }
+
+    /// Keeps downloaded media out of the user's iCloud / Finder backup.
+    ///
+    /// `Documents` is backed up by default, so a handful of downloaded films
+    /// silently added gigabytes to the user's backup — against Apple's Data
+    /// Storage Guidelines, which put content the app can fetch again but the
+    /// user expects offline in exactly this "do not back up" bucket. Apps have
+    /// been rejected over far smaller amounts.
+    ///
+    /// Set on the *directory*, which covers everything already inside it and
+    /// everything added later, so individual downloads need no bookkeeping.
+    ///
+    /// Deliberately not `Library/Caches`, the other usual answer: the system may
+    /// purge Caches under storage pressure, which would delete the film someone
+    /// downloaded for a flight. This attribute gives the semantics actually
+    /// wanted — not backed up, and never purged.
+    ///
+    /// Idempotent, and called on every launch rather than only at creation, so
+    /// installs that already have a downloads directory are corrected too.
+    nonisolated static func excludeFromBackup(_ url: URL) {
+        var url = url
+        var values = URLResourceValues()
+        values.isExcludedFromBackup = true
+        do {
+            try url.setResourceValues(values)
+        } catch {
+            // Not fatal — downloads still work, they just keep getting backed
+            // up. Logged because the symptom (a bloated backup) is otherwise
+            // invisible from inside the app.
+            Logger.downloads.error("Failed to exclude downloads from backup: \(error.localizedDescription)")
+        }
     }
 
     private var maxConcurrent: Int {
@@ -379,6 +412,10 @@ extension DownloadManager: URLSessionDownloadDelegate {
             try FileManager.default.createDirectory(
                 at: downloadsDirectory, withIntermediateDirectories: true
             )
+            // Re-apply in case the directory was removed and recreated since
+            // launch — a recreated one would carry no exclusion, and every
+            // download after that would start being backed up again.
+            Self.excludeFromBackup(downloadsDirectory)
             if FileManager.default.fileExists(atPath: destination.path) {
                 try FileManager.default.removeItem(at: destination)
             }
