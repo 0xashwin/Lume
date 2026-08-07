@@ -24,11 +24,19 @@ enum LiveChannelNavigator {
     /// viewer browsed. `offset` is `+1` for the next channel and `-1` for the
     /// previous; the list wraps at the category's ends so surfing never
     /// dead-ends. Returns `nil` when `media` isn't a resolvable live stream or
-    /// its category holds a single channel.
+    /// its category holds a single reachable channel.
+    ///
+    /// Surfing resolves against exactly the channels the browse list would show:
+    /// this used to fetch the category with a hand-rolled descriptor that dropped
+    /// neither channels hidden in Content Management nor categories locked away
+    /// from a child profile, so a hidden channel stayed in the up/down rotation
+    /// even though every list had stopped showing it. Reusing
+    /// `LiveChannelQuery.descriptor` is what keeps the two in step.
     static func adjacentMedia(
         for media: PlayableMedia,
         offset: Int,
         sort: ContentSortOption,
+        restriction: ContentRestriction,
         in context: ModelContext
     ) -> PlayableMedia? {
         guard case let .live(id) = media.contentRef else { return nil }
@@ -37,11 +45,16 @@ enum LiveChannelNavigator {
         guard let current = try? context.fetch(currentDescriptor).first,
               let categoryId = current.categoryId else { return nil }
 
-        let descriptor = FetchDescriptor<LiveStream>(
-            predicate: #Predicate { $0.categoryId == categoryId },
-            sortBy: sort.liveStreamDescriptors
-        )
-        guard let streams = try? context.fetch(descriptor), streams.count > 1,
+        // The shared channel-list query: same predicate (hidden channels dropped)
+        // and same sort the viewer browsed with.
+        let descriptor = LiveChannelQuery.descriptor(for: .category(categoryId), sort: sort)
+        guard let fetched = try? context.fetch(descriptor) else { return nil }
+        let streams = fetched.excludingRestricted(restriction)
+
+        // A playing channel that isn't itself reachable — locked mid-playback, or
+        // opened by deep link — has no position in the rotation, so surfing stops
+        // rather than using it as a doorway into the rest of the category.
+        guard streams.count > 1,
               let index = streams.firstIndex(where: { $0.id == current.id }) else { return nil }
 
         let target = streams[(index + offset + streams.count) % streams.count]

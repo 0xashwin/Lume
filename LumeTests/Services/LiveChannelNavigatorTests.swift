@@ -71,7 +71,7 @@ struct LiveChannelNavigatorTests {
         let (context, playlist) = try makeWorld(streams: threeChannels)
         let bravo = try media(forStreamId: 101, playlist: playlist, in: context)
 
-        let next = LiveChannelNavigator.adjacentMedia(for: bravo, offset: 1, sort: .playlist, in: context)
+        let next = LiveChannelNavigator.adjacentMedia(for: bravo, offset: 1, sort: .playlist, restriction: ContentRestriction(), in: context)
         #expect(next?.contentRef == liveRef(102, playlist)) // Charlie
     }
 
@@ -79,7 +79,7 @@ struct LiveChannelNavigatorTests {
         let (context, playlist) = try makeWorld(streams: threeChannels)
         let bravo = try media(forStreamId: 101, playlist: playlist, in: context)
 
-        let previous = LiveChannelNavigator.adjacentMedia(for: bravo, offset: -1, sort: .playlist, in: context)
+        let previous = LiveChannelNavigator.adjacentMedia(for: bravo, offset: -1, sort: .playlist, restriction: ContentRestriction(), in: context)
         #expect(previous?.contentRef == liveRef(100, playlist)) // Alpha
     }
 
@@ -89,7 +89,7 @@ struct LiveChannelNavigatorTests {
         let (context, playlist) = try makeWorld(streams: threeChannels)
         let charlie = try media(forStreamId: 102, playlist: playlist, in: context)
 
-        let next = LiveChannelNavigator.adjacentMedia(for: charlie, offset: 1, sort: .playlist, in: context)
+        let next = LiveChannelNavigator.adjacentMedia(for: charlie, offset: 1, sort: .playlist, restriction: ContentRestriction(), in: context)
         #expect(next?.contentRef == liveRef(100, playlist)) // Alpha
     }
 
@@ -97,7 +97,7 @@ struct LiveChannelNavigatorTests {
         let (context, playlist) = try makeWorld(streams: threeChannels)
         let alpha = try media(forStreamId: 100, playlist: playlist, in: context)
 
-        let previous = LiveChannelNavigator.adjacentMedia(for: alpha, offset: -1, sort: .playlist, in: context)
+        let previous = LiveChannelNavigator.adjacentMedia(for: alpha, offset: -1, sort: .playlist, restriction: ContentRestriction(), in: context)
         #expect(previous?.contentRef == liveRef(102, playlist)) // Charlie
     }
 
@@ -109,7 +109,7 @@ struct LiveChannelNavigatorTests {
         let (context, playlist) = try makeWorld(streams: threeChannels)
         let bravo = try media(forStreamId: 101, playlist: playlist, in: context)
 
-        let next = LiveChannelNavigator.adjacentMedia(for: bravo, offset: 1, sort: .nameDescending, in: context)
+        let next = LiveChannelNavigator.adjacentMedia(for: bravo, offset: 1, sort: .nameDescending, restriction: ContentRestriction(), in: context)
         #expect(next?.contentRef == liveRef(100, playlist)) // Alpha
     }
 
@@ -125,7 +125,7 @@ struct LiveChannelNavigatorTests {
         ])
         let bravo = try media(forStreamId: 101, playlist: playlist, in: context)
 
-        let next = LiveChannelNavigator.adjacentMedia(for: bravo, offset: 1, sort: .playlist, in: context)
+        let next = LiveChannelNavigator.adjacentMedia(for: bravo, offset: 1, sort: .playlist, restriction: ContentRestriction(), in: context)
         #expect(next == nil)
     }
 
@@ -135,8 +135,8 @@ struct LiveChannelNavigatorTests {
         ])
         let alpha = try media(forStreamId: 100, playlist: playlist, in: context)
 
-        #expect(LiveChannelNavigator.adjacentMedia(for: alpha, offset: 1, sort: .playlist, in: context) == nil)
-        #expect(LiveChannelNavigator.adjacentMedia(for: alpha, offset: -1, sort: .playlist, in: context) == nil)
+        #expect(LiveChannelNavigator.adjacentMedia(for: alpha, offset: 1, sort: .playlist, restriction: ContentRestriction(), in: context) == nil)
+        #expect(LiveChannelNavigator.adjacentMedia(for: alpha, offset: -1, sort: .playlist, restriction: ContentRestriction(), in: context) == nil)
     }
 
     // MARK: - Non-live input
@@ -148,6 +148,75 @@ struct LiveChannelNavigatorTests {
             playlist: Playlist(name: "P", serverURL: "http://e.com", username: "u", password: "p")
         ))
 
-        #expect(LiveChannelNavigator.adjacentMedia(for: movie, offset: 1, sort: .playlist, in: context) == nil)
+        #expect(LiveChannelNavigator.adjacentMedia(for: movie, offset: 1, sort: .playlist, restriction: ContentRestriction(), in: context) == nil)
+    }
+
+    // MARK: - Hidden channels and parental locks
+
+    /// Hides a channel in Content Management, as the settings screen would.
+    private func hide(streamId: Int, playlist: Playlist, in context: ModelContext) throws {
+        let id = "\(playlist.id.uuidString)-live-\(streamId)"
+        var descriptor = FetchDescriptor<LiveStream>(predicate: #Predicate { $0.id == id })
+        descriptor.fetchLimit = 1
+        try #require(try context.fetch(descriptor).first).isHidden = true
+        try context.save()
+    }
+
+    @Test func `a hidden channel is skipped when surfing`() throws {
+        let (context, playlist) = try makeWorld(streams: threeChannels)
+        try hide(streamId: 101, playlist: playlist, in: context) // Bravo
+        let alpha = try media(forStreamId: 100, playlist: playlist, in: context)
+
+        // Bravo is gone from every channel list, so the rocker must step over it
+        // rather than tune to a channel the viewer chose to remove.
+        let next = LiveChannelNavigator.adjacentMedia(
+            for: alpha, offset: 1, sort: .playlist, restriction: ContentRestriction(), in: context
+        )
+        #expect(next?.contentRef == liveRef(102, playlist)) // Charlie
+    }
+
+    @Test func `hiding all but one channel leaves nothing to surf to`() throws {
+        let (context, playlist) = try makeWorld(streams: threeChannels)
+        try hide(streamId: 101, playlist: playlist, in: context)
+        try hide(streamId: 102, playlist: playlist, in: context)
+        let alpha = try media(forStreamId: 100, playlist: playlist, in: context)
+
+        #expect(LiveChannelNavigator.adjacentMedia(
+            for: alpha, offset: 1, sort: .playlist, restriction: ContentRestriction(), in: context
+        ) == nil)
+    }
+
+    @Test func `surfing stops when the playing channel is itself hidden`() throws {
+        let (context, playlist) = try makeWorld(streams: threeChannels)
+        try hide(streamId: 101, playlist: playlist, in: context)
+        let bravo = try media(forStreamId: 101, playlist: playlist, in: context)
+
+        // Bravo has no position in the rotation any more, so it can't be used as
+        // a doorway into the rest of the category.
+        #expect(LiveChannelNavigator.adjacentMedia(
+            for: bravo, offset: 1, sort: .playlist, restriction: ContentRestriction(), in: context
+        ) == nil)
+    }
+
+    @Test func `a child profile cannot surf within a locked category`() throws {
+        let (context, playlist) = try makeWorld(streams: threeChannels)
+        let bravo = try media(forStreamId: 101, playlist: playlist, in: context)
+        let restriction = ContentRestriction(isActive: true, restrictedCategoryIDs: ["cat-a"])
+
+        #expect(LiveChannelNavigator.adjacentMedia(
+            for: bravo, offset: 1, sort: .playlist, restriction: restriction, in: context
+        ) == nil)
+    }
+
+    @Test func `a parent profile surfs a locked category normally`() throws {
+        let (context, playlist) = try makeWorld(streams: threeChannels)
+        let bravo = try media(forStreamId: 101, playlist: playlist, in: context)
+        // isActive false — a lock applies only while a child profile is active.
+        let restriction = ContentRestriction(isActive: false, restrictedCategoryIDs: ["cat-a"])
+
+        let next = LiveChannelNavigator.adjacentMedia(
+            for: bravo, offset: 1, sort: .playlist, restriction: restriction, in: context
+        )
+        #expect(next?.contentRef == liveRef(102, playlist)) // Charlie
     }
 }
