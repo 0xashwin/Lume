@@ -158,6 +158,41 @@ nonisolated struct EPGSourceValues: Codable, Equatable {
     }
 }
 
+// MARK: - Parental controls
+
+/// The syncable state of the parental-control PIN: just the salted hash, exactly
+/// as `ParentalControlsStore` holds it in the keychain. `nil` (no value at all)
+/// means no PIN is set — so the three-way merge distinguishes "never had a PIN"
+/// from "the parent turned it off", which a bare two-way mirror could not.
+///
+/// `updatedAt` is deliberately *not* a field here: it would make every timestamp
+/// difference read as a change and churn the shadow on every pass. The record's
+/// own `updatedAt` exists only to dedupe duplicate singletons.
+nonisolated struct ParentalPINValues: Codable, Equatable {
+    var hash: String
+
+    /// Conflict policy: cloud wins, matching playlist config and EPG sources. A
+    /// PIN has no field-level merge — two different PINs set on two devices
+    /// before they converged is a genuine either/or, and a deterministic pick
+    /// beats a clever one. The loser's device can set it again from Settings.
+    static func mergeConflict(local _: ParentalPINValues, cloud: ParentalPINValues) -> ParentalPINValues {
+        cloud
+    }
+}
+
+/// The syncable state of a category's parental restriction. Presence *is* the
+/// restriction — an unrestricted category has no value and no cloud record — so
+/// this only ever carries `true`, and lifting a restriction surfaces as `nil`.
+nonisolated struct CategoryRestrictionValues: Codable, Equatable {
+    var isRestricted: Bool = true
+
+    /// Both sides say `true` whenever both sides have a value, so a conflict can
+    /// only be "restricted vs restricted". Either input is the same answer.
+    static func mergeConflict(local: CategoryRestrictionValues, cloud _: CategoryRestrictionValues) -> CategoryRestrictionValues {
+        local
+    }
+}
+
 // MARK: - Per-content user state
 
 /// The syncable user state of a single catalog item. Fields irrelevant to a

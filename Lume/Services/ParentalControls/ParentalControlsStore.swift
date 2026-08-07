@@ -13,12 +13,23 @@
 //  pattern, `kSecUseDataProtectionKeychain` for macOS parity. `WhenUnlocked`
 //  accessibility fits a PIN that's only ever read while the app is foregrounded.
 //
+//  The keychain is the local store of record — `verify` reads it and nothing
+//  else. It is *not* the transport between devices: iCloud Keychain never syncs
+//  to tvOS, which is the one platform where an unenforced parental gate matters
+//  most. `CloudSyncEngine+Parental` carries the hash between devices over the
+//  CloudKit private database instead, using `storedHash` / `store(hash:)` below.
+//
+//  `nonisolated` because that reconcile runs on the `CloudSyncEngine` actor, off
+//  the main actor (the project defaults to main-actor isolation). Safe: this type
+//  holds no state of its own — every call goes straight to the thread-safe
+//  `SecItem` API.
+//
 
 import CryptoKit
 import Foundation
 import Security
 
-enum ParentalControlsStore {
+nonisolated enum ParentalControlsStore {
     private static let service = "bilipp.Lume.parental"
     private static let account = "pin-hash"
     /// Mixed into the hash. Not a secret (it ships in the binary); it only stops
@@ -43,7 +54,30 @@ enum ParentalControlsStore {
 
     /// Stores the salted hash of `pin`, replacing any existing one.
     static func save(pin: String) {
-        let data = Data(hash(pin).utf8)
+        store(hash: hash(pin))
+    }
+
+    /// The stored salted hash, or nil when no PIN is set.
+    ///
+    /// Only the sync reconciler should need this — it is what gets mirrored to
+    /// the other devices. UI code wants `isSet` or `verify` instead.
+    static func storedHash() -> String? {
+        var query = baseQuery
+        query[kSecReturnData as String] = true
+        query[kSecMatchLimit as String] = kSecMatchLimitOne
+
+        var result: AnyObject?
+        guard SecItemCopyMatching(query as CFDictionary, &result) == errSecSuccess,
+              let data = result as? Data
+        else { return nil }
+        return String(data: data, encoding: .utf8)
+    }
+
+    /// Writes an already-hashed PIN. The counterpart to `storedHash` — used when
+    /// pulling another device's PIN down from iCloud, where the PIN itself was
+    /// never transmitted and so cannot be re-hashed.
+    static func store(hash: String) {
+        let data = Data(hash.utf8)
         let attributes: [String: Any] = [
             kSecValueData as String: data,
             kSecAttrAccessible as String: kSecAttrAccessibleWhenUnlocked

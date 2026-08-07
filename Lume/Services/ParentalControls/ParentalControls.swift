@@ -32,6 +32,17 @@ final class ParentalControls {
         isPINSet = ParentalControlsStore.isSet
     }
 
+    /// Re-reads the keychain after an iCloud reconcile may have written to it.
+    ///
+    /// `isPINSet` is a mirror seeded once at init, so without this a device that
+    /// receives its first PIN from another device stays completely ungated until
+    /// the next launch — and a device whose PIN was turned off elsewhere keeps
+    /// prompting for one that no longer exists. Cheap (a single keychain presence
+    /// check), so the callers can be liberal about when they invoke it.
+    func refreshFromStore() {
+        isPINSet = ParentalControlsStore.isSet
+    }
+
     func setPIN(_ pin: String) {
         ParentalControlsStore.save(pin: pin)
         isPINSet = true

@@ -111,10 +111,16 @@ struct LumeApp: App {
     }
 
     /// The CloudKit-mirrored user-data container (`SyncedPlaylist`,
-    /// `UserContentState`, `UserProfile`). Small and CloudKit-backed; a load
-    /// failure is unexpected, so fail loudly rather than risk a silent empty store.
+    /// `UserContentState`, `UserProfile`, parental controls). Small and
+    /// CloudKit-backed; a load failure is unexpected, so fail loudly rather than
+    /// risk a silent empty store.
     private static func makeCloudContainer() -> ModelContainer {
-        let cloudSchema = Schema([SyncedPlaylist.self, UserContentState.self, UserProfile.self, SyncedEPGSource.self])
+        let cloudSchema = Schema([
+            SyncedPlaylist.self, UserContentState.self, UserProfile.self, SyncedEPGSource.self,
+            // Parental controls. Not profile-scoped, unlike `UserContentState` —
+            // see `CloudSyncEngine+Parental` for why that distinction matters.
+            SyncedParentalPIN.self, SyncedCategoryRestriction.self
+        ])
         let cloudConfiguration = ModelConfiguration(
             "CloudUserData",
             schema: cloudSchema,
@@ -245,6 +251,13 @@ struct LumeApp: App {
                     // the refresh instead once the sync queue drains.
                     EPGSyncService.shared.configure(container: catalogContainer)
                     EPGSyncService.shared.syncIfDue()
+                }
+                .onChange(of: cloudSync.status.lastReconcile) {
+                    // A reconcile may have pulled a PIN this device didn't have
+                    // (or cleared one turned off elsewhere). `ParentalControls`
+                    // caches that as `isPINSet`, so it has to be told to re-read
+                    // or the gates stay wrong until the next launch.
+                    parentalControls.refreshFromStore()
                 }
                 .onChange(of: scenePhase) { _, phase in
                     cloudSync.handleScenePhaseChange(to: phase)

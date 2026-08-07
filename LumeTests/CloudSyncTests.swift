@@ -185,7 +185,7 @@ struct CloudSyncEngineTests {
         let fullSchema = Schema([
             Playlist.self, Lume.Category.self, LiveStream.self, Movie.self,
             Series.self, Episode.self, CastMember.self, EPGListing.self, EPGSource.self,
-            SyncedPlaylist.self, UserContentState.self, SyncedEPGSource.self
+            SyncedPlaylist.self, UserContentState.self, SyncedEPGSource.self, SyncedParentalPIN.self, SyncedCategoryRestriction.self
         ])
         // `cloudKitDatabase: .none` is required on both stores: the catalog uses
         // `@Attribute(.unique)`, which CloudKit forbids, and the default
@@ -202,7 +202,7 @@ struct CloudSyncEngineTests {
         )
         let cloudConfig = ModelConfiguration(
             "cloud",
-            schema: Schema([SyncedPlaylist.self, UserContentState.self, SyncedEPGSource.self]),
+            schema: Schema([SyncedPlaylist.self, UserContentState.self, SyncedEPGSource.self, SyncedParentalPIN.self, SyncedCategoryRestriction.self]),
             isStoredInMemoryOnly: true,
             cloudKitDatabase: .none
         )
