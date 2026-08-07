@@ -271,7 +271,7 @@ struct LiveTVView: View {
     private var sortedCategories: [Category] {
         guard let playlistId = activePlaylist?.id else { return [] }
         let prefix = "\(playlistId.uuidString)-"
-        return categorySort.sort(categories.filter { $0.id.hasPrefix(prefix) && !restriction.hides(categoryID: $0.id) })
+        return categorySort.sort(LiveChannelQuery.visibleCategories(categories, playlistPrefix: prefix, restriction: restriction))
     }
 
     /// Whether the active playlist has any favorited / recently-watched channels,
@@ -520,8 +520,7 @@ struct ChannelsList: View {
     }
 
     private var scopedStreams: [LiveStream] {
-        LiveChannelQuery.scoped(streams, scope: scope, playlistPrefix: playlistPrefix)
-            .excludingRestricted(restriction)
+        LiveChannelQuery.scoped(streams, scope: scope, playlistPrefix: playlistPrefix, restriction: restriction)
     }
 
     /// Clears a channel's watch timestamp so it drops out of the Recently

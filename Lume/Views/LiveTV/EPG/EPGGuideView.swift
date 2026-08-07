@@ -25,6 +25,11 @@ struct EPGGuideView: View {
     let onDidClaimFocus: () -> Void
 
     @Environment(\.modelContext) private var modelContext
+    /// The guide is a channel list like any other, so it owes the viewer the same
+    /// parental filtering. It matters most in the Favorites and Recently Watched
+    /// scopes, which span categories: a channel favorited before its category was
+    /// locked would otherwise stay reachable — and playable — from the guide.
+    @Environment(\.contentRestriction) private var restriction
     @Query private var streams: [LiveStream]
 
     private let timeline: EPGTimeline
@@ -72,7 +77,7 @@ struct EPGGuideView: View {
     }
 
     private var scopedStreams: [LiveStream] {
-        LiveChannelQuery.scoped(streams, scope: scope, playlistPrefix: playlistPrefix)
+        LiveChannelQuery.scoped(streams, scope: scope, playlistPrefix: playlistPrefix, restriction: restriction)
     }
 
     var body: some View {
