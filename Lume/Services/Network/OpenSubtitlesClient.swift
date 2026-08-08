@@ -80,7 +80,44 @@ nonisolated struct OpenSubtitlesQuery: Equatable {
     /// filter would return the whole catalogue.
     var isEmpty: Bool {
         let hasText = !(text ?? "").trimmingCharacters(in: .whitespaces).isEmpty
-        return !hasText && imdbId == nil && tmdbId == nil && parentImdbId == nil && parentTmdbId == nil
+        return !hasText && !hasIdentifier
+    }
+
+    var hasIdentifier: Bool {
+        imdbId != nil || tmdbId != nil || parentImdbId != nil || parentTmdbId != nil
+    }
+
+    /// The one id this search is keyed on.
+    ///
+    /// Exactly one, never several: OpenSubtitles **ANDs** its parameters, so a
+    /// record has to match every id sent. A catalog whose `imdbId` disagrees
+    /// with its `tmdbId` — routine, since the two can come from different
+    /// enrichment passes or straight from the provider — then matches nothing
+    /// at all. Measured against *One Battle After Another*: `tmdb_id` alone
+    /// returns 5 German subtitles, `imdb_id` alone 4, and the correct
+    /// `tmdb_id` paired with a mismatched `imdb_id` returns 0.
+    ///
+    /// TMDB first because that is the id Lume's own enrichment writes and the
+    /// one the catalog is keyed on elsewhere (`#Index([\.tmdbId])`).
+    var identifier: URLQueryItem? {
+        if let tmdbId {
+            URLQueryItem(name: "tmdb_id", value: String(tmdbId))
+        } else if let imdbId = OpenSubtitlesClient.normalizedIMDbId(imdbId) {
+            URLQueryItem(name: "imdb_id", value: imdbId)
+        } else if let parentTmdbId {
+            URLQueryItem(name: "parent_tmdb_id", value: String(parentTmdbId))
+        } else if let parentImdbId = OpenSubtitlesClient.normalizedIMDbId(parentImdbId) {
+            URLQueryItem(name: "parent_imdb_id", value: parentImdbId)
+        } else {
+            nil
+        }
+    }
+
+    /// A copy keyed on the title alone. The retry when an id-keyed search comes
+    /// back empty — which means the id is stale or wrong, not that the title
+    /// has no subtitles.
+    var titleOnly: OpenSubtitlesQuery {
+        OpenSubtitlesQuery(text: text, season: season, episode: episode, languages: languages)
     }
 }
 
@@ -188,7 +225,21 @@ nonisolated struct OpenSubtitlesClient {
 
     /// Subtitle candidates for `query`, best-known releases first. Anonymous —
     /// a user token is only needed to download.
+    /// Subtitle candidates for `query`.
+    ///
+    /// An id-keyed search that comes back empty is retried on the title alone.
+    /// Empty here does not mean "this title has no subtitles" — it usually means
+    /// the catalog's id is stale or points at the wrong feature, and the title
+    /// still finds them.
     func search(_ query: OpenSubtitlesQuery, host: String = defaultHost, token: String? = nil) async throws -> [OnlineSubtitle] {
+        let results = try await searchOnce(query, host: host, token: token)
+        guard results.isEmpty, query.hasIdentifier else { return results }
+        let fallback = query.titleOnly
+        guard !fallback.isEmpty else { return results }
+        return try await searchOnce(fallback, host: host, token: token)
+    }
+
+    private func searchOnce(_ query: OpenSubtitlesQuery, host: String, token: String?) async throws -> [OnlineSubtitle] {
         guard isConfigured else { throw OpenSubtitlesError.notConfigured }
         guard !query.isEmpty else { return [] }
         guard let url = Self.searchURL(for: query, host: host) else { throw OpenSubtitlesError.invalidResponse }
@@ -205,20 +256,14 @@ nonisolated struct OpenSubtitlesClient {
     /// contract is unit-testable without a network.
     static func searchURL(for query: OpenSubtitlesQuery, host: String = defaultHost) -> URL? {
         var items: [URLQueryItem] = []
-        if let text = query.text?.trimmingCharacters(in: .whitespaces), !text.isEmpty {
-            items.append(URLQueryItem(name: "query", value: text.lowercased()))
-        }
-        if let imdbId = normalizedIMDbId(query.imdbId) {
-            items.append(URLQueryItem(name: "imdb_id", value: imdbId))
-        }
-        if let tmdbId = query.tmdbId {
-            items.append(URLQueryItem(name: "tmdb_id", value: String(tmdbId)))
-        }
-        if let parentImdbId = normalizedIMDbId(query.parentImdbId) {
-            items.append(URLQueryItem(name: "parent_imdb_id", value: parentImdbId))
-        }
-        if let parentTmdbId = query.parentTmdbId {
-            items.append(URLQueryItem(name: "parent_tmdb_id", value: String(parentTmdbId)))
+        // An id and a title are never sent together. The id is the precise
+        // match, and every extra parameter narrows the result set (the API ANDs
+        // them) — a decorated catalog title like "One Battle After Another
+        // (2025)" can only take hits away.
+        if let identifier = query.identifier {
+            items.append(identifier)
+        } else if let text = searchText(from: query.text) {
+            items.append(URLQueryItem(name: "query", value: text))
         }
         if let season = query.season {
             items.append(URLQueryItem(name: "season_number", value: String(season)))
@@ -237,6 +282,35 @@ nonisolated struct OpenSubtitlesClient {
         components.path = "/api/v1/subtitles"
         components.queryItems = items.sorted { $0.name < $1.name }
         return components.url
+    }
+
+    /// The title to match on, stripped of the decoration IPTV catalogs wrap
+    /// around a name and lowercased for the canonical query string.
+    ///
+    /// The API matches this text closely, so the decoration is not free: for
+    /// *One Battle After Another* a trailing `(2025)` — which is exactly how
+    /// Xtream catalogs name films — cut the German result set from 846 to 28.
+    /// Provider prefixes (`4K | …`, `DE - …`) are worse still. Returns `nil`
+    /// when nothing usable is left.
+    static func searchText(from raw: String?) -> String? {
+        guard var text = raw?.trimmingCharacters(in: .whitespaces), !text.isEmpty else { return nil }
+
+        // Drop a leading provider tag: everything up to the last "|".
+        if let separator = text.lastIndex(of: "|") {
+            text = String(text[text.index(after: separator)...])
+        }
+        // Drop a trailing year, bare or parenthesised.
+        text = text.replacingOccurrences(
+            of: #"[\s\-–—]*[\(\[]?(19|20)\d{2}[\)\]]?\s*$"#,
+            with: "",
+            options: .regularExpression
+        )
+        // Collapse the runs of whitespace that stripping can leave behind.
+        text = text
+            .replacingOccurrences(of: #"\s+"#, with: " ", options: .regularExpression)
+            .trimmingCharacters(in: .whitespaces)
+            .lowercased()
+        return text.isEmpty ? nil : text
     }
 
     /// OpenSubtitles takes IMDb ids as bare digits; the catalogue stores them in

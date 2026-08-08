@@ -30298,6 +30298,7 @@
       }
     },
     "Sync watched movies and episodes, and show your Trakt watchlist on Home." : {
+      "extractionState" : "stale",
       "localizations" : {
         "de" : {
           "stringUnit" : {

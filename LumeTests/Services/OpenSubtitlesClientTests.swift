@@ -52,39 +52,63 @@ struct OpenSubtitlesClientTests {
         #expect(names == names.sorted())
     }
 
-    @Test func `search url carries the movie identifiers`() throws {
-        let query = OpenSubtitlesQuery(text: "Fight Club", imdbId: "tt0137523", tmdbId: 550, languages: ["en"])
+    private func queryItems(_ query: OpenSubtitlesQuery) throws -> [String: String?] {
         let url = try #require(OpenSubtitlesClient.searchURL(for: query))
         let items = try #require(URLComponents(url: url, resolvingAgainstBaseURL: false)?.queryItems)
-        let byName = Dictionary(uniqueKeysWithValues: items.map { ($0.name, $0.value) })
+        return Dictionary(uniqueKeysWithValues: items.map { ($0.name, $0.value) })
+    }
 
-        #expect(url.host() == "api.opensubtitles.com")
-        #expect(url.path == "/api/v1/subtitles")
+    /// The API ANDs its parameters, so a second id can only take matches away —
+    /// and a catalog whose `imdbId` disagrees with its `tmdbId` would match
+    /// nothing at all. TMDB wins because that is the id Lume's enrichment writes.
+    @Test func `search url sends exactly one identifier, tmdb first`() throws {
+        let query = OpenSubtitlesQuery(text: "Fight Club", imdbId: "tt0137523", tmdbId: 550, languages: ["en"])
+        let byName = try queryItems(query)
+
         #expect(byName["tmdb_id"] == "550")
-        #expect(byName["imdb_id"] == "0137523")
-        #expect(byName["query"] == "fight club")
+        #expect(byName["imdb_id"] == nil)
+        // The title is the id's competitor, not its companion.
+        #expect(byName["query"] == nil)
         #expect(byName["languages"] == "en")
     }
 
+    @Test func `search url falls back to the imdb id when there is no tmdb id`() throws {
+        let byName = try queryItems(OpenSubtitlesQuery(text: "Fight Club", imdbId: "tt0137523"))
+        #expect(byName["imdb_id"] == "0137523")
+        #expect(byName["query"] == nil)
+    }
+
+    @Test func `search url hits the right host and path`() throws {
+        let url = try #require(OpenSubtitlesClient.searchURL(for: OpenSubtitlesQuery(tmdbId: 550)))
+        #expect(url.host() == "api.opensubtitles.com")
+        #expect(url.path == "/api/v1/subtitles")
+    }
+
     @Test func `search url keys an episode on its series plus season and episode`() throws {
-        let query = OpenSubtitlesQuery(
+        let byName = try queryItems(OpenSubtitlesQuery(
             text: "Breaking Bad",
             parentImdbId: "tt0903747",
             parentTmdbId: 1396,
             season: 1,
             episode: 1,
             languages: ["de", "en"]
-        )
-        let url = try #require(OpenSubtitlesClient.searchURL(for: query))
-        let items = try #require(URLComponents(url: url, resolvingAgainstBaseURL: false)?.queryItems)
-        let byName = Dictionary(uniqueKeysWithValues: items.map { ($0.name, $0.value) })
+        ))
 
         #expect(byName["parent_tmdb_id"] == "1396")
-        #expect(byName["parent_imdb_id"] == "0903747")
+        #expect(byName["parent_imdb_id"] == nil)
         #expect(byName["season_number"] == "1")
         #expect(byName["episode_number"] == "1")
         // Comma-separated and sorted, as the API expects.
         #expect(byName["languages"] == "de,en")
+    }
+
+    /// Season and episode still ride along without a parent id — a series the
+    /// catalog never enriched searches by name plus the two numbers.
+    @Test func `search url keeps season and episode on a title-only episode search`() throws {
+        let byName = try queryItems(OpenSubtitlesQuery(text: "Breaking Bad", season: 1, episode: 1))
+        #expect(byName["query"] == "breaking bad")
+        #expect(byName["season_number"] == "1")
+        #expect(byName["episode_number"] == "1")
     }
 
     @Test func `search url omits identifiers that are absent`() throws {
@@ -92,6 +116,56 @@ struct OpenSubtitlesClientTests {
         let url = try #require(OpenSubtitlesClient.searchURL(for: query))
         let names = (URLComponents(url: url, resolvingAgainstBaseURL: false)?.queryItems ?? []).map(\.name)
         #expect(names == ["query"])
+    }
+
+    // MARK: - Title cleaning
+
+    /// Xtream catalogs name films `Title (2025)`; the API matches the text
+    /// closely enough that the suffix collapses the result set.
+    @Test func `search text strips a trailing year`() {
+        #expect(OpenSubtitlesClient.searchText(from: "One Battle After Another (2025)") == "one battle after another")
+        #expect(OpenSubtitlesClient.searchText(from: "One Battle After Another 2025") == "one battle after another")
+        #expect(OpenSubtitlesClient.searchText(from: "One Battle After Another - 2025") == "one battle after another")
+        #expect(OpenSubtitlesClient.searchText(from: "The Godfather [1972]") == "the godfather")
+    }
+
+    @Test func `search text strips a provider prefix`() {
+        #expect(OpenSubtitlesClient.searchText(from: "4K | One Battle After Another (2025)") == "one battle after another")
+        #expect(OpenSubtitlesClient.searchText(from: "DE | UHD | Dune Part Two 2024") == "dune part two")
+    }
+
+    /// A year *inside* the title is not decoration — stripping it would search
+    /// for the wrong film.
+    @Test func `search text keeps a year that is part of the title`() {
+        #expect(OpenSubtitlesClient.searchText(from: "2001: A Space Odyssey") == "2001: a space odyssey")
+        #expect(OpenSubtitlesClient.searchText(from: "Blade Runner 2049 (2017)") == "blade runner 2049")
+    }
+
+    @Test func `search text returns nil when nothing usable is left`() {
+        #expect(OpenSubtitlesClient.searchText(from: nil) == nil)
+        #expect(OpenSubtitlesClient.searchText(from: "   ") == nil)
+        #expect(OpenSubtitlesClient.searchText(from: "2025") == nil)
+    }
+
+    // MARK: - Title-only retry
+
+    @Test func `a query keyed on an id can retry on its title`() {
+        let query = OpenSubtitlesQuery(text: "Fight Club", imdbId: "tt0137523", tmdbId: 550, languages: ["de"])
+        #expect(query.hasIdentifier)
+
+        let retry = query.titleOnly
+        #expect(retry.hasIdentifier == false)
+        #expect(retry.isEmpty == false)
+        #expect(retry.text == "Fight Club")
+        // The language filter is the viewer's choice, not part of the keying.
+        #expect(retry.languages == ["de"])
+    }
+
+    @Test func `an episode retry keeps its season and episode`() {
+        let retry = OpenSubtitlesQuery(parentTmdbId: 1396, season: 1, episode: 1).titleOnly
+        #expect(retry.season == 1)
+        #expect(retry.episode == 1)
+        #expect(retry.parentTmdbId == nil)
     }
 
     // MARK: - Query emptiness
