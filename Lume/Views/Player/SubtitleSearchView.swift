@@ -10,9 +10,25 @@
 //  the overlay is torn down when the controls auto-hide — a sheet anchored there
 //  would vanish with it. See `subtitleSearch(isPresented:media:onPick:)`.
 //
+//  The search itself is shared, the layout is not: iOS/macOS get a `List`, while
+//  tvOS gets a ten-foot layout built from the app's TV components (see
+//  `SubtitleSearchView+TV.swift`). A `List` at iOS metrics is unreadable across a
+//  room and sits flush against the overscan margin.
+//
 
 import SwiftData
 import SwiftUI
+
+/// What the results area is showing. Shared by both layouts so the two can't
+/// drift on which state wins, and unit-testable without a view.
+nonisolated enum SubtitleSearchStatus: Equatable {
+    case searching
+    case failed(String)
+    /// The stream isn't something OpenSubtitles indexes (a live channel).
+    case unsupported
+    case empty
+    case results
+}
 
 struct SubtitleSearchView: View {
     let media: PlayableMedia
@@ -21,33 +37,24 @@ struct SubtitleSearchView: View {
     var onPick: (ExternalSubtitle) -> Void
 
     @Environment(\.modelContext) private var modelContext
-    @Environment(\.dismiss) private var dismiss
+    /// Not `private`: the tvOS layout lives in an extension in its own file.
+    @Environment(\.dismiss) var dismiss
 
-    @State private var service = OpenSubtitlesService.shared
-    @State private var query: OpenSubtitlesQuery?
-    @State private var results: [OnlineSubtitle] = []
-    @State private var isSearching = false
-    @State private var errorMessage: String?
+    @State var service = OpenSubtitlesService.shared
+    @State var query: OpenSubtitlesQuery?
+    @State var results: [OnlineSubtitle] = []
+    @State var isSearching = false
+    @State var errorMessage: String?
     /// The result currently being downloaded, so its row can show progress and
     /// a second tap can't spend two downloads from the daily quota.
-    @State private var downloadingID: String?
+    @State var downloadingID: String?
 
     var body: some View {
-        NavigationStack {
-            List {
-                if !service.isSignedIn {
-                    OpenSubtitlesSignInSection()
-                }
-                languageSection
-                resultsSection
-            }
-            .platformNavigationTitle("Subtitles")
-            #if !os(tvOS)
-                .toolbar {
-                    ToolbarItem(placement: .cancellationAction) {
-                        Button("Done") { dismiss() }
-                    }
-                }
+        Group {
+            #if os(tvOS)
+                tvBody
+            #else
+                standardBody
             #endif
         }
         .task(id: media.id) { await runSearch() }
@@ -58,25 +65,16 @@ struct SubtitleSearchView: View {
         }
     }
 
-    // MARK: - Language
+    // MARK: - Shared state
 
-    private var languageSection: some View {
-        Section {
-            NavigationLink {
-                SubtitleLanguagePicker()
-            } label: {
-                HStack {
-                    Label("Languages", systemImage: "globe")
-                    Spacer()
-                    Text(languageSummary)
-                        .foregroundStyle(.secondary)
-                        .lineLimit(1)
-                }
-            }
-        }
+    var status: SubtitleSearchStatus {
+        if isSearching { return .searching }
+        if let errorMessage { return .failed(errorMessage) }
+        if query == nil { return .unsupported }
+        return results.isEmpty ? .empty : .results
     }
 
-    private var languageSummary: String {
+    var languageSummary: String {
         let names = service.preferredLanguages.map { code in
             Locale.current.localizedString(forIdentifier: code)
                 ?? Locale.current.localizedString(forLanguageCode: code)
@@ -85,55 +83,9 @@ struct SubtitleSearchView: View {
         return names.isEmpty ? String(localized: "Any") : names.joined(separator: ", ")
     }
 
-    // MARK: - Results
-
-    private var resultsSection: some View {
-        Section {
-            if isSearching {
-                HStack(spacing: 10) {
-                    ProgressView()
-                    Text("Searching…")
-                        .foregroundStyle(.secondary)
-                }
-            } else if let errorMessage {
-                Text(errorMessage)
-                    .foregroundStyle(.red)
-            } else if query == nil {
-                Text("Subtitle search is only available for movies and episodes.")
-                    .foregroundStyle(.secondary)
-            } else if results.isEmpty {
-                Text("No subtitles found for this title.")
-                    .foregroundStyle(.secondary)
-            } else {
-                ForEach(results) { subtitle in
-                    Button {
-                        pick(subtitle)
-                    } label: {
-                        SubtitleResultRow(
-                            subtitle: subtitle,
-                            isDownloading: downloadingID == subtitle.id
-                        )
-                    }
-                    // Without this the whole row inherits the tint and every
-                    // line renders blue, including the release name and count.
-                    #if !os(tvOS)
-                    .buttonStyle(.plain)
-                    #endif
-                    .disabled(downloadingID != nil)
-                }
-            }
-        } header: {
-            Text(media.title)
-        } footer: {
-            if let remaining = service.remainingDownloads {
-                Text("\(remaining) downloads left today.")
-            }
-        }
-    }
-
     // MARK: - Actions
 
-    private func runSearch() async {
+    func runSearch() async {
         errorMessage = nil
         results = []
         // Resolving the ids touches SwiftData on the main actor; the fetch that
@@ -154,7 +106,7 @@ struct SubtitleSearchView: View {
         }
     }
 
-    private func pick(_ subtitle: OnlineSubtitle) {
+    func pick(_ subtitle: OnlineSubtitle) {
         guard downloadingID == nil else { return }
         downloadingID = subtitle.id
         Task {
@@ -174,52 +126,145 @@ struct SubtitleSearchView: View {
             }
         }
     }
-}
 
-// MARK: - Result row
+    // MARK: - iOS / macOS / visionOS
 
-private struct SubtitleResultRow: View {
-    let subtitle: OnlineSubtitle
-    let isDownloading: Bool
-
-    var body: some View {
-        HStack(spacing: 12) {
-            VStack(alignment: .leading, spacing: 3) {
-                HStack(spacing: 6) {
-                    Text(subtitle.languageName)
-                        .font(.headline)
-                    if subtitle.isHearingImpaired {
-                        badge("captions.bubble")
+    #if !os(tvOS)
+        private var standardBody: some View {
+            NavigationStack {
+                List {
+                    if !service.isSignedIn {
+                        OpenSubtitlesSignInSection()
                     }
-                    if subtitle.isFromTrusted {
-                        badge("checkmark.seal")
-                    }
-                    if subtitle.isMachineTranslated {
-                        badge("wand.and.stars")
+                    languageSection
+                    resultsSection
+                }
+                .platformNavigationTitle("Subtitles")
+                .toolbar {
+                    ToolbarItem(placement: .cancellationAction) {
+                        Button("Done") { dismiss() }
                     }
                 }
-                if !subtitle.releaseName.isEmpty {
-                    Text(subtitle.releaseName)
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                        .lineLimit(2)
-                }
-                Text("\(subtitle.downloadCount) downloads")
-                    .font(.caption2)
-                    .foregroundStyle(.tertiary)
-            }
-            Spacer(minLength: 8)
-            if isDownloading {
-                ProgressView()
             }
         }
-        .contentShape(Rectangle())
-    }
 
-    private func badge(_ systemName: String) -> some View {
-        Image(systemName: systemName)
-            .font(.caption)
-            .foregroundStyle(.secondary)
+        private var languageSection: some View {
+            Section {
+                NavigationLink {
+                    SubtitleLanguagePicker()
+                } label: {
+                    HStack {
+                        Label("Languages", systemImage: "globe")
+                        Spacer()
+                        Text(languageSummary)
+                            .foregroundStyle(.secondary)
+                            .lineLimit(1)
+                    }
+                }
+            }
+        }
+
+        private var resultsSection: some View {
+            Section {
+                switch status {
+                case .searching:
+                    HStack(spacing: 10) {
+                        ProgressView()
+                        Text("Searching…")
+                            .foregroundStyle(.secondary)
+                    }
+                case let .failed(message):
+                    Text(message)
+                        .foregroundStyle(.red)
+                case .unsupported:
+                    Text("Subtitle search is only available for movies and episodes.")
+                        .foregroundStyle(.secondary)
+                case .empty:
+                    Text("No subtitles found for this title.")
+                        .foregroundStyle(.secondary)
+                case .results:
+                    ForEach(results) { subtitle in
+                        Button {
+                            pick(subtitle)
+                        } label: {
+                            SubtitleResultRow(
+                                subtitle: subtitle,
+                                isDownloading: downloadingID == subtitle.id
+                            )
+                        }
+                        // Without this the whole row inherits the tint and every
+                        // line renders blue, including the release name and count.
+                        .buttonStyle(.plain)
+                        .disabled(downloadingID != nil)
+                    }
+                }
+            } header: {
+                Text(media.title)
+            } footer: {
+                if let remaining = service.remainingDownloads {
+                    Text("\(remaining) downloads left today.")
+                }
+            }
+        }
+    #endif
+}
+
+// MARK: - Result row (iOS / macOS / visionOS)
+
+#if !os(tvOS)
+    private struct SubtitleResultRow: View {
+        let subtitle: OnlineSubtitle
+        let isDownloading: Bool
+
+        var body: some View {
+            HStack(spacing: 12) {
+                VStack(alignment: .leading, spacing: 3) {
+                    HStack(spacing: 6) {
+                        Text(subtitle.languageName)
+                            .font(.headline)
+                        ForEach(subtitle.badges) { badge in
+                            Image(systemName: badge.systemImage)
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                        }
+                    }
+                    if !subtitle.releaseName.isEmpty {
+                        Text(subtitle.releaseName)
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                            .lineLimit(2)
+                    }
+                    Text("\(subtitle.downloadCount) downloads")
+                        .font(.caption2)
+                        .foregroundStyle(.tertiary)
+                }
+                Spacer(minLength: 8)
+                if isDownloading {
+                    ProgressView()
+                }
+            }
+            .contentShape(Rectangle())
+        }
+    }
+#endif
+
+// MARK: - Row badges
+
+/// The at-a-glance marks on a result: hearing-impaired, uploader-trusted, and
+/// machine/AI-translated. Shared by both layouts so the two agree on which
+/// glyph means what.
+nonisolated struct SubtitleBadge: Identifiable {
+    let id: String
+    let systemImage: String
+}
+
+extension OnlineSubtitle {
+    var badges: [SubtitleBadge] {
+        var badges: [SubtitleBadge] = []
+        if isHearingImpaired { badges.append(SubtitleBadge(id: "cc", systemImage: "captions.bubble")) }
+        if isFromTrusted { badges.append(SubtitleBadge(id: "trusted", systemImage: "checkmark.seal")) }
+        if isMachineTranslated { badges.append(SubtitleBadge(id: "machine", systemImage: "wand.and.stars")) }
+        return badges
     }
 }
 
@@ -229,41 +274,23 @@ private struct SubtitleResultRow: View {
 /// through to `OpenSubtitlesService.preferredLanguages`, which persists the
 /// choice and re-runs the search.
 struct SubtitleLanguagePicker: View {
-    @State private var service = OpenSubtitlesService.shared
-    @State private var languages: [OpenSubtitlesLanguage] = []
-    @State private var searchText = ""
+    // Not `private`: the tvOS layout lives in an extension in its own file.
+    @State var service = OpenSubtitlesService.shared
+    @State var languages: [OpenSubtitlesLanguage] = []
+    @State var searchText = ""
 
     var body: some View {
-        List {
-            ForEach(filtered) { language in
-                Button {
-                    toggle(language.code)
-                } label: {
-                    HStack {
-                        Text(language.name)
-                        Spacer()
-                        if service.preferredLanguages.contains(language.code) {
-                            Image(systemName: "checkmark")
-                                .foregroundStyle(.tint)
-                        }
-                    }
-                    .contentShape(Rectangle())
-                }
-                #if !os(tvOS)
-                .buttonStyle(.plain)
-                #endif
-            }
+        Group {
+            #if os(tvOS)
+                tvBody
+            #else
+                standardBody
+            #endif
         }
-        .platformNavigationTitle("Languages")
-        #if !os(tvOS)
-            .searchable(text: $searchText, prompt: Text("Search languages"))
-        #endif
-            .task {
-                languages = await service.languages()
-            }
+        .task { languages = await service.languages() }
     }
 
-    private var filtered: [OpenSubtitlesLanguage] {
+    var filtered: [OpenSubtitlesLanguage] {
         let trimmed = searchText.trimmingCharacters(in: .whitespaces)
         guard !trimmed.isEmpty else { return languages }
         return languages.filter { $0.name.localizedCaseInsensitiveContains(trimmed) }
@@ -271,7 +298,7 @@ struct SubtitleLanguagePicker: View {
 
     /// Keeps at least one language selected — an empty list would ask the API
     /// for every language there is.
-    private func toggle(_ code: String) {
+    func toggle(_ code: String) {
         var selection = service.preferredLanguages
         if let index = selection.firstIndex(of: code) {
             guard selection.count > 1 else { return }
@@ -281,6 +308,31 @@ struct SubtitleLanguagePicker: View {
         }
         service.preferredLanguages = selection
     }
+
+    #if !os(tvOS)
+        private var standardBody: some View {
+            List {
+                ForEach(filtered) { language in
+                    Button {
+                        toggle(language.code)
+                    } label: {
+                        HStack {
+                            Text(language.name)
+                            Spacer()
+                            if service.preferredLanguages.contains(language.code) {
+                                Image(systemName: "checkmark")
+                                    .foregroundStyle(.tint)
+                            }
+                        }
+                        .contentShape(Rectangle())
+                    }
+                    .buttonStyle(.plain)
+                }
+            }
+            .platformNavigationTitle("Languages")
+            .searchable(text: $searchText, prompt: Text("Search languages"))
+        }
+    #endif
 }
 
 // MARK: - Presentation

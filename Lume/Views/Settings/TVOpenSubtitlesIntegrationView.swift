@@ -13,6 +13,11 @@
     import SwiftUI
 
     struct TVOpenSubtitlesIntegrationView: View {
+        /// Drops the explanatory paragraph, keeping only the actionable hint.
+        /// The in-player overlay raises this above the search results, where a
+        /// two-paragraph preamble pushes what the viewer came for off-screen.
+        var isCompact = false
+
         @State private var service = OpenSubtitlesService.shared
         @State private var username = ""
         @State private var password = ""
@@ -31,10 +36,12 @@
 
         private var signIn: some View {
             VStack(alignment: .leading, spacing: 16) {
-                Text("Sign in with your free opensubtitles.com account to download subtitles for movies and episodes from the player's subtitle menu.")
-                    .font(.system(size: 24))
-                    .foregroundStyle(.secondary)
-                    .padding(.horizontal, TVSettingsMetrics.rowHPadding)
+                if !isCompact {
+                    Text("Sign in with your free opensubtitles.com account to download subtitles for movies and episodes from the player's subtitle menu.")
+                        .font(.system(size: 24))
+                        .foregroundStyle(.secondary)
+                        .padding(.horizontal, TVSettingsMetrics.rowHPadding)
+                }
 
                 Text("Enter your username, not the email address you registered with — OpenSubtitles rejects an email here.")
                     .font(.system(size: 22))
