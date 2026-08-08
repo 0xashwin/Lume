@@ -75,6 +75,7 @@ struct OpenSubtitlesSignInSection: View {
         } footer: {
             VStack(alignment: .leading, spacing: 6) {
                 Text("Sign in with your free opensubtitles.com account to download subtitles. Searching works without one.")
+                Text("Enter your username, not the email address you registered with — OpenSubtitles rejects an email here.")
                 if let error = service.signInError {
                     Text(error)
                         .foregroundStyle(.red)

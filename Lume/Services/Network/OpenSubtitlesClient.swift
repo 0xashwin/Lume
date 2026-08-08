@@ -47,7 +47,10 @@ enum OpenSubtitlesError: Error, Equatable {
         case .notConfigured:
             "Subtitle search isn't available in this build."
         case .invalidCredentials:
-            "Wrong username or password."
+            // The email address is the common wrong guess, and the API's own
+            // reply ("invalid username/password") doesn't say so — name it at
+            // the moment the sign-in actually fails.
+            "Wrong username or password. OpenSubtitles wants your username here, not your email address."
         case .notAuthenticated:
             "Sign in to your OpenSubtitles account to download subtitles."
         case .quotaExceeded:

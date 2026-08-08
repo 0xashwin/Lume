@@ -36,6 +36,11 @@
                     .foregroundStyle(.secondary)
                     .padding(.horizontal, TVSettingsMetrics.rowHPadding)
 
+                Text("Enter your username, not the email address you registered with — OpenSubtitles rejects an email here.")
+                    .font(.system(size: 22))
+                    .foregroundStyle(.secondary)
+                    .padding(.horizontal, TVSettingsMetrics.rowHPadding)
+
                 TVSettingsField(
                     title: "Username",
                     placeholder: "Username",

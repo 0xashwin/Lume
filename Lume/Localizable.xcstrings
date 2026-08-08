@@ -10667,6 +10667,58 @@
         }
       }
     },
+    "Enter your username, not the email address you registered with — OpenSubtitles rejects an email here." : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Gib deinen Benutzernamen ein, nicht die E-Mail-Adresse, mit der du dich registriert hast — OpenSubtitles lehnt eine E-Mail hier ab."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Introduce tu nombre de usuario, no la dirección de correo con la que te registraste: OpenSubtitles rechaza un correo aquí."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Saisissez votre nom d’utilisateur, et non l’adresse e-mail utilisée à l’inscription — OpenSubtitles refuse une adresse e-mail ici."
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Inserisci il tuo nome utente, non l’indirizzo email con cui ti sei registrato: OpenSubtitles qui rifiuta un’email."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "登録したメールアドレスではなく、ユーザー名を入力してください。OpenSubtitlesはここでメールアドレスを受け付けません。"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "가입할 때 사용한 이메일 주소가 아니라 사용자 이름을 입력하세요. OpenSubtitles는 여기에서 이메일을 받지 않습니다."
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Digite seu nome de usuário, não o e-mail com que você se cadastrou — o OpenSubtitles recusa um e-mail aqui."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "请输入用户名，而不是注册时使用的电子邮件地址 —— OpenSubtitles 在此处不接受电子邮件。"
+          }
+        }
+      }
+    },
     "EPG Sources" : {
       "localizations" : {
         "de" : {
@@ -34474,54 +34526,54 @@
         }
       }
     },
-    "Wrong username or password." : {
+    "Wrong username or password. OpenSubtitles wants your username here, not your email address." : {
       "localizations" : {
         "de" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Falscher Benutzername oder falsches Passwort."
+            "value" : "Falscher Benutzername oder falsches Passwort. OpenSubtitles erwartet hier deinen Benutzernamen, nicht deine E-Mail-Adresse."
           }
         },
         "es" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Nombre de usuario o contraseña incorrectos."
+            "value" : "Nombre de usuario o contraseña incorrectos. OpenSubtitles espera aquí tu nombre de usuario, no tu correo electrónico."
           }
         },
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Nom d’utilisateur ou mot de passe incorrect."
+            "value" : "Nom d’utilisateur ou mot de passe incorrect. OpenSubtitles attend ici votre nom d’utilisateur, pas votre adresse e-mail."
           }
         },
         "it" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Nome utente o password errati."
+            "value" : "Nome utente o password errati. Qui OpenSubtitles si aspetta il tuo nome utente, non il tuo indirizzo email."
           }
         },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "ユーザー名またはパスワードが正しくありません。"
+            "value" : "ユーザー名またはパスワードが正しくありません。OpenSubtitlesはここでメールアドレスではなくユーザー名を求めます。"
           }
         },
         "ko" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "사용자 이름 또는 비밀번호가 올바르지 않습니다."
+            "value" : "사용자 이름 또는 비밀번호가 올바르지 않습니다. OpenSubtitles는 여기에 이메일이 아닌 사용자 이름을 요구합니다."
           }
         },
         "pt" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Nome de usuário ou senha incorretos."
+            "value" : "Nome de usuário ou senha incorretos. O OpenSubtitles espera seu nome de usuário aqui, não seu e-mail."
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "用户名或密码有误。"
+            "value" : "用户名或密码有误。OpenSubtitles 在此处需要用户名，而不是电子邮件地址。"
           }
         }
       }
