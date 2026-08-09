@@ -215,8 +215,10 @@ failure modes it is built to make structurally impossible.
 
 Prefer a third-party app? Lume can hand streams off to an **external player** —
 **Infuse** or **VLC** — via their deep-link APIs, selectable in **Settings**.
-Downloads always play in Lume, and playback falls back to the built-in player when
-the selected app is not installed.
+Because not every app handles every stream — Infuse plays movies and series but no
+live channels — the hand-off covers **movies & series** by default, and can be
+switched to **live TV** or to both. Downloads always play in Lume, and playback falls
+back to the built-in player when the selected app is not installed.
 
 Send playback to the TV with **AirPlay** — a route picker sits in the player overlay.
 Full-screen video is delivered through Apple's AVPlayer: on iOS and iPadOS, picking a

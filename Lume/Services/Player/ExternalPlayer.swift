@@ -6,7 +6,8 @@
 //  When the user prefers an external player in Settings, playback start sites
 //  call `ExternalPlayback.open(_:)` first and only fall through to the
 //  built-in player when the hand-off cannot happen (player not installed,
-//  preference off, or the media is a local download other apps can't read).
+//  preference off, the selected scope excludes this kind of stream, or the
+//  media is a local download other apps can't read).
 //
 
 import Foundation
@@ -67,6 +68,43 @@ enum ExternalPlayer: String, CaseIterable, Identifiable {
     }
 }
 
+/// Which content the external-player hand-off applies to. Not every player
+/// handles every kind of stream — Infuse, for one, plays VOD but no live TV —
+/// so the scope is a separate preference from the player choice.
+enum ExternalPlayerScope: String, CaseIterable, Identifiable {
+    /// Both VOD and live TV.
+    case all
+    /// Movies and episodes only; live channels stay in the built-in player.
+    case vod
+    /// Live channels only; movies and episodes stay in the built-in player.
+    case live
+
+    /// VOD only: the players Lume hands off to are VOD-first (Infuse plays no
+    /// live streams at all), so limiting the hand-off is the safe default.
+    static let `default` = ExternalPlayerScope.vod
+
+    var id: String {
+        rawValue
+    }
+
+    var displayName: String {
+        switch self {
+        case .all: String(localized: "Everything")
+        case .vod: String(localized: "Movies & Series")
+        case .live: String(localized: "Live TV")
+        }
+    }
+
+    /// Whether media of `kind` is handed off under this scope.
+    func includes(_ kind: PlayableMedia.Kind) -> Bool {
+        switch self {
+        case .all: true
+        case .vod: kind == .vod
+        case .live: kind == .live
+        }
+    }
+}
+
 /// Reads the user's external-player preference and performs the hand-off.
 enum ExternalPlayback {
     /// The player selected in Settings, or `nil` when playback stays in the
@@ -76,13 +114,28 @@ enum ExternalPlayback {
         return ExternalPlayer(rawValue: raw)
     }
 
+    /// The content the hand-off applies to. Anything the picker didn't write —
+    /// including the unset default — means movies and series only.
+    static var scope: ExternalPlayerScope {
+        guard let raw = UserDefaults.standard.string(forKey: PlayerSettings.externalPlayerScopeKey),
+              let scope = ExternalPlayerScope(rawValue: raw) else { return .default }
+        return scope
+    }
+
+    /// The player `media` would be handed off to, or `nil` when it stays in the
+    /// built-in player — because no player is selected, the current scope
+    /// excludes this kind of stream, or the media is a local download other
+    /// apps cannot read from Lume's sandbox.
+    static func target(for media: PlayableMedia) -> ExternalPlayer? {
+        guard let player = preferred, scope.includes(media.kind), !media.url.isFileURL else { return nil }
+        return player
+    }
+
     /// Opens `media` in the preferred external player. Returns `true` when the
     /// hand-off happened; on `false` the caller starts the built-in player so
-    /// playback never dead-ends. Local downloads always return `false` — other
-    /// apps cannot read files inside Lume's sandbox.
+    /// playback never dead-ends.
     static func open(_ media: PlayableMedia) -> Bool {
-        guard let player = preferred,
-              !media.url.isFileURL,
+        guard let player = target(for: media),
               let deepLink = player.deepLink(for: media.url) else { return false }
         #if os(macOS)
             guard NSWorkspace.shared.urlForApplication(toOpen: deepLink) != nil else { return false }

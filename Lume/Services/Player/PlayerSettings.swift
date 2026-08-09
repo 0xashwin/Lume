@@ -115,6 +115,11 @@ enum PlayerSettings {
     /// in the built-in player.
     static let externalPlayerKey = "player.externalPlayer"
 
+    /// Raw value of the `ExternalPlayerScope` the hand-off is limited to —
+    /// VOD, live TV, or both. Unset (or unrecognised) means VOD only; see
+    /// `ExternalPlayerScope.default`.
+    static let externalPlayerScopeKey = "player.externalPlayerScope"
+
     // MARK: - Playback behaviour
 
     /// Engine-independent playback preferences for episodic content. Both default

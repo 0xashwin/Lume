@@ -84,7 +84,20 @@ import SwiftUI
                         externalPlayerRaw = nextExternalPlayerRaw(after: externalPlayerRaw)
                     }
 
-                    Text("Streams open in the selected app instead of Lume's player. Downloads always play in Lume, and the built-in player is used when the app is not installed.")
+                    // Only meaningful once a player is selected — some players
+                    // (Infuse, for one) handle VOD but not live streams.
+                    if ExternalPlayer(rawValue: externalPlayerRaw) != nil {
+                        TVOptionCycleRow(
+                            title: "Use For",
+                            valueLabel: ExternalPlayerScope(rawValue: externalPlayerScopeRaw)?.displayName
+                                ?? ExternalPlayerScope.default.displayName
+                        ) {
+                            externalPlayerScopeRaw = nextExternalPlayerScopeRaw(after: externalPlayerScopeRaw)
+                        }
+                    }
+
+                    // swiftlint:disable:next line_length
+                    Text("Streams open in the selected app instead of Lume's player. Downloads always play in Lume, and the built-in player is used when the app is not installed or the stream is outside the selected content.")
                         .font(.system(size: 20))
                         .foregroundStyle(.secondary)
                         .padding(.horizontal, TVSettingsMetrics.rowHPadding)
