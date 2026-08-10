@@ -2,6 +2,9 @@ import Foundation
 @testable import Lume
 import Testing
 
+/// Serialized: the preference tests read and write shared `UserDefaults`
+/// keys, which parallel execution interleaves.
+@Suite(.serialized)
 struct ExternalPlayerTests {
     @Test func `player all cases`() {
         #expect(ExternalPlayer.allCases.count == 2)
@@ -73,5 +76,104 @@ struct ExternalPlayerTests {
 
         defaults.set("vlc", forKey: PlayerSettings.externalPlayerKey)
         #expect(ExternalPlayback.preferred == .vlc)
+    }
+
+    // MARK: - Scope
+
+    @Test func `scope includes the matching kinds`() {
+        #expect(ExternalPlayerScope.all.includes(.vod))
+        #expect(ExternalPlayerScope.all.includes(.live))
+        #expect(ExternalPlayerScope.vod.includes(.vod))
+        #expect(!ExternalPlayerScope.vod.includes(.live))
+        #expect(ExternalPlayerScope.live.includes(.live))
+        #expect(!ExternalPlayerScope.live.includes(.vod))
+    }
+
+    @Test func `scope defaults to movies and series and ignores unknown values`() {
+        withStoredScope { defaults in
+            defaults.removeObject(forKey: PlayerSettings.externalPlayerScopeKey)
+            #expect(ExternalPlayback.scope == .vod)
+
+            defaults.set("notAScope", forKey: PlayerSettings.externalPlayerScopeKey)
+            #expect(ExternalPlayback.scope == .vod)
+
+            defaults.set("all", forKey: PlayerSettings.externalPlayerScopeKey)
+            #expect(ExternalPlayback.scope == .all)
+
+            defaults.set("live", forKey: PlayerSettings.externalPlayerScopeKey)
+            #expect(ExternalPlayback.scope == .live)
+        }
+    }
+
+    @Test func `hand-off target honours the scope`() throws {
+        let stream = try #require(URL(string: "http://example.com/stream.ts"))
+        let vod = makeMedia(url: stream, kind: .vod)
+        let live = makeMedia(url: stream, kind: .live)
+
+        withStoredPlayer { playerDefaults in
+            playerDefaults.set("infuse", forKey: PlayerSettings.externalPlayerKey)
+            withStoredScope { defaults in
+                defaults.set("vod", forKey: PlayerSettings.externalPlayerScopeKey)
+                #expect(ExternalPlayback.target(for: vod) == .infuse)
+                #expect(ExternalPlayback.target(for: live) == nil)
+
+                defaults.set("live", forKey: PlayerSettings.externalPlayerScopeKey)
+                #expect(ExternalPlayback.target(for: vod) == nil)
+                #expect(ExternalPlayback.target(for: live) == .infuse)
+
+                defaults.set("all", forKey: PlayerSettings.externalPlayerScopeKey)
+                #expect(ExternalPlayback.target(for: vod) == .infuse)
+                #expect(ExternalPlayback.target(for: live) == .infuse)
+            }
+        }
+    }
+
+    @Test func `local downloads never hand off regardless of scope`() {
+        let download = makeMedia(url: URL(fileURLWithPath: "/tmp/movie.mkv"), kind: .vod)
+
+        withStoredPlayer { playerDefaults in
+            playerDefaults.set("infuse", forKey: PlayerSettings.externalPlayerKey)
+            withStoredScope { defaults in
+                defaults.set("all", forKey: PlayerSettings.externalPlayerScopeKey)
+                #expect(ExternalPlayback.target(for: download) == nil)
+            }
+        }
+    }
+
+    private func makeMedia(url: URL, kind: PlayableMedia.Kind) -> PlayableMedia {
+        PlayableMedia(
+            id: kind == .live ? "channel-1" : "movie-1",
+            url: url,
+            title: kind == .live ? "Channel" : "Movie",
+            subtitle: nil,
+            posterURL: nil,
+            kind: kind,
+            startTime: 0,
+            contentRef: kind == .live ? .live("1") : .movie("1")
+        )
+    }
+
+    /// Runs `body` with the scope key restored afterwards — these tests write to
+    /// `UserDefaults.standard`, which the app (and other suites) share.
+    private func withStoredScope(_ body: (UserDefaults) -> Void) {
+        restoring(PlayerSettings.externalPlayerScopeKey, body)
+    }
+
+    private func withStoredPlayer(_ body: (UserDefaults) -> Void) {
+        restoring(PlayerSettings.externalPlayerKey, body)
+    }
+
+    private func restoring(_ key: String, _ body: (UserDefaults) -> Void) {
+        let defaults = UserDefaults.standard
+        let saved = defaults.string(forKey: key)
+        defer {
+            if let saved {
+                defaults.set(saved, forKey: key)
+            } else {
+                defaults.removeObject(forKey: key)
+            }
+        }
+        defaults.removeObject(forKey: key)
+        body(defaults)
     }
 }

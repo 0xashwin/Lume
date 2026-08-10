@@ -30,6 +30,8 @@ struct SettingsView: View {
     @AppStorage(PlayerSettings.engineKey) var engineRaw: String = PlayerEngineKind.defaultValue.rawValue
     @AppStorage(PlayerSettings.enginePriorityKey) var enginePriorityRaw: String = ""
     @AppStorage(PlayerSettings.externalPlayerKey) var externalPlayerRaw: String = ""
+    @AppStorage(PlayerSettings.externalPlayerScopeKey)
+    var externalPlayerScopeRaw: String = ExternalPlayerScope.default.rawValue
     @AppStorage(PlayerSettings.Playback.autoPlayNextKey)
     var autoPlayNext = PlayerSettings.Playback.autoPlayNextDefault
     @AppStorage(PlayerSettings.Playback.showNextEpisodeButtonKey)
@@ -121,6 +123,7 @@ struct SettingsView: View {
                     playbackSection
                     downloadsSection
                     playerSection
+                    externalPlayerSection
                     storageSection
                     supportSection
                     aboutSection
@@ -368,7 +371,18 @@ struct SettingsView: View {
                 NavigationLink("VLCKit Options") { VLCEngineSettingsScreen() }
                 NavigationLink("KSPlayer Options") { KSEngineSettingsScreen() }
                 NavigationLink("Lume Engine Options") { LumeEngineSettingsScreen() }
+            } header: {
+                Text("Player")
+            } footer: {
+                Text("Lume plays each stream with your preferred engine and falls back to the next if it can't be played.")
+            }
+        }
 
+        /// Hand-off to a third-party player. Its own group — this bypasses the
+        /// engines above rather than configuring them — but headerless, so it
+        /// still reads as part of the Player block.
+        private var externalPlayerSection: some View {
+            Section {
                 Picker("External Player", selection: $externalPlayerRaw) {
                     Text("Off").tag("")
                     ForEach(ExternalPlayer.allCases) { player in
@@ -376,10 +390,20 @@ struct SettingsView: View {
                     }
                 }
                 .pickerStyle(.menu)
-            } header: {
-                Text("Player")
+
+                // Only meaningful once a player is selected — some players
+                // (Infuse, for one) handle VOD but not live streams.
+                if ExternalPlayer(rawValue: externalPlayerRaw) != nil {
+                    Picker("Use For", selection: $externalPlayerScopeRaw) {
+                        ForEach(ExternalPlayerScope.allCases) { scope in
+                            Text(scope.displayName).tag(scope.rawValue)
+                        }
+                    }
+                    .pickerStyle(.menu)
+                }
             } footer: {
-                Text("Lume plays each stream with your preferred engine and falls back to the next if it can't be played. Streams open in the selected external app instead, when one is installed.")
+                // swiftlint:disable:next line_length
+                Text("Streams open in the selected external app instead of Lume's player, when it is installed. Some apps — Infuse among them — play movies and series but no live channels, so you can limit the hand-off to one or the other.")
             }
         }
 
