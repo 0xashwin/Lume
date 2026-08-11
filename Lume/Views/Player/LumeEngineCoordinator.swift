@@ -20,7 +20,9 @@ final class SubtitleCueModel: ObservableObject {
     /// Assigns only on an actual change, so an unchanged cue repeated across
     /// ticks doesn't invalidate the leaf ten times a second.
     func update(_ newText: String?) {
-        if text != newText { text = newText }
+        if text != newText {
+            text = newText
+        }
     }
 }
 
@@ -261,7 +263,9 @@ final class LumeEngineCoordinator: NSObject, ObservableObject {
         let session = session
         let index = id.flatMap(Int32.init)
         Task { await session?.selectSubtitleTrack(index) }
-        if id == nil { subtitleCues.update(nil) }
+        if id == nil {
+            subtitleCues.update(nil)
+        }
         if let info = mediaInfo {
             publishTracks(info: info)
         }
@@ -281,6 +285,7 @@ final class LumeEngineCoordinator: NSObject, ObservableObject {
             configuration.startPosition = media.startTime
         }
         configuration.hardwareDecode = options.hardwareDecode ? .videoToolbox : .software
+        configuration.deinterlace = Self.deinterlacing(for: options)
         configuration.bufferTarget = Double(media.isLive ? options.liveBuffer : options.vodBuffer) / 1000
         configuration.videoQueueDepth = options.videoQueueDepth
         configuration.audioQueueDepth = options.audioQueueDepth
@@ -297,6 +302,22 @@ final class LumeEngineCoordinator: NSObject, ObservableObject {
             configuration.demuxer.maxAnalyzeDuration = analyzeDuration
         }
         return configuration
+    }
+
+    /// Translates the stored deinterlace choices into the engine's policy.
+    /// Kept out of `makeConfiguration` so it stays a pure mapping between two
+    /// vocabularies — Lume's settings on one side, the engine's on the other.
+    private static func deinterlacing(for options: LumeEngineOptions) -> VideoDecoder.Deinterlacing {
+        let mode: VideoDecoder.Deinterlacing.Mode = switch options.deinterlaceMode {
+        case .off: .off
+        case .auto: .auto
+        case .always: .always
+        }
+        let rate: VideoDecoder.Deinterlacing.Rate = switch options.deinterlaceRate {
+        case .field: .field
+        case .frame: .frame
+        }
+        return VideoDecoder.Deinterlacing(mode: mode, rate: rate)
     }
 
     private func handle(event: PlayerEvent) {
@@ -403,7 +424,9 @@ final class LumeEngineCoordinator: NSObject, ObservableObject {
     }
 
     private func trackLabel(_ track: TrackInfo, fallback: String) -> String {
-        if let title = track.title, !title.isEmpty { return title }
+        if let title = track.title, !title.isEmpty {
+            return title
+        }
         if let language = track.language, !language.isEmpty {
             return Locale.current.localizedString(forLanguageCode: language) ?? language
         }
@@ -446,7 +469,9 @@ extension LumeEngineCoordinator: ExternalSubtitleLoading {
     /// the menu rather than left selected but silent.
     private func loadExternalSubtitleFile(_ subtitle: ExternalSubtitle) {
         subtitleCues.update(nil)
-        if let info = mediaInfo { publishTracks(info: info) }
+        if let info = mediaInfo {
+            publishTracks(info: info)
+        }
         let session = session
         Task {
             do {
@@ -455,7 +480,9 @@ extension LumeEngineCoordinator: ExternalSubtitleLoading {
                 Logger.player.error("LumeEngine could not load external subtitles: \(LogRedaction.describe(error), privacy: .public)")
                 self.externalSubtitle = nil
                 self.selectedSubtitleID = nil
-                if let info = self.mediaInfo { self.publishTracks(info: info) }
+                if let info = self.mediaInfo {
+                    self.publishTracks(info: info)
+                }
             }
         }
     }
