@@ -2738,6 +2738,58 @@
         }
       }
     },
+    "Always" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Immer"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Siempre"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Toujours"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sempre"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "常に"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "항상"
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sempre"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "始终"
+          }
+        }
+      }
+    },
     "Analyze Duration" : {
       "localizations" : {
         "de" : {
@@ -3527,6 +3579,58 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "自动"
+          }
+        }
+      }
+    },
+    "Automatic filters only streams that report interlaced frames; choose Always for providers that don't. Doubling the frame rate smooths motion at a higher cost. " : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Automatisch filtert nur Streams, die Interlaced-Bilder melden; wähle Immer für Anbieter, die das nicht tun. Eine verdoppelte Bildrate glättet Bewegungen bei höherem Aufwand. "
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Automático solo filtra las transmisiones que informan de fotogramas entrelazados; elige Siempre para los proveedores que no lo hacen. Duplicar la frecuencia de imagen suaviza el movimiento con más coste. "
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Automatique ne filtre que les flux qui signalent des images entrelacées ; choisissez Toujours pour ceux qui ne le font pas. Doubler la fréquence d'images lisse le mouvement, à un coût plus élevé. "
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Automatico filtra solo i flussi che segnalano fotogrammi interlacciati; scegli Sempre per i provider che non lo fanno. Raddoppiare la frequenza dei fotogrammi rende il movimento più fluido a costo maggiore. "
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "「自動」はインターレースフレームを報告するストリームのみを処理します。報告しないプロバイダーには「常に」を選んでください。フレームレートを2倍にすると動きは滑らかになりますが、負荷は高くなります。 "
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "'자동'은 인터레이스 프레임을 보고하는 스트림만 처리하며, 보고하지 않는 제공자에는 '항상'을 선택하세요. 프레임 속도를 2배로 하면 움직임이 부드러워지지만 부하가 커집니다. "
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Automático filtra apenas as transmissões que informam quadros entrelaçados; escolha Sempre para provedores que não informam. Dobrar a taxa de quadros suaviza o movimento a um custo maior. "
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "“自动”仅处理报告隔行帧的流；对于不报告的服务商，请选择“始终”。将帧率翻倍可让画面更流畅，但开销更大。 "
           }
         }
       }
@@ -7357,6 +7461,58 @@
         }
       }
     },
+    "Deinterlace" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Deinterlacing"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Desentrelazado"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Désentrelacement"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Deinterlacciamento"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "インターレース解除"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "디인터레이스"
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Desentrelaçamento"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "去隔行"
+          }
+        }
+      }
+    },
     "Deinterlace Mode" : {
       "comment" : "A label displayed above a picker for selecting the deinterlace mode.",
       "isCommentAutoGenerated" : true,
@@ -7459,6 +7615,58 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "去隔行视频"
+          }
+        }
+      }
+    },
+    "Deinterlacing removes the combing interlaced broadcasts — most live sport — show on motion, without giving up hardware decoding. " : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Deinterlacing entfernt die Kammartefakte, die Interlaced-Sendungen – die meisten Live-Sportübertragungen – bei Bewegung zeigen, ohne die Hardware-Dekodierung aufzugeben. "
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "El desentrelazado elimina el efecto peine que las emisiones entrelazadas —la mayoría del deporte en directo— muestran en movimiento, sin renunciar a la decodificación por hardware. "
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Le désentrelacement supprime le peignage que les diffusions entrelacées — la plupart des sports en direct — montrent sur les mouvements, sans renoncer au décodage matériel. "
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Il deinterlacciamento elimina l'effetto pettine che le trasmissioni interlacciate — la maggior parte dello sport in diretta — mostrano in movimento, senza rinunciare alla decodifica hardware. "
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "インターレース解除は、インターレース放送（ライブスポーツの多く）が動きで見せる櫛状のノイズを、ハードウェアデコードを手放すことなく取り除きます。 "
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "디인터레이스는 인터레이스 방송(대부분의 라이브 스포츠)이 움직임에서 보이는 빗살 무늬를 하드웨어 디코딩을 포기하지 않고 제거합니다. "
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "O desentrelaçamento remove o efeito de pente que as transmissões entrelaçadas — a maior parte dos esportes ao vivo — mostram em movimento, sem abrir mão da decodificação por hardware. "
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "去隔行可消除隔行扫描节目（大多数体育直播）在运动时出现的锯齿状条纹，同时不必放弃硬件解码。 "
           }
         }
       }
@@ -8292,6 +8500,58 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "完成"
+          }
+        }
+      }
+    },
+    "Doubled" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Verdoppelt"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Duplicada"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Doublée"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Raddoppiata"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "2倍"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "2배"
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Duplicada"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "翻倍"
           }
         }
       }
@@ -12079,6 +12339,58 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "强制高级版"
+          }
+        }
+      }
+    },
+    "Frame Rate" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Bildrate"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Frecuencia de imagen"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Fréquence d'images"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Frequenza fotogrammi"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "フレームレート"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "프레임 속도"
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Taxa de Quadros"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "帧率"
           }
         }
       }
@@ -21859,6 +22171,58 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "OpenSubtitles 返回了意外的响应。"
+          }
+        }
+      }
+    },
+    "Original" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Original"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Original"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Originale"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Originale"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "元のまま"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "원본"
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Original"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "原始"
           }
         }
       }
