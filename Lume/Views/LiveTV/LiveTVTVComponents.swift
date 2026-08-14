@@ -272,6 +272,8 @@
         let contentSort: ContentSortOption
         let onPlay: (LiveStream) -> Void
         let onPlayCatchup: (LiveStream, EPGProgramCell) -> Void
+        /// Raises Multi-View (or the paywall) — the rail hosts the entry point.
+        let onOpenMultiView: () -> Void
 
         /// The active playlist's id prefix, needed to scope the virtual
         /// (favorites / recently watched) collections in-memory.
@@ -296,6 +298,7 @@
                     sections: sections,
                     selectedSection: $selectedSection,
                     layoutModeRaw: $layoutModeRaw,
+                    onOpenMultiView: onOpenMultiView,
                     onCategoryActivated: { guideFocusToken += 1 }
                 )
                 content
@@ -343,12 +346,14 @@
         let sections: [LiveTVSection]
         @Binding var selectedSection: LiveTVSection?
         @Binding var layoutModeRaw: String
+        let onOpenMultiView: () -> Void
         /// Fired when the user activates (clicks) a category.
         var onCategoryActivated: () -> Void = {}
 
         /// Which rail control currently holds focus — drives the highlight.
         private enum RailItem: Hashable {
             case mode(String)
+            case multiView
             case category(String)
         }
 
@@ -375,11 +380,14 @@
                 // Without this, pressing Down from the right-hand "Guide" segment
                 // misses the left-aligned categories (only the left "List"
                 // segment sits directly above them).
-                viewModeSwitch
-                    .padding(.horizontal, 14)
-                    .padding(.top, 40)
-                    .padding(.bottom, 18)
-                    .focusSection()
+                HStack(spacing: 8) {
+                    viewModeSwitch
+                    multiViewButton
+                }
+                .padding(.horizontal, 14)
+                .padding(.top, 40)
+                .padding(.bottom, 18)
+                .focusSection()
 
                 ScrollView {
                     LazyVStack(alignment: .leading, spacing: 8) {
@@ -454,6 +462,29 @@
             }
             .buttonStyle(TVCardButtonStyle(focusScale: 1.04))
             .focused($focused, equals: .mode(mode.rawValue))
+            .animation(.easeOut(duration: 0.18), value: isItemFocused)
+        }
+
+        /// Sits outside the List/Guide pill group: it is an action, not a third
+        /// segment of a mutually exclusive choice. Sharing the row's focus section
+        /// keeps it a left/right move away, and leaves Down landing on the
+        /// categories from any of the three controls.
+        private var multiViewButton: some View {
+            let isItemFocused = focused == .multiView
+            return Button(action: onOpenMultiView) {
+                Image(systemName: "rectangle.split.2x2")
+                    .font(.system(size: 22, weight: .semibold))
+                    .frame(width: 52)
+                    .padding(.vertical, 20)
+                    .foregroundStyle(isItemFocused ? .black : .white.opacity(0.6))
+                    .background(
+                        RoundedRectangle(cornerRadius: 14, style: .continuous)
+                            .fill(isItemFocused ? AnyShapeStyle(.white) : AnyShapeStyle(.white.opacity(0.08)))
+                    )
+            }
+            .buttonStyle(TVCardButtonStyle(focusScale: 1.04))
+            .focused($focused, equals: .multiView)
+            .accessibilityLabel("Multi-View")
             .animation(.easeOut(duration: 0.18), value: isItemFocused)
         }
 
