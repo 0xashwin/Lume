@@ -79,7 +79,14 @@ struct MultiViewTilePlayer: View {
 
             if let displayMedia {
                 engineView(for: displayMedia)
-                    .id("\(engine.rawValue)-\(reloadToken)")
+                    // The channel is part of the identity: switching channel has
+                    // to tear the engine down and build a fresh one. Keyed on the
+                    // engine alone, a switch reused the live engine view, which
+                    // left the previous stream playing (the coordinators load in
+                    // `onAppear`, and only KSPlayer reloads on a URL change) and
+                    // stranded the spinner, because the tile had already latched
+                    // "playback started" for the outgoing channel.
+                    .id("\(engine.rawValue)-\(media.id)-\(reloadToken)")
             }
 
             if loadFailed || resolveFailed {
@@ -96,10 +103,13 @@ struct MultiViewTilePlayer: View {
         }
         .onChange(of: media.id) { _, _ in
             // A new channel in this tile restarts the fallback chain: the engine
-            // the previous channel ended up on says nothing about this one.
+            // the previous channel ended up on says nothing about this one. Every
+            // outcome flag has to clear too, or the new channel inherits the old
+            // one's spinner or failure badge.
             engineAttempt = 0
             isPlaying = false
             loadFailed = false
+            resolveFailed = false
         }
     }
 

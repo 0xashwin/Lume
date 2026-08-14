@@ -22,6 +22,43 @@ private struct MultiViewPickerTarget: Identifiable {
     let id: MultiViewSlot.ID
 }
 
+/// Presents the tile channel picker. A sheet on iOS/macOS; on tvOS its own
+/// `fullScreenCover` stacked over Multi-View's, because a tvOS cover always
+/// dismisses itself on Menu and nothing can stop it (neither `onExitCommand` nor
+/// `interactiveDismissDisabled`). Nesting turns that into the behaviour we want:
+/// Menu in the picker closes only the picker, Menu in the grid closes Multi-View.
+/// Presenting it also takes focus off the grid, which tvOS would otherwise keep
+/// reachable behind a plain overlay.
+///
+/// A `ViewModifier` rather than an inline `#if`: a conditional in the middle of a
+/// modifier chain is something SwiftFormat cannot indent readably.
+private struct MultiViewPickerPresentation: ViewModifier {
+    @Binding var target: MultiViewPickerTarget?
+    let usedMediaIDs: Set<String>
+    let playlistsInUse: (MultiViewSlot.ID) -> Set<UUID>
+    let onPick: (PlayableMedia, MultiViewSlot.ID) -> Void
+
+    func body(content: Content) -> some View {
+        #if os(tvOS)
+            content.fullScreenCover(item: $target) { target in
+                MultiViewChannelPickerTV(
+                    usedMediaIDs: usedMediaIDs,
+                    playlistsInUse: playlistsInUse(target.id),
+                    onPick: { onPick($0, target.id) }
+                )
+            }
+        #else
+            content.sheet(item: $target) { target in
+                MultiViewChannelPicker(
+                    usedMediaIDs: usedMediaIDs,
+                    playlistsInUse: playlistsInUse(target.id),
+                    onPick: { onPick($0, target.id) }
+                )
+            }
+        #endif
+    }
+}
+
 struct MultiViewScreen: View {
     @Environment(\.dismiss) private var dismiss
     @Environment(\.scenePhase) private var scenePhase
@@ -32,6 +69,13 @@ struct MultiViewScreen: View {
     @State private var session: MultiViewSession
     /// The tile whose channel picker is open.
     @State private var pickingSlot: MultiViewPickerTarget?
+    #if os(tvOS)
+        /// Drives the close button's own focus colours — never a size or a
+        /// position, so the focus engine has no layout to fight with.
+        @FocusState private var isCloseFocused: Bool
+        /// Same, for the layout pills.
+        @FocusState private var focusedLayout: MultiViewLayout?
+    #endif
 
     /// - Parameter seed: channels to start with. Empty tiles prompt for a channel,
     ///   so opening Multi-View cold is a valid entry.
@@ -61,13 +105,6 @@ struct MultiViewScreen: View {
         #endif
             .persistentSystemOverlays(.hidden)
             .preferredColorScheme(.dark)
-            .sheet(item: $pickingSlot) { target in
-                MultiViewChannelPicker(
-                    usedMediaIDs: session.usedMediaIDs,
-                    playlistsInUse: session.playlistsInUse(excluding: target.id),
-                    onPick: { session.setMedia($0, in: target.id) }
-                )
-            }
             .task {
                 // The tiles' QoE reports would be nonsense against a summary that
                 // models one stream at a time.
@@ -80,6 +117,15 @@ struct MultiViewScreen: View {
             .onChange(of: session.layout) { _, layout in
                 UserDefaults.standard.set(layout.rawValue, forKey: MultiViewLayout.storageKey)
             }
+            .modifier(MultiViewPickerPresentation(
+                target: $pickingSlot,
+                usedMediaIDs: session.usedMediaIDs,
+                playlistsInUse: { session.playlistsInUse(excluding: $0) },
+                onPick: { media, slotID in
+                    session.setMedia(media, in: slotID)
+                    pickingSlot = nil
+                }
+            ))
         #if os(iOS) || os(tvOS)
             .onChange(of: scenePhase) { _, phase in
                 // No engine plays Multi-View in the background, and four streams left
@@ -96,6 +142,8 @@ struct MultiViewScreen: View {
                 PlaybackQoE.shared.isSuspended = false
             }
         #if os(tvOS)
+            // Only reached when the picker isn't presented — its own cover handles
+            // Menu while it is up.
             .onExitCommand { close() }
         #endif
     }
@@ -177,15 +225,53 @@ struct MultiViewScreen: View {
         } label: {
             Label("Close", systemImage: "xmark")
                 .labelStyle(.iconOnly)
-                .font(.system(size: 15, weight: .semibold))
-                .foregroundStyle(.white)
-                .frame(width: 36, height: 36)
-                .background(.white.opacity(0.12), in: Circle())
+                .font(.system(size: closeGlyphSize, weight: .semibold))
+                .foregroundStyle(closeForeground)
+                .frame(width: closeDiameter, height: closeDiameter)
+                .background(closeFill, in: Circle())
         }
-        .buttonStyle(.plain)
         .accessibilityLabel("Close Multi-View")
-        #if !os(tvOS)
+        #if os(tvOS)
+            // Not `.plain`: on tvOS that leaves the system to paint its own white
+            // focus fill *behind* the glyph, which is also white — an invisible
+            // button exactly when it has focus. Own the focus colours instead.
+            .buttonStyle(TVCardButtonStyle(focusScale: 1.06))
+            .focused($isCloseFocused)
+        #else
+            .buttonStyle(.plain)
             .keyboardShortcut(.escape, modifiers: [])
+        #endif
+    }
+
+    private var closeGlyphSize: CGFloat {
+        #if os(tvOS)
+            22
+        #else
+            15
+        #endif
+    }
+
+    private var closeDiameter: CGFloat {
+        #if os(tvOS)
+            52
+        #else
+            36
+        #endif
+    }
+
+    private var closeForeground: Color {
+        #if os(tvOS)
+            isCloseFocused ? .black : .white
+        #else
+            .white
+        #endif
+    }
+
+    private var closeFill: Color {
+        #if os(tvOS)
+            isCloseFocused ? .white : .white.opacity(0.12)
+        #else
+            .white.opacity(0.12)
         #endif
     }
 
@@ -197,16 +283,19 @@ struct MultiViewScreen: View {
                     Button {
                         session.layout = layout
                     } label: {
+                        let isActive = session.layout == layout
+                        let isItemFocused = focusedLayout == layout
                         Image(systemName: layout.systemImage)
                             .font(.system(size: 24, weight: .semibold))
                             .frame(width: 72, height: 52)
-                            .foregroundStyle(session.layout == layout ? .black : .white)
+                            .foregroundStyle(isItemFocused || isActive ? .black : .white)
                             .background(
                                 RoundedRectangle(cornerRadius: 10, style: .continuous)
-                                    .fill(session.layout == layout ? .white : .white.opacity(0.12))
+                                    .fill(pillFill(isFocused: isItemFocused, isActive: isActive))
                             )
                     }
                     .buttonStyle(TVCardButtonStyle(focusScale: 1.06))
+                    .focused($focusedLayout, equals: layout)
                     .accessibilityLabel(Text(layout.title))
                 }
             }
@@ -226,6 +315,17 @@ struct MultiViewScreen: View {
             .frame(maxWidth: 180)
         #endif
     }
+
+    #if os(tvOS)
+        /// Focus wins over the active state: a focused pill is fully white, the
+        /// active-but-unfocused one keeps a dimmer white so the current layout
+        /// still reads.
+        private func pillFill(isFocused: Bool, isActive: Bool) -> AnyShapeStyle {
+            if isFocused { return AnyShapeStyle(.white) }
+            if isActive { return AnyShapeStyle(.white.opacity(0.6)) }
+            return AnyShapeStyle(.white.opacity(0.12))
+        }
+    #endif
 
     // MARK: - Lifecycle
 
