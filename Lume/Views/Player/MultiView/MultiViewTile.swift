@@ -23,10 +23,11 @@ struct MultiViewTile: View {
     /// tree. Drives the focus border only, never a size or a position, so the
     /// focus engine's animated context has no layout to fight with.
     @FocusState.Binding var focusedTile: MultiViewSlot.ID?
-    /// Whether the tile's own "…" button is showing. It rides with the screen's
-    /// chrome so a settled grid is nothing but video; a tap on the tile brings
-    /// both back. tvOS has no such button — the actions hang off a long press.
-    var showsMenu = true
+    /// Whether the tile's own chrome — the channel caption and, off tvOS, the
+    /// "…" button — is showing. It rides with the screen's controls, so a
+    /// settled grid is nothing but video. tvOS has no "…": the actions hang off
+    /// a long press.
+    var showsControls = true
     var onFocusAudio: () -> Void
     var onPickChannel: () -> Void
     var onRemove: () -> Void
@@ -123,9 +124,9 @@ struct MultiViewTile: View {
                 .buttonStyle(.plain)
                 .padding(8)
                 .accessibilityLabel("Tile options")
-                .opacity(showsMenu ? 1 : 0)
-                .allowsHitTesting(showsMenu)
-                .animation(.easeInOut(duration: 0.2), value: showsMenu)
+                .opacity(showsControls ? 1 : 0)
+                .allowsHitTesting(showsControls)
+                .animation(.easeInOut(duration: 0.2), value: showsControls)
             }
         #endif
     }
@@ -133,8 +134,16 @@ struct MultiViewTile: View {
     private func tileBody(_ media: PlayableMedia) -> some View {
         MultiViewTilePlayer(media: media, isMuted: !hasAudio)
             .overlay(alignment: .bottomLeading) {
-                caption(media)
+                // Removed rather than faded to zero: an `opacity(0)` caption stays
+                // in the accessibility tree, so VoiceOver would still announce a
+                // caption nobody can see. The tile's own label already carries the
+                // channel and its audio state. The transition keeps the fade.
+                if showsControls {
+                    caption(media)
+                        .transition(.opacity)
+                }
             }
+            .animation(.easeInOut(duration: 0.2), value: showsControls)
     }
 
     private func caption(_ media: PlayableMedia) -> some View {

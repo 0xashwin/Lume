@@ -106,9 +106,16 @@ struct MultiViewScreen: View {
         #endif
     }
 
-    /// - Parameter seed: channels to start with. Empty tiles prompt for a channel,
-    ///   so opening Multi-View cold is a valid entry.
-    init(seed: [PlayableMedia] = []) {
+    /// Dismisses the screen when it is hosted as an overlay (tvOS) rather than
+    /// presented, where `dismiss` has nothing to act on.
+    private let onClose: (() -> Void)?
+
+    /// - Parameters:
+    ///   - seed: channels to start with. Empty tiles prompt for a channel, so
+    ///     opening Multi-View cold is a valid entry.
+    ///   - onClose: supplied by an overlay host; omitted when presented.
+    init(seed: [PlayableMedia] = [], onClose: (() -> Void)? = nil) {
+        self.onClose = onClose
         let stored = UserDefaults.standard.integer(forKey: MultiViewLayout.storageKey)
         let fitting = MultiViewLayout.fitting(seed.count)
         let layout = MultiViewLayout(rawValue: max(stored, fitting.rawValue)) ?? fitting
@@ -117,7 +124,18 @@ struct MultiViewScreen: View {
 
     private var tileSpacing: CGFloat {
         #if os(tvOS)
-            16
+            12
+        #else
+            6
+        #endif
+    }
+
+    /// Outer margin around the grid. On tvOS the grid ignores the safe area, so
+    /// this is the whole margin — just enough that a focused edge tile's lift
+    /// isn't clipped.
+    private var gridInset: CGFloat {
+        #if os(tvOS)
+            24
         #else
             6
         #endif
@@ -157,6 +175,15 @@ struct MultiViewScreen: View {
             .onChange(of: session.layout) { _, layout in
                 UserDefaults.standard.set(layout.rawValue, forKey: MultiViewLayout.storageKey)
             }
+            .onChange(of: session.activeMedia.count) { _, count in
+                // Removing the last stream has to bring the controls back, or
+                // there is no way out of an empty grid.
+                if count == 0 {
+                    revealChrome()
+                } else {
+                    scheduleChromeHide()
+                }
+            }
         #if os(tvOS)
             // Focus back on a tile means the viewer is done with the controls.
             .onChange(of: focusedTile) { _, tile in
@@ -194,8 +221,15 @@ struct MultiViewScreen: View {
             }
         #if os(tvOS)
             // Only reached when the picker isn't presented — its own cover handles
-            // Menu while it is up.
-            .onExitCommand { close() }
+            // Menu while it is up. With the controls showing, Menu puts them away
+            // rather than tearing the whole grid down.
+            .onExitCommand {
+                if isChromeVisible {
+                    hideChrome()
+                } else {
+                    close()
+                }
+            }
         #endif
     }
 
@@ -219,8 +253,12 @@ struct MultiViewScreen: View {
                 }
             }
         }
-        .padding(tileSpacing)
+        .padding(gridInset)
         #if os(tvOS)
+            // Video belongs edge to edge; the safe area is for the controls,
+            // which are a separate overlay. `gridInset` still leaves room for
+            // the focus lift so a focused edge tile isn't clipped.
+            .ignoresSafeArea()
             .focusSection()
             // A transparent view is not focusable on tvOS, so the hidden chrome
             // cannot be reached by moving up into it. Instead the up press the
@@ -258,7 +296,7 @@ struct MultiViewScreen: View {
             slot: slot,
             hasAudio: session.isAudioSlot(slot.id),
             focusedTile: $focusedTile,
-            showsMenu: isChromeVisible,
+            showsControls: isChromeVisible,
             onFocusAudio: {
                 session.focusAudio(on: slot.id)
                 revealChrome()
@@ -298,9 +336,26 @@ struct MultiViewScreen: View {
         #endif
     }
 
+    #if os(tvOS)
+        /// Put the controls away and hand focus back to a tile, so the grid is
+        /// navigable again rather than leaving focus stranded on hidden buttons.
+        private func hideChrome() {
+            isChromeVisible = false
+            guard let first = session.slots.first?.id else { return }
+            Task { @MainActor in
+                try? await Task.sleep(for: .milliseconds(80))
+                focusedTile = first
+            }
+        }
+    #endif
+
     private func scheduleChromeHide() {
         #if !os(tvOS)
             chromeHideTask?.cancel()
+            // An empty grid has nothing to tap to bring the controls back — the
+            // only tap target is an empty tile, and that opens the picker. Leave
+            // them up until something is actually playing.
+            guard !session.activeMedia.isEmpty else { return }
             chromeHideTask = Task { @MainActor in
                 try? await Task.sleep(for: .seconds(Self.chromeAutoHideDelay))
                 guard !Task.isCancelled else { return }
@@ -470,6 +525,10 @@ struct MultiViewScreen: View {
     // MARK: - Lifecycle
 
     private func close() {
+        if let onClose {
+            onClose()
+            return
+        }
         #if os(macOS)
             dismissWindow(id: "multiview")
         #else

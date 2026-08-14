@@ -52,7 +52,11 @@ struct LiveTVView: View {
     @State private var showingSync = false
     @State private var playingMedia: PlayableMedia?
     @State private var showingSettings = false
-    @State private var showingMultiView = false
+    #if os(tvOS)
+        @Environment(DeepLinkRouter.self) private var router
+    #else
+        @State private var showingMultiView = false
+    #endif
     @State private var showingPaywall = false
     @State private var premium = PremiumManager.shared
 
@@ -199,6 +203,8 @@ struct LiveTVView: View {
             .fullScreenCover(item: $playingMedia) { media in
                 FullScreenPlayerView(media: media)
             }
+            #endif
+            #if os(iOS)
             .fullScreenCover(isPresented: $showingMultiView) {
                 MultiViewScreen()
             }
@@ -356,6 +362,9 @@ struct LiveTVView: View {
         }
         #if os(macOS)
             openWindow(id: "multiview")
+        #elseif os(tvOS)
+            // Presented by `MainTabView`, above the tab bar — see the router.
+            router.isMultiViewPresented = true
         #else
             showingMultiView = true
         #endif
