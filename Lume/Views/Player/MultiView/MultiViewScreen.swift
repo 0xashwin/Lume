@@ -69,6 +69,17 @@ struct MultiViewScreen: View {
     @State private var session: MultiViewSession
     /// The tile whose channel picker is open.
     @State private var pickingSlot: MultiViewPickerTarget?
+    /// Which tile holds focus. Hoisted out of the tiles so the screen can hand
+    /// focus to one on open — tvOS otherwise lands it on the close button, the
+    /// first focusable in the tree.
+    @FocusState private var focusedTile: MultiViewSlot.ID?
+    #if os(tvOS)
+        /// Scope for `resetFocus`, which is how the chrome takes focus the moment
+        /// it becomes visible: it is transparent until then, and a transparent
+        /// view is not focusable, so it cannot simply be moved into.
+        @Namespace private var focusScope
+        @Environment(\.resetFocus) private var resetFocus
+    #endif
     #if os(tvOS)
         /// Drives the close button's own focus colours — never a size or a
         /// position, so the focus engine has no layout to fight with.
@@ -76,6 +87,24 @@ struct MultiViewScreen: View {
         /// Same, for the layout pills.
         @FocusState private var focusedLayout: MultiViewLayout?
     #endif
+
+    /// Whether the floating chrome is showing. It starts hidden on tvOS (the grid
+    /// is what you came for; a press up brings the controls in) and auto-hides
+    /// elsewhere.
+    @State private var isChromeVisible = !isTV
+    #if !os(tvOS)
+        @State private var chromeHideTask: Task<Void, Never>?
+    #endif
+
+    private static let chromeAutoHideDelay: TimeInterval = 4
+
+    private static var isTV: Bool {
+        #if os(tvOS)
+            true
+        #else
+            false
+        #endif
+    }
 
     /// - Parameter seed: channels to start with. Empty tiles prompt for a channel,
     ///   so opening Multi-View cold is a valid entry.
@@ -95,10 +124,19 @@ struct MultiViewScreen: View {
     }
 
     var body: some View {
-        VStack(spacing: 0) {
-            topBar
+        // The chrome floats *over* the grid rather than sitting in a VStack above
+        // it: as a row it permanently took a band off the top, letterboxing every
+        // tile. Overlaid, the tiles always have the whole screen, and the chrome
+        // fades out entirely when it isn't wanted.
+        ZStack(alignment: .top) {
             grid
+            chrome
+                .opacity(isChromeVisible ? 1 : 0)
+                .animation(.easeInOut(duration: 0.2), value: isChromeVisible)
         }
+        #if os(tvOS)
+        .focusScope(focusScope)
+        #endif
         .background(Color.black.ignoresSafeArea())
         #if os(iOS)
             .statusBarHidden(true)
@@ -113,10 +151,20 @@ struct MultiViewScreen: View {
                 // which hitches every running decoder — more so with four of them.
                 ContentIndexingService.shared.isPlaybackActive = true
                 configureAudioSession()
+                landInitialFocus()
+                scheduleChromeHide()
             }
             .onChange(of: session.layout) { _, layout in
                 UserDefaults.standard.set(layout.rawValue, forKey: MultiViewLayout.storageKey)
             }
+        #if os(tvOS)
+            // Focus back on a tile means the viewer is done with the controls.
+            .onChange(of: focusedTile) { _, tile in
+                if tile != nil {
+                    isChromeVisible = false
+                }
+            }
+        #endif
             .modifier(MultiViewPickerPresentation(
                 target: $pickingSlot,
                 usedMediaIDs: session.usedMediaIDs,
@@ -137,6 +185,9 @@ struct MultiViewScreen: View {
             }
         #endif
             .onDisappear {
+                #if !os(tvOS)
+                    chromeHideTask?.cancel()
+                #endif
                 releaseAudioSession()
                 ContentIndexingService.shared.isPlaybackActive = false
                 PlaybackQoE.shared.isSuspended = false
@@ -171,6 +222,33 @@ struct MultiViewScreen: View {
         .padding(tileSpacing)
         #if os(tvOS)
             .focusSection()
+            // A transparent view is not focusable on tvOS, so the hidden chrome
+            // cannot be reached by moving up into it. Instead the up press the
+            // focus engine has nowhere to send — the top tile row is the top of
+            // the grid — is what brings the controls in.
+            .onMoveCommand { direction in
+                guard direction == .up, !isChromeVisible else { return }
+                isChromeVisible = true
+                // Deferred: the reset has to land after the chrome has faded in
+                // far enough to be focusable, and outside the focus engine's
+                // animated context. Releasing the tile first matters — two
+                // `@FocusState`s both asserting a value leaves the engine on the
+                // incumbent. Should the engine decline the hand-off anyway, the
+                // chrome is opaque by now, so a second press up reaches it.
+                Task { @MainActor in
+                    try? await Task.sleep(for: .milliseconds(150))
+                    focusedTile = nil
+                    resetFocus(in: focusScope)
+                }
+            }
+        #else
+                // Taps in the gaps around the tiles bring the chrome back too, so
+                // revealing it never has to change which tile is audible.
+            .background(
+                    Color.black
+                        .contentShape(Rectangle())
+                        .onTapGesture { revealChrome() }
+                )
         #endif
     }
 
@@ -179,8 +257,18 @@ struct MultiViewScreen: View {
         return MultiViewTile(
             slot: slot,
             hasAudio: session.isAudioSlot(slot.id),
-            onFocusAudio: { session.focusAudio(on: slot.id) },
-            onPickChannel: { pickingSlot = MultiViewPickerTarget(id: slot.id) },
+            focusedTile: $focusedTile,
+            showsMenu: isChromeVisible,
+            onFocusAudio: {
+                session.focusAudio(on: slot.id)
+                revealChrome()
+            },
+            onPickChannel: {
+                pickingSlot = MultiViewPickerTarget(id: slot.id)
+                // So the controls are up when the picker is dismissed, rather
+                // than the viewer landing back on a bare grid.
+                revealChrome()
+            },
             onRemove: { session.setMedia(nil, in: slot.id) }
         )
         // Identity follows the slot, not its position, so filling or clearing one
@@ -188,9 +276,42 @@ struct MultiViewScreen: View {
         .id(slot.id)
     }
 
+    // MARK: - Focus and chrome
+
+    /// Hands focus to the first tile once the grid has mounted. Deferred a tick:
+    /// the focus engine picks its own target as the tree appears (the close
+    /// button, being first), and a write made in the same turn is overwritten.
+    private func landInitialFocus() {
+        guard let first = session.slots.first?.id else { return }
+        Task { @MainActor in
+            try? await Task.sleep(for: .milliseconds(80))
+            focusedTile = first
+        }
+    }
+
+    /// Show the chrome and restart its hide timer. A no-op on tvOS, where the up
+    /// press reveals it and moving focus back to a tile hides it again.
+    private func revealChrome() {
+        #if !os(tvOS)
+            isChromeVisible = true
+            scheduleChromeHide()
+        #endif
+    }
+
+    private func scheduleChromeHide() {
+        #if !os(tvOS)
+            chromeHideTask?.cancel()
+            chromeHideTask = Task { @MainActor in
+                try? await Task.sleep(for: .seconds(Self.chromeAutoHideDelay))
+                guard !Task.isCancelled else { return }
+                isChromeVisible = false
+            }
+        #endif
+    }
+
     // MARK: - Chrome
 
-    private var topBar: some View {
+    private var chrome: some View {
         HStack(spacing: 12) {
             closeButton
             Spacer(minLength: 12)
@@ -198,8 +319,25 @@ struct MultiViewScreen: View {
         }
         .padding(.horizontal, barHorizontalPadding)
         .padding(.vertical, barVerticalPadding)
+        // A scrim under the controls: they now sit over video, which can be any
+        // brightness, and white-on-white is unreadable.
+        .background(
+            LinearGradient(
+                colors: [.black.opacity(0.55), .clear],
+                startPoint: .top,
+                endPoint: .bottom
+            )
+            .ignoresSafeArea(edges: .top)
+            .allowsHitTesting(false)
+        )
         #if os(tvOS)
-            .focusSection()
+        // Stays in the tree even while transparent, so a press up out of the
+        // top tile row always has a focus target — which is what brings it
+        // back into view.
+        .focusSection()
+        #else
+        // Hidden chrome must not swallow the tap that reveals it.
+        .allowsHitTesting(isChromeVisible)
         #endif
     }
 
@@ -237,6 +375,8 @@ struct MultiViewScreen: View {
             // button exactly when it has focus. Own the focus colours instead.
             .buttonStyle(TVCardButtonStyle(focusScale: 1.06))
             .focused($isCloseFocused)
+            // Where `resetFocus` sends focus once the chrome is up.
+            .prefersDefaultFocus(isChromeVisible, in: focusScope)
         #else
             .buttonStyle(.plain)
             .keyboardShortcut(.escape, modifiers: [])

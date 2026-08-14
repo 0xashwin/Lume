@@ -18,15 +18,22 @@ import SwiftUI
 struct MultiViewTile: View {
     let slot: MultiViewSlot
     let hasAudio: Bool
+    /// Owned by `MultiViewScreen` so it can hand focus to a tile on open — tvOS
+    /// otherwise lands focus on the close button, the first focusable in the
+    /// tree. Drives the focus border only, never a size or a position, so the
+    /// focus engine's animated context has no layout to fight with.
+    @FocusState.Binding var focusedTile: MultiViewSlot.ID?
+    /// Whether the tile's own "…" button is showing. It rides with the screen's
+    /// chrome so a settled grid is nothing but video; a tap on the tile brings
+    /// both back. tvOS has no such button — the actions hang off a long press.
+    var showsMenu = true
     var onFocusAudio: () -> Void
     var onPickChannel: () -> Void
     var onRemove: () -> Void
 
-    #if os(tvOS)
-        /// Drives the focus border only — never a size or a position, so the
-        /// focus engine's animated context has no layout to fight with.
-        @FocusState private var isTileFocused: Bool
-    #endif
+    private var isTileFocused: Bool {
+        focusedTile == slot.id
+    }
 
     private var cornerRadius: CGFloat {
         #if os(tvOS)
@@ -94,7 +101,7 @@ struct MultiViewTile: View {
                 tileBody(media)
             }
             .buttonStyle(TVCardButtonStyle(focusScale: 1.02))
-            .focused($isTileFocused)
+            .focused($focusedTile, equals: slot.id)
             .contextMenu {
                 tileActions
             }
@@ -116,6 +123,9 @@ struct MultiViewTile: View {
                 .buttonStyle(.plain)
                 .padding(8)
                 .accessibilityLabel("Tile options")
+                .opacity(showsMenu ? 1 : 0)
+                .allowsHitTesting(showsMenu)
+                .animation(.easeInOut(duration: 0.2), value: showsMenu)
             }
         #endif
     }
@@ -180,7 +190,7 @@ struct MultiViewTile: View {
         }
         #if os(tvOS)
         .buttonStyle(TVCardButtonStyle(focusScale: 1.02))
-        .focused($isTileFocused)
+        .focused($focusedTile, equals: slot.id)
         #else
         .buttonStyle(.plain)
         #endif
