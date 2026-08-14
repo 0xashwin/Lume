@@ -12,12 +12,23 @@ import SwiftData
 import Testing
 
 struct LiveChannelNavigatorTests {
+    /// One channel to seed. Only `num` / `name` / `category` matter to the plain
+    /// category tests; the flags drive the Favorites / Recently Watched scopes
+    /// and the hidden-channel filtering.
+    private struct StreamSpec {
+        var num: Int
+        var name: String
+        var category: String
+        var isFavorite = false
+        var favoriteOrder: Int?
+        var isHidden = false
+        var lastWatched: Date?
+    }
+
     // Mirrors the id scheme ContentSyncManager writes:
     // "<playlistUUID>-live-<streamId>". The playlist prefix is what
     // `playlist(for:)` keys off, so tests must reproduce it.
-    private func makeWorld(
-        streams: [(num: Int, name: String, category: String)]
-    ) throws -> (ModelContext, Playlist) {
+    private func makeWorld(streams: [StreamSpec]) throws -> (ModelContext, Playlist) {
         let container = try makeTestContainer()
         let context = ModelContext(container)
         let playlist = Playlist(
@@ -37,6 +48,10 @@ struct LiveChannelNavigatorTests {
                 num: spec.num,
                 categoryId: spec.category
             )
+            stream.isFavorite = spec.isFavorite
+            stream.favoriteOrder = spec.favoriteOrder
+            stream.isHidden = spec.isHidden
+            stream.lastWatchedDate = spec.lastWatched
             context.insert(stream)
         }
         try context.save()
@@ -50,19 +65,20 @@ struct LiveChannelNavigatorTests {
     private func media(
         forStreamId streamId: Int,
         playlist: Playlist,
+        scope: LiveChannelScope? = nil,
         in context: ModelContext
     ) throws -> PlayableMedia {
         let id = "\(playlist.id.uuidString)-live-\(streamId)"
         var descriptor = FetchDescriptor<LiveStream>(predicate: #Predicate { $0.id == id })
         descriptor.fetchLimit = 1
         let stream = try #require(try context.fetch(descriptor).first)
-        return try #require(PlayableMedia.from(stream: stream, playlist: playlist))
+        return try #require(PlayableMedia.from(stream: stream, playlist: playlist, scope: scope))
     }
 
-    private let threeChannels: [(num: Int, name: String, category: String)] = [
-        (num: 1, name: "Alpha", category: "cat-a"),
-        (num: 2, name: "Bravo", category: "cat-a"),
-        (num: 3, name: "Charlie", category: "cat-a")
+    private let threeChannels: [StreamSpec] = [
+        StreamSpec(num: 1, name: "Alpha", category: "cat-a"),
+        StreamSpec(num: 2, name: "Bravo", category: "cat-a"),
+        StreamSpec(num: 3, name: "Charlie", category: "cat-a")
     ]
 
     // MARK: - Next / previous
@@ -119,9 +135,9 @@ struct LiveChannelNavigatorTests {
         // Bravo is the lone channel in cat-b; another category's channels must
         // not leak in, so there is no neighbour to surf to.
         let (context, playlist) = try makeWorld(streams: [
-            (num: 1, name: "Alpha", category: "cat-a"),
-            (num: 2, name: "Bravo", category: "cat-b"),
-            (num: 3, name: "Charlie", category: "cat-a")
+            StreamSpec(num: 1, name: "Alpha", category: "cat-a"),
+            StreamSpec(num: 2, name: "Bravo", category: "cat-b"),
+            StreamSpec(num: 3, name: "Charlie", category: "cat-a")
         ])
         let bravo = try media(forStreamId: 101, playlist: playlist, in: context)
 
@@ -131,12 +147,103 @@ struct LiveChannelNavigatorTests {
 
     @Test func `single channel category has no neighbour`() throws {
         let (context, playlist) = try makeWorld(streams: [
-            (num: 1, name: "Alpha", category: "cat-a")
+            StreamSpec(num: 1, name: "Alpha", category: "cat-a")
         ])
         let alpha = try media(forStreamId: 100, playlist: playlist, in: context)
 
         #expect(LiveChannelNavigator.adjacentMedia(for: alpha, offset: 1, sort: .playlist, in: context) == nil)
         #expect(LiveChannelNavigator.adjacentMedia(for: alpha, offset: -1, sort: .playlist, in: context) == nil)
+    }
+
+    // MARK: - Launch scope
+
+    /// Alpha and Charlie are favorited from different categories; Bravo sits
+    /// between them in cat-a but isn't a favorite.
+    private let mixedFavorites: [StreamSpec] = [
+        StreamSpec(num: 1, name: "Alpha", category: "cat-a", isFavorite: true),
+        StreamSpec(num: 2, name: "Bravo", category: "cat-a"),
+        StreamSpec(num: 3, name: "Charlie", category: "cat-b", isFavorite: true)
+    ]
+
+    @Test func `favorites surfing stays in the favorites list`() throws {
+        let (context, playlist) = try makeWorld(streams: mixedFavorites)
+        let alpha = try media(forStreamId: 100, playlist: playlist, scope: .favorites, in: context)
+
+        let next = LiveChannelNavigator.adjacentMedia(for: alpha, offset: 1, sort: .playlist, in: context)
+        // Charlie, the other favorite — not Bravo, Alpha's own category neighbour.
+        #expect(next?.contentRef == liveRef(102, playlist))
+    }
+
+    @Test func `favorites order follows favoriteOrder`() throws {
+        let (context, playlist) = try makeWorld(streams: [
+            StreamSpec(num: 1, name: "Alpha", category: "cat-a", isFavorite: true, favoriteOrder: 2),
+            StreamSpec(num: 2, name: "Bravo", category: "cat-a", isFavorite: true, favoriteOrder: 0),
+            StreamSpec(num: 3, name: "Charlie", category: "cat-b", isFavorite: true, favoriteOrder: 1)
+        ])
+        let bravo = try media(forStreamId: 101, playlist: playlist, scope: .favorites, in: context)
+
+        let next = LiveChannelNavigator.adjacentMedia(for: bravo, offset: 1, sort: .playlist, in: context)
+        #expect(next?.contentRef == liveRef(102, playlist)) // Charlie
+    }
+
+    @Test func `the launch scope travels to the next channel`() throws {
+        let (context, playlist) = try makeWorld(streams: mixedFavorites)
+        let alpha = try media(forStreamId: 100, playlist: playlist, scope: .favorites, in: context)
+
+        let next = LiveChannelNavigator.adjacentMedia(for: alpha, offset: 1, sort: .playlist, in: context)
+        #expect(next?.channelScope == .favorites)
+    }
+
+    @Test func `recently watched surfing stays in the recents list`() throws {
+        let now = Date()
+        let (context, playlist) = try makeWorld(streams: [
+            StreamSpec(num: 1, name: "Alpha", category: "cat-a", lastWatched: now),
+            StreamSpec(num: 2, name: "Bravo", category: "cat-a"),
+            StreamSpec(num: 3, name: "Charlie", category: "cat-b", lastWatched: now.addingTimeInterval(-60))
+        ])
+        let alpha = try media(forStreamId: 100, playlist: playlist, scope: .recentlyWatched, in: context)
+
+        // Most recent first: Alpha, Charlie — Bravo was never watched.
+        let next = LiveChannelNavigator.adjacentMedia(for: alpha, offset: 1, sort: .playlist, in: context)
+        #expect(next?.contentRef == liveRef(102, playlist)) // Charlie
+    }
+
+    @Test func `scope falls back to the category when the channel left the list`() throws {
+        // Bravo was launched from Favorites and un-favorited since; surfing must
+        // keep working from its own category rather than dead-end.
+        let (context, playlist) = try makeWorld(streams: threeChannels)
+        let bravo = try media(forStreamId: 101, playlist: playlist, scope: .favorites, in: context)
+
+        let next = LiveChannelNavigator.adjacentMedia(for: bravo, offset: 1, sort: .playlist, in: context)
+        #expect(next?.contentRef == liveRef(102, playlist)) // Charlie
+    }
+
+    // MARK: - Hidden channels
+
+    @Test func `hidden channels are skipped`() throws {
+        let (context, playlist) = try makeWorld(streams: [
+            StreamSpec(num: 1, name: "Alpha", category: "cat-a"),
+            StreamSpec(num: 2, name: "Bravo", category: "cat-a", isHidden: true),
+            StreamSpec(num: 3, name: "Charlie", category: "cat-a")
+        ])
+        let alpha = try media(forStreamId: 100, playlist: playlist, scope: .category("cat-a"), in: context)
+
+        let next = LiveChannelNavigator.adjacentMedia(for: alpha, offset: 1, sort: .playlist, in: context)
+        #expect(next?.contentRef == liveRef(102, playlist)) // Charlie, not hidden Bravo
+    }
+
+    @Test func `a hidden channel still surfs its category`() throws {
+        // A hidden channel can be playing (recall, deep link) even though no
+        // browse list contains it — it must not dead-end.
+        let (context, playlist) = try makeWorld(streams: [
+            StreamSpec(num: 1, name: "Alpha", category: "cat-a"),
+            StreamSpec(num: 2, name: "Bravo", category: "cat-a", isHidden: true),
+            StreamSpec(num: 3, name: "Charlie", category: "cat-a")
+        ])
+        let bravo = try media(forStreamId: 101, playlist: playlist, in: context)
+
+        let next = LiveChannelNavigator.adjacentMedia(for: bravo, offset: 1, sort: .playlist, in: context)
+        #expect(next?.contentRef == liveRef(102, playlist)) // Charlie
     }
 
     // MARK: - Non-live input

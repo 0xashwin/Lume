@@ -89,7 +89,7 @@ struct LiveTVView: View {
                     scope: section.scope,
                     playlistPrefix: playlistPrefix,
                     sort: contentSort,
-                    onPlay: { playChannel($0) },
+                    onPlay: { playChannel($0, scope: section.scope) },
                     onPlayCatchup: { playCatchup($0, cell: $1) }
                 )
             } else {
@@ -103,12 +103,12 @@ struct LiveTVView: View {
     private func channelList(for section: LiveTVSection) -> some View {
         #if os(tvOS)
             TVChannelsList(scope: section.scope, playlistPrefix: playlistPrefix, sort: contentSort) { stream in
-                playChannel(stream)
+                playChannel(stream, scope: section.scope)
             }
             .frame(maxWidth: .infinity)
         #else
             ChannelsList(scope: section.scope, playlistPrefix: playlistPrefix, sort: contentSort) { stream in
-                playChannel(stream)
+                playChannel(stream, scope: section.scope)
             }
         #endif
     }
@@ -247,7 +247,7 @@ struct LiveTVView: View {
                 displayedSection: displayed,
                 layoutModeRaw: $layoutModeRaw,
                 contentSort: contentSort,
-                onPlay: { playChannel($0) },
+                onPlay: { playChannel($0, scope: displayed?.scope) },
                 onPlayCatchup: { playCatchup($0, cell: $1) },
                 playlistPrefix: playlistPrefix
             )
@@ -311,9 +311,11 @@ struct LiveTVView: View {
             : sections.first
     }
 
-    private func playChannel(_ stream: LiveStream) {
+    /// `scope` is the section the channel was picked from; it travels with the
+    /// media so in-player channel surfing stays inside that list.
+    private func playChannel(_ stream: LiveStream, scope: LiveChannelScope?) {
         guard let playlist = activePlaylist,
-              let media = PlayableMedia.from(stream: stream, playlist: playlist) else { return }
+              let media = PlayableMedia.from(stream: stream, playlist: playlist, scope: scope) else { return }
         present(media)
     }
 
