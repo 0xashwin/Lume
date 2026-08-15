@@ -16,6 +16,8 @@
     struct TVChannelsList: View {
         let scope: LiveChannelScope
         let playlistPrefix: String
+        /// Seeds Multi-View with this channel, gated on Lume Pro by the host.
+        let onStartMultiView: (LiveStream) -> Void
         let onPlay: (LiveStream) -> Void
         @Environment(\.modelContext) private var modelContext
         @Query private var streams: [LiveStream]
@@ -30,9 +32,16 @@
         /// Drives the "Clear Recently Watched" confirmation alert.
         @State private var confirmingClear = false
 
-        init(scope: LiveChannelScope, playlistPrefix: String, sort: ContentSortOption, onPlay: @escaping (LiveStream) -> Void) {
+        init(
+            scope: LiveChannelScope,
+            playlistPrefix: String,
+            sort: ContentSortOption,
+            onStartMultiView: @escaping (LiveStream) -> Void,
+            onPlay: @escaping (LiveStream) -> Void
+        ) {
             self.scope = scope
             self.playlistPrefix = playlistPrefix
+            self.onStartMultiView = onStartMultiView
             self.onPlay = onPlay
             _streams = Query(LiveChannelQuery.descriptor(for: scope, sort: sort))
         }
@@ -61,10 +70,10 @@
                             TVChannelRow(
                                 stream: stream,
                                 epg: epgByChannel[stream.epgChannelId ?? ""],
-                                onRemove: scope == .recentlyWatched ? { removeFromRecentlyWatched(stream) } : nil
-                            ) {
-                                onPlay(stream)
-                            }
+                                onRemove: scope == .recentlyWatched ? { removeFromRecentlyWatched(stream) } : nil,
+                                onStartMultiView: { onStartMultiView(stream) },
+                                onPlay: { onPlay(stream) }
+                            )
                             .onAppear {
                                 if stream.id == visible.last?.id, visibleCount < channels.count {
                                     visibleCount = min(visibleCount + LiveChannelQuery.pageSize, channels.count)
@@ -140,8 +149,10 @@
         /// (see `ChannelEPGSnapshot`) rather than by a per-row `@Query`.
         var epg: ChannelEPG?
         var onRemove: (() -> Void)?
+        var onStartMultiView: (() -> Void)?
         let onPlay: () -> Void
 
+        @Environment(\.modelContext) private var modelContext
         @FocusState private var isFocused: Bool
 
         private var currentEPG: EPGSlot? {
@@ -220,7 +231,12 @@
             .buttonStyle(TVCardButtonStyle(focusScale: 1.03))
             .focused($isFocused)
             .animation(.easeOut(duration: 0.18), value: isFocused)
-            .recentlyWatchedRemoveMenu(onRemove)
+            .liveChannelMenu(
+                isFavorite: stream.isFavorite,
+                onToggleFavorite: { LiveChannelFavorites.toggle(stream, in: modelContext) },
+                onStartMultiView: onStartMultiView,
+                onRemoveFromRecents: onRemove
+            )
         }
 
         private var logo: some View {
@@ -274,6 +290,8 @@
         let onPlayCatchup: (LiveStream, EPGProgramCell) -> Void
         /// Raises Multi-View (or the paywall) — the rail hosts the entry point.
         let onOpenMultiView: () -> Void
+        /// Raises Multi-View seeded with a channel, from its long-press menu.
+        let onStartMultiView: (LiveStream) -> Void
 
         /// The active playlist's id prefix, needed to scope the virtual
         /// (favorites / recently watched) collections in-memory.
@@ -322,9 +340,15 @@
                     .id("\(section.id)-\(contentSort.rawValue)-guide")
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
                 case .list:
-                    TVChannelsList(scope: section.scope, playlistPrefix: playlistPrefix, sort: contentSort, onPlay: onPlay)
-                        .id("\(section.id)-\(contentSort.rawValue)-list")
-                        .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    TVChannelsList(
+                        scope: section.scope,
+                        playlistPrefix: playlistPrefix,
+                        sort: contentSort,
+                        onStartMultiView: onStartMultiView,
+                        onPlay: onPlay
+                    )
+                    .id("\(section.id)-\(contentSort.rawValue)-list")
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
                 }
             } else {
                 ContentUnavailableView(

@@ -87,6 +87,44 @@ struct MultiViewSlot: Identifiable, Hashable {
     var media: PlayableMedia?
 }
 
+// MARK: - Launch
+
+/// One request to open Multi-View, carrying the channels it should start with.
+///
+/// The seed travels *with* the presentation rather than beside it: a separate
+/// "is presented" flag and seed property are two independent pieces of state, and
+/// the presentation can be built from the flag before the seed lands — which
+/// opened the grid empty when Multi-View was started from a channel. Presenting
+/// on this value instead makes that impossible, and its fresh `id` per launch
+/// gives the screen a new identity so its `@State` session is rebuilt.
+struct MultiViewLaunch: Identifiable {
+    let id = UUID()
+    var seed: [PlayableMedia] = []
+}
+
+#if os(macOS)
+    /// Channels waiting for the Multi-View window to pick them up. macOS opens a
+    /// single, long-lived window rather than presenting a screen, so there is no
+    /// launch value to build it from — the grid takes what is queued here when it
+    /// appears, and the window may already be open, in which case the channels
+    /// fill its free tiles.
+    @Observable
+    final class MultiViewLaunchQueue {
+        static let shared = MultiViewLaunchQueue()
+
+        var pending: [PlayableMedia] = []
+
+        private init() {}
+
+        /// Returns the queued channels and empties the queue, so a later open
+        /// from the toolbar starts blank.
+        func take() -> [PlayableMedia] {
+            defer { pending = [] }
+            return pending
+        }
+    }
+#endif
+
 // MARK: - Session
 
 /// The live Multi-View grid. Owned by `MultiViewScreen` for the lifetime of the

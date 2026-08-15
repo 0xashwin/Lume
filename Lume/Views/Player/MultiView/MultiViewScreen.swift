@@ -102,6 +102,19 @@ struct MultiViewScreen: View {
         @State private var chromeHideTask: Task<Void, Never>?
     #endif
 
+    /// The controls stay put while nothing is playing — there is nothing behind
+    /// them to look at, and hiding them would strand the viewer: the only target
+    /// left is an empty tile, and that opens the picker rather than bringing them
+    /// back.
+    var controlsArePinned: Bool {
+        session.activeMedia.isEmpty
+    }
+
+    /// Whether the controls are on screen, pinned or not.
+    var showsChrome: Bool {
+        isChromeVisible || controlsArePinned
+    }
+
     /// How far down the grid starts while the controls are showing, so they sit
     /// above the players instead of over them. Measured rather than hard-coded:
     /// the bar grows with Dynamic Type, and on tvOS it also sits inside the
@@ -161,8 +174,8 @@ struct MultiViewScreen: View {
         ZStack(alignment: .top) {
             grid
             chrome
-                .opacity(isChromeVisible ? 1 : 0)
-                .animation(.easeInOut(duration: 0.2), value: isChromeVisible)
+                .opacity(showsChrome ? 1 : 0)
+                .animation(.easeInOut(duration: 0.2), value: showsChrome)
                 .onGeometryChange(for: CGRect.self) { proxy in
                     proxy.frame(in: .global)
                 } action: { frame in
@@ -193,6 +206,7 @@ struct MultiViewScreen: View {
                 // which hitches every running decoder — more so with four of them.
                 ContentIndexingService.shared.isPlaybackActive = true
                 configureAudioSession()
+                adoptQueuedChannels()
                 landInitialFocus()
                 scheduleChromeHide()
             }
@@ -254,7 +268,9 @@ struct MultiViewScreen: View {
             // Menu while it is up. With the controls showing, Menu puts them away
             // rather than tearing the whole grid down.
             .onExitCommand {
-                if isChromeVisible {
+                // Pinned controls can't be dismissed, so Menu closes Multi-View
+                // rather than doing nothing.
+                if isChromeVisible, !controlsArePinned {
                     hideChrome()
                 } else {
                     close()
@@ -287,8 +303,8 @@ struct MultiViewScreen: View {
         // Make room for the controls rather than sitting under them: the tiles
         // give up the band the bar occupies while it is showing, and take it back
         // as it goes away.
-        .padding(.top, isChromeVisible ? chromeInset : 0)
-        .animation(.easeInOut(duration: 0.2), value: isChromeVisible)
+        .padding(.top, showsChrome ? chromeInset : 0)
+        .animation(.easeInOut(duration: 0.2), value: showsChrome)
         #if os(tvOS)
             // Video belongs edge to edge; the safe area is for the controls,
             // which are a separate overlay. `gridInset` still leaves room for
@@ -316,7 +332,7 @@ struct MultiViewScreen: View {
                 // In the reversed order the focus change is still to come; clear the
                 // flag it is about to set, or it would swallow the *next* press.
                 Task { @MainActor in engineMovedFocus = false }
-                guard direction == .up, !isChromeVisible, !engineHandledPress, isFocusOnTopRow else { return }
+                guard direction == .up, !showsChrome, !engineHandledPress, isFocusOnTopRow else { return }
                 isChromeVisible = true
                 // Deferred: the reset has to land after the chrome has faded in
                 // far enough to be focusable, and outside the focus engine's
@@ -347,7 +363,7 @@ struct MultiViewScreen: View {
             slot: slot,
             hasAudio: session.isAudioSlot(slot.id),
             focusedTile: $focusedTile,
-            showsControls: isChromeVisible,
+            showsControls: showsChrome,
             onFocusAudio: {
                 session.focusAudio(on: slot.id)
                 revealChrome()
@@ -363,6 +379,23 @@ struct MultiViewScreen: View {
         // Identity follows the slot, not its position, so filling or clearing one
         // tile never tears down a sibling's player.
         .id(slot.id)
+    }
+
+    /// Picks up channels queued for the Multi-View window. macOS only: every
+    /// other platform builds the screen around its launch, so the seed is already
+    /// in the session by the time this runs. Free tiles are filled in order, so
+    /// starting a channel into a window that is already playing adds to the grid
+    /// rather than replacing it.
+    private func adoptQueuedChannels() {
+        #if os(macOS)
+            let queued = MultiViewLaunchQueue.shared.take()
+            guard !queued.isEmpty else { return }
+            var remaining = queued[...]
+            for slot in session.slots where slot.media == nil {
+                guard let next = remaining.popFirst() else { break }
+                session.setMedia(next, in: slot.id)
+            }
+        #endif
     }
 
     // MARK: - Focus and chrome

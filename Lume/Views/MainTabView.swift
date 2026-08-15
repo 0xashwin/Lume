@@ -100,9 +100,16 @@ struct MainTabView: View {
             }
         #if os(tvOS)
             .overlay {
-                if router.isMultiViewPresented {
-                    MultiViewScreen(onClose: { router.isMultiViewPresented = false })
-                        .transition(.opacity)
+                if let launch = router.multiViewLaunch {
+                    MultiViewScreen(
+                        seed: launch.seed,
+                        onClose: { router.multiViewLaunch = nil }
+                    )
+                    // A launch's own id, so a grid started from a channel is a
+                    // new view rather than the previous one re-rendered — which
+                    // would keep the earlier session and drop the seed.
+                    .id(launch.id)
+                    .transition(.opacity)
                 }
             }
         #endif

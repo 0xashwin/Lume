@@ -55,7 +55,9 @@ struct LiveTVView: View {
     #if os(tvOS)
         @Environment(DeepLinkRouter.self) private var router
     #else
-        @State private var showingMultiView = false
+        /// Non-nil while Multi-View is up; carries the channels it opened with,
+        /// when it was started from a channel rather than the toolbar.
+        @State private var multiViewLaunch: MultiViewLaunch?
     #endif
     @State private var showingPaywall = false
     @State private var premium = PremiumManager.shared
@@ -109,14 +111,22 @@ struct LiveTVView: View {
     @ViewBuilder
     private func channelList(for section: LiveTVSection) -> some View {
         #if os(tvOS)
-            TVChannelsList(scope: section.scope, playlistPrefix: playlistPrefix, sort: contentSort) { stream in
-                playChannel(stream)
-            }
+            TVChannelsList(
+                scope: section.scope,
+                playlistPrefix: playlistPrefix,
+                sort: contentSort,
+                onStartMultiView: { startMultiView(with: $0) },
+                onPlay: { playChannel($0) }
+            )
             .frame(maxWidth: .infinity)
         #else
-            ChannelsList(scope: section.scope, playlistPrefix: playlistPrefix, sort: contentSort) { stream in
-                playChannel(stream)
-            }
+            ChannelsList(
+                scope: section.scope,
+                playlistPrefix: playlistPrefix,
+                sort: contentSort,
+                onStartMultiView: { startMultiView(with: $0) },
+                onPlay: { playChannel($0) }
+            )
         #endif
     }
 
@@ -205,8 +215,8 @@ struct LiveTVView: View {
             }
             #endif
             #if os(iOS)
-            .fullScreenCover(isPresented: $showingMultiView) {
-                MultiViewScreen()
+            .fullScreenCover(item: $multiViewLaunch) { launch in
+                MultiViewScreen(seed: launch.seed)
             }
             #endif
             .paywall(isPresented: $showingPaywall, highlight: .multiView)
@@ -273,6 +283,7 @@ struct LiveTVView: View {
                 onPlay: { playChannel($0) },
                 onPlayCatchup: { playCatchup($0, cell: $1) },
                 onOpenMultiView: { openMultiView() },
+                onStartMultiView: { startMultiView(with: $0) },
                 playlistPrefix: playlistPrefix
             )
         }
@@ -354,19 +365,33 @@ struct LiveTVView: View {
         present(media)
     }
 
+    /// Opens Multi-View on a channel picked from the list, so the grid starts
+    /// with something playing rather than two empty tiles.
+    private func startMultiView(with stream: LiveStream) {
+        guard let playlist = activePlaylist,
+              let media = PlayableMedia.from(stream: stream, playlist: playlist)
+        else {
+            return
+        }
+        openMultiView(seed: [media])
+    }
+
     /// Opens Multi-View, or the paywall when the viewer isn't on Lume Pro.
-    private func openMultiView() {
+    private func openMultiView(seed: [PlayableMedia] = []) {
         guard premium.isPremium else {
             showingPaywall = true
             return
         }
         #if os(macOS)
+            // The window is a singleton, so it cannot be built around a launch:
+            // hand the channels over and let the grid adopt them on appear.
+            MultiViewLaunchQueue.shared.pending = seed
             openWindow(id: "multiview")
         #elseif os(tvOS)
             // Presented by `MainTabView`, above the tab bar — see the router.
-            router.isMultiViewPresented = true
+            router.multiViewLaunch = MultiViewLaunch(seed: seed)
         #else
-            showingMultiView = true
+            multiViewLaunch = MultiViewLaunch(seed: seed)
         #endif
     }
 
@@ -385,6 +410,8 @@ struct LiveTVView: View {
 struct ChannelsList: View {
     let scope: LiveChannelScope
     let playlistPrefix: String
+    /// Seeds Multi-View with this channel, gated on Lume Pro by the host.
+    let onStartMultiView: (LiveStream) -> Void
     let onPlay: (LiveStream) -> Void
     @Environment(\.modelContext) private var modelContext
     @Environment(\.contentRestriction) private var restriction
@@ -400,9 +427,16 @@ struct ChannelsList: View {
     /// Drives the "Clear Recently Watched" confirmation alert.
     @State private var confirmingClear = false
 
-    init(scope: LiveChannelScope, playlistPrefix: String, sort: ContentSortOption, onPlay: @escaping (LiveStream) -> Void) {
+    init(
+        scope: LiveChannelScope,
+        playlistPrefix: String,
+        sort: ContentSortOption,
+        onStartMultiView: @escaping (LiveStream) -> Void,
+        onPlay: @escaping (LiveStream) -> Void
+    ) {
         self.scope = scope
         self.playlistPrefix = playlistPrefix
+        self.onStartMultiView = onStartMultiView
         self.onPlay = onPlay
         _streams = Query(LiveChannelQuery.descriptor(for: scope, sort: sort))
     }
@@ -470,7 +504,12 @@ struct ChannelsList: View {
                                     .contentShape(Rectangle())
                             }
                             .buttonStyle(.plain)
-                            .recentlyWatchedRemoveMenu(scope == .recentlyWatched ? { removeFromRecentlyWatched(stream) } : nil)
+                            .liveChannelMenu(
+                                isFavorite: stream.isFavorite,
+                                onToggleFavorite: { LiveChannelFavorites.toggle(stream, in: modelContext) },
+                                onStartMultiView: { onStartMultiView(stream) },
+                                onRemoveFromRecents: scope == .recentlyWatched ? { removeFromRecentlyWatched(stream) } : nil
+                            )
                             .onAppear {
                                 if stream.id == visible.last?.id, visibleCount < channels.count {
                                     visibleCount = min(visibleCount + LiveChannelQuery.pageSize, channels.count)

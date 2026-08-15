@@ -38,7 +38,7 @@ extension MultiViewScreen {
         .focusSection()
         #else
         // Hidden chrome must not swallow the tap that reveals it.
-        .allowsHitTesting(isChromeVisible)
+        .allowsHitTesting(showsChrome)
         #endif
     }
 

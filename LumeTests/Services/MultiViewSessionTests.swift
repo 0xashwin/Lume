@@ -89,6 +89,23 @@ struct MultiViewSessionTests {
         #expect(MultiViewLayout.fitting(9) == .four)
     }
 
+    // MARK: - Launch
+
+    @Test func `a launch carries the channels the grid should open with`() {
+        let launch = MultiViewLaunch(seed: [channel(1)])
+        #expect(launch.seed.map(\.title) == ["Channel 1"])
+        #expect(MultiViewLaunch().seed.isEmpty)
+    }
+
+    @Test func `every launch is its own identity`() {
+        // The hosts present on this value and key the screen to its id, so two
+        // launches must never look like the same one — a reused identity keeps
+        // the previous session alive and drops the new seed.
+        let first = MultiViewLaunch(seed: [channel(1)])
+        let second = MultiViewLaunch(seed: [channel(1)])
+        #expect(first.id != second.id)
+    }
+
     // MARK: - Seeding
 
     @Test func `a session seeds its leading tiles and leaves the rest empty`() {

@@ -22,6 +22,13 @@ final class DeepLinkRouter {
         /// Menu. That would make it impossible for Menu to dismiss only
         /// Multi-View's own controls overlay, which is what a viewer expects
         /// while the controls are up.
-        var isMultiViewPresented = false
+        /// Non-nil while Multi-View is up; carries the channels it opened with,
+        /// when it was started from a channel's long-press menu rather than the
+        /// rail button.
+        var multiViewLaunch: MultiViewLaunch?
+
+        var isMultiViewPresented: Bool {
+            multiViewLaunch != nil
+        }
     #endif
 }
