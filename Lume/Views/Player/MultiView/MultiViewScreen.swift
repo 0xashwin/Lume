@@ -100,11 +100,13 @@ struct MultiViewScreen: View {
     @State var isChromeVisible = !isTV
     #if !os(tvOS)
         @State private var chromeHideTask: Task<Void, Never>?
-        /// Measured height of the controls, so the grid can make room for them
-        /// instead of being covered. Measured rather than hard-coded because the
-        /// bar grows with Dynamic Type.
-        @State private var chromeHeight: CGFloat = 0
     #endif
+
+    /// How far down the grid starts while the controls are showing, so they sit
+    /// above the players instead of over them. Measured rather than hard-coded:
+    /// the bar grows with Dynamic Type, and on tvOS it also sits inside the
+    /// overscan margin.
+    @State private var chromeInset: CGFloat = 0
 
     private static let chromeAutoHideDelay: TimeInterval = 4
 
@@ -161,13 +163,18 @@ struct MultiViewScreen: View {
             chrome
                 .opacity(isChromeVisible ? 1 : 0)
                 .animation(.easeInOut(duration: 0.2), value: isChromeVisible)
-            #if !os(tvOS)
-                .onGeometryChange(for: CGFloat.self) { proxy in
-                    proxy.size.height
-                } action: { height in
-                    chromeHeight = height
+                .onGeometryChange(for: CGRect.self) { proxy in
+                    proxy.frame(in: .global)
+                } action: { frame in
+                    #if os(tvOS)
+                        // The grid ignores the safe area, so it starts at the top
+                        // of the screen and has to clear the bar's position on
+                        // screen — overscan margin included, not just its height.
+                        chromeInset = frame.maxY
+                    #else
+                        chromeInset = frame.height
+                    #endif
                 }
-            #endif
         }
         #if os(tvOS)
         .focusScope(focusScope)
@@ -277,59 +284,56 @@ struct MultiViewScreen: View {
             }
         }
         .padding(gridInset)
-        #if !os(tvOS)
-            // Make room for the controls rather than sitting under them: the
-            // tiles give up exactly the bar's height while it is showing, and
-            // take it back as it fades out. tvOS keeps the overlay on top —
-            // there the grid is full-bleed by design.
-            .padding(.top, isChromeVisible ? chromeHeight : 0)
-            .animation(.easeInOut(duration: 0.2), value: isChromeVisible)
-        #endif
+        // Make room for the controls rather than sitting under them: the tiles
+        // give up the band the bar occupies while it is showing, and take it back
+        // as it goes away.
+        .padding(.top, isChromeVisible ? chromeInset : 0)
+        .animation(.easeInOut(duration: 0.2), value: isChromeVisible)
         #if os(tvOS)
-        // Video belongs edge to edge; the safe area is for the controls,
-        // which are a separate overlay. `gridInset` still leaves room for
-        // the focus lift so a focused edge tile isn't clipped.
-        .ignoresSafeArea()
-        .focusSection()
-        // A transparent view is not focusable on tvOS, so the hidden chrome
-        // cannot be reached by moving up into it. Instead the up press the
-        // focus engine has nowhere to send — the top tile row is the top of
-        // the grid — is what brings the controls in.
-        .onMoveCommand { direction in
-            // Only when the press had nowhere to go — `onMoveCommand` fires for
-            // every move, including ones the focus engine has already handled.
-            //
-            // Which of the two lands first is *not* stable, so both are checked
-            // (measured on device): on an idle grid the focus change arrives
-            // ~6ms before this handler, which then sees the destination tile —
-            // `engineMovedFocus` is what catches it. Under live decoders the
-            // order reverses and this handler runs ~6ms *before* the focus
-            // change, still seeing the origin tile — `isFocusOnTopRow` is what
-            // catches that. A time window can't tell them apart and was the
-            // reason an up press from the bottom row still raised the controls.
-            let engineHandledPress = engineMovedFocus
-            engineMovedFocus = false
-            // In the reversed order the focus change is still to come; clear the
-            // flag it is about to set, or it would swallow the *next* press.
-            Task { @MainActor in engineMovedFocus = false }
-            guard direction == .up, !isChromeVisible, !engineHandledPress, isFocusOnTopRow else { return }
-            isChromeVisible = true
-            // Deferred: the reset has to land after the chrome has faded in
-            // far enough to be focusable, and outside the focus engine's
-            // animated context. Releasing the tile first matters — two
-            // `@FocusState`s both asserting a value leaves the engine on the
-            // incumbent. Should the engine decline the hand-off anyway, the
-            // chrome is opaque by now, so a second press up reaches it.
-            Task { @MainActor in
-                try? await Task.sleep(for: .milliseconds(150))
-                focusedTile = nil
-                resetFocus(in: focusScope)
+            // Video belongs edge to edge; the safe area is for the controls,
+            // which are a separate overlay. `gridInset` still leaves room for
+            // the focus lift so a focused edge tile isn't clipped.
+            .ignoresSafeArea()
+            .focusSection()
+            // A transparent view is not focusable on tvOS, so the hidden chrome
+            // cannot be reached by moving up into it. Instead the up press the
+            // focus engine has nowhere to send — the top tile row is the top of
+            // the grid — is what brings the controls in.
+            .onMoveCommand { direction in
+                // Only when the press had nowhere to go — `onMoveCommand` fires for
+                // every move, including ones the focus engine has already handled.
+                //
+                // Which of the two lands first is *not* stable, so both are checked
+                // (measured on device): on an idle grid the focus change arrives
+                // ~6ms before this handler, which then sees the destination tile —
+                // `engineMovedFocus` is what catches it. Under live decoders the
+                // order reverses and this handler runs ~6ms *before* the focus
+                // change, still seeing the origin tile — `isFocusOnTopRow` is what
+                // catches that. A time window can't tell them apart and was the
+                // reason an up press from the bottom row still raised the controls.
+                let engineHandledPress = engineMovedFocus
+                engineMovedFocus = false
+                // In the reversed order the focus change is still to come; clear the
+                // flag it is about to set, or it would swallow the *next* press.
+                Task { @MainActor in engineMovedFocus = false }
+                guard direction == .up, !isChromeVisible, !engineHandledPress, isFocusOnTopRow else { return }
+                isChromeVisible = true
+                // Deferred: the reset has to land after the chrome has faded in
+                // far enough to be focusable, and outside the focus engine's
+                // animated context. Releasing the tile first matters — two
+                // `@FocusState`s both asserting a value leaves the engine on the
+                // incumbent. Should the engine decline the hand-off anyway, the
+                // chrome is opaque by now, so a second press up reaches it.
+                Task { @MainActor in
+                    try? await Task.sleep(for: .milliseconds(150))
+                    focusedTile = nil
+                    resetFocus(in: focusScope)
+                }
             }
-        }
         #else
                 // Taps in the gaps around the tiles bring the chrome back too, so
                 // revealing it never has to change which tile is audible.
-        .background(
+            .background(
                     Color.black
                         .contentShape(Rectangle())
                         .onTapGesture { revealChrome() }
