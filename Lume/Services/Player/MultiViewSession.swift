@@ -56,6 +56,13 @@ enum MultiViewLayout: Int, CaseIterable, Identifiable {
         }
     }
 
+    /// Whether `index` sits in the grid's top row — the only slots with nothing
+    /// above them. A press up from anywhere else has a tile to move to, so only
+    /// these should summon the controls.
+    func isInTopRow(_ index: Int, isPortrait: Bool) -> Bool {
+        rows(isPortrait: isPortrait).first?.contains(index) ?? false
+    }
+
     static let storageKey = "lume.multiView.layout"
 
     /// The smallest layout that holds `count` streams, so opening Multi-View

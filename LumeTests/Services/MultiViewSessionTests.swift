@@ -57,6 +57,28 @@ struct MultiViewSessionTests {
         }
     }
 
+    @Test func `only the grid's top row has nothing above it`() {
+        // Landscape, which is the only arrangement tvOS ever shows.
+        #expect(MultiViewLayout.two.isInTopRow(0, isPortrait: false))
+        #expect(MultiViewLayout.two.isInTopRow(1, isPortrait: false))
+
+        #expect(MultiViewLayout.three.isInTopRow(0, isPortrait: false))
+        #expect(MultiViewLayout.three.isInTopRow(1, isPortrait: false))
+        #expect(!MultiViewLayout.three.isInTopRow(2, isPortrait: false))
+
+        #expect(MultiViewLayout.four.isInTopRow(0, isPortrait: false))
+        #expect(MultiViewLayout.four.isInTopRow(1, isPortrait: false))
+        #expect(!MultiViewLayout.four.isInTopRow(2, isPortrait: false))
+        #expect(!MultiViewLayout.four.isInTopRow(3, isPortrait: false))
+    }
+
+    @Test func `a stacked grid puts only its first tile on the top row`() {
+        #expect(MultiViewLayout.two.isInTopRow(0, isPortrait: true))
+        #expect(!MultiViewLayout.two.isInTopRow(1, isPortrait: true))
+        #expect(MultiViewLayout.three.isInTopRow(0, isPortrait: true))
+        #expect(!MultiViewLayout.three.isInTopRow(1, isPortrait: true))
+    }
+
     @Test func `the smallest layout that fits a seed is chosen`() {
         #expect(MultiViewLayout.fitting(0) == .two)
         #expect(MultiViewLayout.fitting(1) == .two)

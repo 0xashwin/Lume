@@ -66,7 +66,7 @@ struct MultiViewScreen: View {
         @Environment(\.dismissWindow) private var dismissWindow
     #endif
 
-    @State private var session: MultiViewSession
+    @State var session: MultiViewSession
     /// The tile whose channel picker is open.
     @State private var pickingSlot: MultiViewPickerTarget?
     /// Which tile holds focus. Hoisted out of the tiles so the screen can hand
@@ -74,24 +74,28 @@ struct MultiViewScreen: View {
     /// first focusable in the tree.
     @FocusState private var focusedTile: MultiViewSlot.ID?
     #if os(tvOS)
+        /// When focus last moved between tiles — see `focusJustMoved`.
+        @State private var focusMovedAt = Date.distantPast
+    #endif
+    #if os(tvOS)
         /// Scope for `resetFocus`, which is how the chrome takes focus the moment
         /// it becomes visible: it is transparent until then, and a transparent
         /// view is not focusable, so it cannot simply be moved into.
-        @Namespace private var focusScope
+        @Namespace var focusScope
         @Environment(\.resetFocus) private var resetFocus
     #endif
     #if os(tvOS)
         /// Drives the close button's own focus colours — never a size or a
         /// position, so the focus engine has no layout to fight with.
-        @FocusState private var isCloseFocused: Bool
+        @FocusState var isCloseFocused: Bool
         /// Same, for the layout pills.
-        @FocusState private var focusedLayout: MultiViewLayout?
+        @FocusState var focusedLayout: MultiViewLayout?
     #endif
 
     /// Whether the floating chrome is showing. It starts hidden on tvOS (the grid
     /// is what you came for; a press up brings the controls in) and auto-hides
     /// elsewhere.
-    @State private var isChromeVisible = !isTV
+    @State var isChromeVisible = !isTV
     #if !os(tvOS)
         @State private var chromeHideTask: Task<Void, Never>?
         /// Measured height of the controls, so the grid can make room for them
@@ -198,6 +202,7 @@ struct MultiViewScreen: View {
         #if os(tvOS)
             // Focus back on a tile means the viewer is done with the controls.
             .onChange(of: focusedTile) { _, tile in
+                focusMovedAt = Date()
                 if tile != nil {
                     isChromeVisible = false
                 }
@@ -284,7 +289,13 @@ struct MultiViewScreen: View {
         // focus engine has nowhere to send — the top tile row is the top of
         // the grid — is what brings the controls in.
         .onMoveCommand { direction in
-            guard direction == .up, !isChromeVisible else { return }
+            // Only when the press had nowhere to go. `onMoveCommand` fires for
+            // every move, including ones the focus engine has already handled —
+            // and it arrives *after* the engine has moved focus, so checking the
+            // focused tile alone would see the destination, not the origin. That
+            // is what made an up press from the bottom row of a 2×2 grid summon
+            // the controls instead of moving between tiles.
+            guard direction == .up, !isChromeVisible, !focusJustMoved, isFocusOnTopRow else { return }
             isChromeVisible = true
             // Deferred: the reset has to land after the chrome has faded in
             // far enough to be focusable, and outside the focus engine's
@@ -356,6 +367,23 @@ struct MultiViewScreen: View {
     }
 
     #if os(tvOS)
+        /// Whether the press that just arrived moved focus between tiles. The
+        /// focus engine acts *first* — `onMoveCommand` is delivered a couple of
+        /// milliseconds later — so a focus change this recent means the press was
+        /// ordinary navigation and not a request for the controls.
+        private var focusJustMoved: Bool {
+            Date().timeIntervalSince(focusMovedAt) < 0.05
+        }
+
+        /// Whether the focused tile has nothing above it. A tvOS display is never
+        /// portrait, so the grid is always in its landscape arrangement.
+        private var isFocusOnTopRow: Bool {
+            guard let focusedTile,
+                  let index = session.slots.firstIndex(where: { $0.id == focusedTile })
+            else { return false }
+            return session.layout.isInTopRow(index, isPortrait: false)
+        }
+
         /// Put the controls away and hand focus back to a tile, so the grid is
         /// navigable again rather than leaving focus stranded on hidden buttons.
         private func hideChrome() {
@@ -383,167 +411,9 @@ struct MultiViewScreen: View {
         #endif
     }
 
-    // MARK: - Chrome
-
-    private var chrome: some View {
-        HStack(spacing: 12) {
-            closeButton
-            Spacer(minLength: 12)
-            layoutPicker
-        }
-        .padding(.horizontal, barHorizontalPadding)
-        .padding(.vertical, barVerticalPadding)
-        // A scrim under the controls: they now sit over video, which can be any
-        // brightness, and white-on-white is unreadable.
-        .background(
-            LinearGradient(
-                colors: [.black.opacity(0.55), .clear],
-                startPoint: .top,
-                endPoint: .bottom
-            )
-            .ignoresSafeArea(edges: .top)
-            .allowsHitTesting(false)
-        )
-        #if os(tvOS)
-        // Stays in the tree even while transparent, so a press up out of the
-        // top tile row always has a focus target — which is what brings it
-        // back into view.
-        .focusSection()
-        #else
-        // Hidden chrome must not swallow the tap that reveals it.
-        .allowsHitTesting(isChromeVisible)
-        #endif
-    }
-
-    private var barHorizontalPadding: CGFloat {
-        #if os(tvOS)
-            48
-        #else
-            12
-        #endif
-    }
-
-    private var barVerticalPadding: CGFloat {
-        #if os(tvOS)
-            32
-        #else
-            8
-        #endif
-    }
-
-    private var closeButton: some View {
-        Button {
-            close()
-        } label: {
-            Label("Close", systemImage: "xmark")
-                .labelStyle(.iconOnly)
-                .font(.system(size: closeGlyphSize, weight: .semibold))
-                .foregroundStyle(closeForeground)
-                .frame(width: closeDiameter, height: closeDiameter)
-                .background(closeFill, in: Circle())
-        }
-        .accessibilityLabel("Close Multi-View")
-        #if os(tvOS)
-            // Not `.plain`: on tvOS that leaves the system to paint its own white
-            // focus fill *behind* the glyph, which is also white — an invisible
-            // button exactly when it has focus. Own the focus colours instead.
-            .buttonStyle(TVCardButtonStyle(focusScale: 1.06))
-            .focused($isCloseFocused)
-            // Where `resetFocus` sends focus once the chrome is up.
-            .prefersDefaultFocus(isChromeVisible, in: focusScope)
-        #else
-            .buttonStyle(.plain)
-            .keyboardShortcut(.escape, modifiers: [])
-        #endif
-    }
-
-    private var closeGlyphSize: CGFloat {
-        #if os(tvOS)
-            22
-        #else
-            15
-        #endif
-    }
-
-    private var closeDiameter: CGFloat {
-        #if os(tvOS)
-            52
-        #else
-            36
-        #endif
-    }
-
-    private var closeForeground: Color {
-        #if os(tvOS)
-            isCloseFocused ? .black : .white
-        #else
-            .white
-        #endif
-    }
-
-    private var closeFill: Color {
-        #if os(tvOS)
-            isCloseFocused ? .white : .white.opacity(0.12)
-        #else
-            .white.opacity(0.12)
-        #endif
-    }
-
-    @ViewBuilder
-    private var layoutPicker: some View {
-        #if os(tvOS)
-            HStack(spacing: 10) {
-                ForEach(MultiViewLayout.allCases) { layout in
-                    Button {
-                        session.layout = layout
-                    } label: {
-                        let isActive = session.layout == layout
-                        let isItemFocused = focusedLayout == layout
-                        Image(systemName: layout.systemImage)
-                            .font(.system(size: 24, weight: .semibold))
-                            .frame(width: 72, height: 52)
-                            .foregroundStyle(isItemFocused || isActive ? .black : .white)
-                            .background(
-                                RoundedRectangle(cornerRadius: 10, style: .continuous)
-                                    .fill(pillFill(isFocused: isItemFocused, isActive: isActive))
-                            )
-                    }
-                    .buttonStyle(TVCardButtonStyle(focusScale: 1.06))
-                    .focused($focusedLayout, equals: layout)
-                    .accessibilityLabel(Text(layout.title))
-                }
-            }
-        #else
-            Picker("Layout", selection: Binding(
-                get: { session.layout },
-                set: { session.layout = $0 }
-            )) {
-                ForEach(MultiViewLayout.allCases) { layout in
-                    Image(systemName: layout.systemImage)
-                        .accessibilityLabel(Text(layout.title))
-                        .tag(layout)
-                }
-            }
-            .pickerStyle(.segmented)
-            .labelsHidden()
-            .frame(maxWidth: 180)
-        #endif
-    }
-
-    #if os(tvOS)
-        /// Focus wins over the active state: a focused pill is fully white, the
-        /// active-but-unfocused one keeps a dimmer white so the current layout
-        /// still reads.
-        private func pillFill(isFocused: Bool, isActive: Bool) -> AnyShapeStyle {
-            if isFocused { return AnyShapeStyle(.white) }
-            if isActive { return AnyShapeStyle(.white.opacity(0.6)) }
-            return AnyShapeStyle(.white.opacity(0.12))
-        }
-    #endif
-
     // MARK: - Lifecycle
 
-    private func close() {
+    func close() {
         if let onClose {
             onClose()
             return
