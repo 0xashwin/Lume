@@ -44,11 +44,14 @@ struct ExternalPlayerTests {
         #expect(link.absoluteString.hasPrefix("vlc-x-callback://x-callback-url/stream?url="))
     }
 
-    @Test func `vidhub deep link uses the play action`() throws {
+    /// `/open`, not the `/play` the docs steer new integrations to: the
+    /// shipping App Store build answers only the former and silently ignores
+    /// the latter.
+    @Test func `vidhub deep link uses the open action`() throws {
         let stream = try #require(URL(string: "http://example.com/movie.mkv"))
         let link = try #require(ExternalPlayer.vidhub.deepLink(for: stream))
         #expect(link.scheme == "open-vidhub")
-        #expect(link.absoluteString == "open-vidhub://x-callback-url/play?url=http%3A%2F%2Fexample.com%2Fmovie.mkv")
+        #expect(link.absoluteString == "open-vidhub://x-callback-url/open?url=http%3A%2F%2Fexample.com%2Fmovie.mkv")
     }
 
     @Test func `vidhub deep link percent-encodes a live stream query`() throws {

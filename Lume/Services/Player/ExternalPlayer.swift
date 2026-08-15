@@ -53,10 +53,11 @@ enum ExternalPlayer: String, CaseIterable, Identifiable {
     ///   (https://support.firecore.com/hc/en-us/articles/215090997)
     /// - VLC: `vlc-x-callback://x-callback-url/stream?url=…`
     ///   (https://wiki.videolan.org/Documentation:IOS/#x-callback-url)
-    /// - VidHub: `open-vidhub://x-callback-url/play?url=…`
-    ///   (https://vidhub.okaapps.com/3rd-party-app-integration/). `/play` is
-    ///   the current entry point — the older `/open` takes no start position
-    ///   and cannot tell a finished stream from an abandoned one.
+    /// - VidHub: `open-vidhub://x-callback-url/open?url=…`
+    ///   (https://vidhub.okaapps.com/3rd-party-app-integration/). The docs
+    ///   steer new integrations to `/play`, but the shipping App Store build
+    ///   only answers `/open`: it launches and ignores an unrecognised path,
+    ///   and since we send no `x-error` callback the failure is silent.
     func deepLink(for streamURL: URL) -> URL? {
         // The stream URL is carried as a query parameter value, so every
         // reserved character — including `&`, `=` and `?`, which
@@ -68,8 +69,9 @@ enum ExternalPlayer: String, CaseIterable, Identifiable {
             return nil
         }
         let action = switch self {
-        case .infuse, .vidhub: "play"
+        case .infuse: "play"
         case .vlc: "stream"
+        case .vidhub: "open"
         }
         return URL(string: "\(scheme)://x-callback-url/\(action)?url=\(encoded)")
     }
