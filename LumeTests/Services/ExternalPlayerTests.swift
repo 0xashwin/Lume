@@ -7,14 +7,27 @@ import Testing
 @Suite(.serialized)
 struct ExternalPlayerTests {
     @Test func `player all cases`() {
-        #expect(ExternalPlayer.allCases.count == 2)
+        #expect(ExternalPlayer.allCases.count == 3)
         #expect(ExternalPlayer.infuse.rawValue == "infuse")
         #expect(ExternalPlayer.vlc.rawValue == "vlc")
+        #expect(ExternalPlayer.vidhub.rawValue == "vidhub")
     }
 
     @Test func `player schemes match registered apps`() {
         #expect(ExternalPlayer.infuse.scheme == "infuse")
         #expect(ExternalPlayer.vlc.scheme == "vlc-x-callback")
+        #expect(ExternalPlayer.vidhub.scheme == "open-vidhub")
+    }
+
+    /// Every scheme must be declared in `LSApplicationQueriesSchemes` or
+    /// `canOpenURL(_:)` answers `false` and the hand-off silently never happens.
+    @Test func `every player scheme is declared in Info plist`() throws {
+        let declared = try #require(
+            Bundle.main.object(forInfoDictionaryKey: "LSApplicationQueriesSchemes") as? [String]
+        )
+        for player in ExternalPlayer.allCases {
+            #expect(declared.contains(player.scheme), "\(player.scheme) missing from LSApplicationQueriesSchemes")
+        }
     }
 
     @Test func `infuse deep link wraps stream URL`() throws {
@@ -29,6 +42,23 @@ struct ExternalPlayerTests {
         let link = try #require(ExternalPlayer.vlc.deepLink(for: stream))
         #expect(link.scheme == "vlc-x-callback")
         #expect(link.absoluteString.hasPrefix("vlc-x-callback://x-callback-url/stream?url="))
+    }
+
+    @Test func `vidhub deep link uses the play action`() throws {
+        let stream = try #require(URL(string: "http://example.com/movie.mkv"))
+        let link = try #require(ExternalPlayer.vidhub.deepLink(for: stream))
+        #expect(link.scheme == "open-vidhub")
+        #expect(link.absoluteString == "open-vidhub://x-callback-url/play?url=http%3A%2F%2Fexample.com%2Fmovie.mkv")
+    }
+
+    @Test func `vidhub deep link percent-encodes a live stream query`() throws {
+        let original = "http://host:8080/live/user/pass/1.m3u8?token=a&b=c"
+        let stream = try #require(URL(string: original))
+        let link = try #require(ExternalPlayer.vidhub.deepLink(for: stream))
+        let encoded = try #require(link.absoluteString.components(separatedBy: "url=").last)
+        #expect(!encoded.contains("&"))
+        #expect(!encoded.contains("?"))
+        #expect(encoded.removingPercentEncoding == original)
     }
 
     @Test func `deep link percent-encodes nested query so the stream URL survives`() throws {
@@ -76,6 +106,9 @@ struct ExternalPlayerTests {
 
         defaults.set("vlc", forKey: PlayerSettings.externalPlayerKey)
         #expect(ExternalPlayback.preferred == .vlc)
+
+        defaults.set("vidhub", forKey: PlayerSettings.externalPlayerKey)
+        #expect(ExternalPlayback.preferred == .vidhub)
     }
 
     // MARK: - Scope

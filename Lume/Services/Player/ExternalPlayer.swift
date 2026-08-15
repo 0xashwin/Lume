@@ -22,6 +22,7 @@ import Foundation
 enum ExternalPlayer: String, CaseIterable, Identifiable {
     case infuse
     case vlc
+    case vidhub
 
     var id: String {
         rawValue
@@ -31,6 +32,7 @@ enum ExternalPlayer: String, CaseIterable, Identifiable {
         switch self {
         case .infuse: "Infuse"
         case .vlc: "VLC"
+        case .vidhub: "VidHub"
         }
     }
 
@@ -41,6 +43,7 @@ enum ExternalPlayer: String, CaseIterable, Identifiable {
         switch self {
         case .infuse: "infuse"
         case .vlc: "vlc-x-callback"
+        case .vidhub: "open-vidhub"
         }
     }
 
@@ -50,6 +53,10 @@ enum ExternalPlayer: String, CaseIterable, Identifiable {
     ///   (https://support.firecore.com/hc/en-us/articles/215090997)
     /// - VLC: `vlc-x-callback://x-callback-url/stream?url=…`
     ///   (https://wiki.videolan.org/Documentation:IOS/#x-callback-url)
+    /// - VidHub: `open-vidhub://x-callback-url/play?url=…`
+    ///   (https://vidhub.okaapps.com/3rd-party-app-integration/). `/play` is
+    ///   the current entry point — the older `/open` takes no start position
+    ///   and cannot tell a finished stream from an abandoned one.
     func deepLink(for streamURL: URL) -> URL? {
         // The stream URL is carried as a query parameter value, so every
         // reserved character — including `&`, `=` and `?`, which
@@ -61,7 +68,7 @@ enum ExternalPlayer: String, CaseIterable, Identifiable {
             return nil
         }
         let action = switch self {
-        case .infuse: "play"
+        case .infuse, .vidhub: "play"
         case .vlc: "stream"
         }
         return URL(string: "\(scheme)://x-callback-url/\(action)?url=\(encoded)")
