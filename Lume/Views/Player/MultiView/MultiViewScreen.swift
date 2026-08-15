@@ -74,8 +74,10 @@ struct MultiViewScreen: View {
     /// first focusable in the tree.
     @FocusState private var focusedTile: MultiViewSlot.ID?
     #if os(tvOS)
-        /// When focus last moved between tiles — see `focusJustMoved`.
-        @State private var focusMovedAt = Date.distantPast
+        /// Set when the focus engine moves focus from one tile to another, and
+        /// cleared by the move command that caused it — see `onMoveCommand` on
+        /// the grid.
+        @State private var engineMovedFocus = false
     #endif
     #if os(tvOS)
         /// Scope for `resetFocus`, which is how the chrome takes focus the moment
@@ -201,8 +203,13 @@ struct MultiViewScreen: View {
             }
         #if os(tvOS)
             // Focus back on a tile means the viewer is done with the controls.
-            .onChange(of: focusedTile) { _, tile in
-                focusMovedAt = Date()
+            .onChange(of: focusedTile) { old, tile in
+                // Tile-to-tile is the focus engine answering a move. A change
+                // involving `nil` is the controls taking or releasing focus, and
+                // must not be mistaken for navigation.
+                if old != nil, tile != nil {
+                    engineMovedFocus = true
+                }
                 if tile != nil {
                     isChromeVisible = false
                 }
@@ -289,13 +296,23 @@ struct MultiViewScreen: View {
         // focus engine has nowhere to send — the top tile row is the top of
         // the grid — is what brings the controls in.
         .onMoveCommand { direction in
-            // Only when the press had nowhere to go. `onMoveCommand` fires for
-            // every move, including ones the focus engine has already handled —
-            // and it arrives *after* the engine has moved focus, so checking the
-            // focused tile alone would see the destination, not the origin. That
-            // is what made an up press from the bottom row of a 2×2 grid summon
-            // the controls instead of moving between tiles.
-            guard direction == .up, !isChromeVisible, !focusJustMoved, isFocusOnTopRow else { return }
+            // Only when the press had nowhere to go — `onMoveCommand` fires for
+            // every move, including ones the focus engine has already handled.
+            //
+            // Which of the two lands first is *not* stable, so both are checked
+            // (measured on device): on an idle grid the focus change arrives
+            // ~6ms before this handler, which then sees the destination tile —
+            // `engineMovedFocus` is what catches it. Under live decoders the
+            // order reverses and this handler runs ~6ms *before* the focus
+            // change, still seeing the origin tile — `isFocusOnTopRow` is what
+            // catches that. A time window can't tell them apart and was the
+            // reason an up press from the bottom row still raised the controls.
+            let engineHandledPress = engineMovedFocus
+            engineMovedFocus = false
+            // In the reversed order the focus change is still to come; clear the
+            // flag it is about to set, or it would swallow the *next* press.
+            Task { @MainActor in engineMovedFocus = false }
+            guard direction == .up, !isChromeVisible, !engineHandledPress, isFocusOnTopRow else { return }
             isChromeVisible = true
             // Deferred: the reset has to land after the chrome has faded in
             // far enough to be focusable, and outside the focus engine's
@@ -367,14 +384,6 @@ struct MultiViewScreen: View {
     }
 
     #if os(tvOS)
-        /// Whether the press that just arrived moved focus between tiles. The
-        /// focus engine acts *first* — `onMoveCommand` is delivered a couple of
-        /// milliseconds later — so a focus change this recent means the press was
-        /// ordinary navigation and not a request for the controls.
-        private var focusJustMoved: Bool {
-            Date().timeIntervalSince(focusMovedAt) < 0.05
-        }
-
         /// Whether the focused tile has nothing above it. A tvOS display is never
         /// portrait, so the grid is always in its landscape arrangement.
         private var isFocusOnTopRow: Bool {
