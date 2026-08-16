@@ -23,6 +23,33 @@ struct PlayableMedia: Identifiable, Hashable, Codable {
     let kind: Kind
     let startTime: TimeInterval
     let contentRef: ContentRef
+    /// The Live TV list this channel was launched from (Favorites, Recently
+    /// Watched, or a category). `nil` where playback started outside a channel
+    /// list — Home, Search, recall — in which case the player surfs the
+    /// channel's own category. See `LiveChannelNavigator.adjacentMedia`.
+    let channelScope: LiveChannelScope?
+
+    nonisolated init(
+        id: String,
+        url: URL,
+        title: String,
+        subtitle: String?,
+        posterURL: URL?,
+        kind: Kind,
+        startTime: TimeInterval,
+        contentRef: ContentRef,
+        channelScope: LiveChannelScope? = nil
+    ) {
+        self.id = id
+        self.url = url
+        self.title = title
+        self.subtitle = subtitle
+        self.posterURL = posterURL
+        self.kind = kind
+        self.startTime = startTime
+        self.contentRef = contentRef
+        self.channelScope = channelScope
+    }
 
     var isLive: Bool {
         kind == .live
@@ -41,7 +68,8 @@ struct PlayableMedia: Identifiable, Hashable, Codable {
             posterURL: posterURL,
             kind: kind,
             startTime: position,
-            contentRef: contentRef
+            contentRef: contentRef,
+            channelScope: channelScope
         )
     }
 
@@ -58,7 +86,8 @@ struct PlayableMedia: Identifiable, Hashable, Codable {
             posterURL: posterURL,
             kind: kind,
             startTime: startTime,
-            contentRef: contentRef
+            contentRef: contentRef,
+            channelScope: channelScope
         )
     }
 }
@@ -156,7 +185,15 @@ extension PlayableMedia {
         )
     }
 
-    static func from(stream: LiveStream, playlist: Playlist, client: XtreamClient = XtreamClient()) -> PlayableMedia? {
+    /// `scope` is the channel list the viewer picked this channel from; pass it
+    /// wherever playback starts from a scoped list so in-player surfing stays
+    /// inside that list.
+    static func from(
+        stream: LiveStream,
+        playlist: Playlist,
+        scope: LiveChannelScope? = nil,
+        client: XtreamClient = XtreamClient()
+    ) -> PlayableMedia? {
         let url: URL
         if playlist.sourceType == .stalker {
             guard let cmd = stream.directURL, let placeholder = StalkerLink.placeholder(type: .itv, cmd: cmd) else { return nil }
@@ -177,7 +214,8 @@ extension PlayableMedia {
             posterURL: URL(string: stream.streamIcon ?? ""),
             kind: .live,
             startTime: 0,
-            contentRef: .live(stream.id)
+            contentRef: .live(stream.id),
+            channelScope: scope
         )
     }
 

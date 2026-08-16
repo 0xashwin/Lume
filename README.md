@@ -215,7 +215,7 @@ developed in the open in its own repository —
 failure modes it is built to make structurally impossible.
 
 Prefer a third-party app? Lume can hand streams off to an **external player** —
-**Infuse** or **VLC** — via their deep-link APIs, selectable in **Settings**.
+**Infuse**, **VLC** or **VidHub** — via their deep-link APIs, selectable in **Settings**.
 Because not every app handles every stream — Infuse plays movies and series but no
 live channels — the hand-off covers **movies & series** by default, and can be
 switched to **live TV** or to both. Downloads always play in Lume, and playback falls
