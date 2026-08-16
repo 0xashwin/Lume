@@ -11503,6 +11503,58 @@
         }
       }
     },
+    "Everything currently listed will be hidden from browsing. Use Show All to bring it back." : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Alles, was aktuell aufgelistet ist, wird beim Stöbern ausgeblendet. Mit „Alle anzeigen“ holst du es zurück."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Todo lo que aparece en la lista se ocultará de la navegación. Usa «Mostrar todo» para recuperarlo."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tout ce qui figure actuellement dans la liste sera masqué lors de la navigation. Utilisez « Tout afficher » pour le récupérer."
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tutto ciò che è attualmente elencato verrà nascosto dalla navigazione. Usa \"Mostra tutto\" per ripristinarlo."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "現在リストに表示されているものはすべて閲覧時に非表示になります。「すべて表示」で元に戻せます。"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "현재 목록에 있는 모든 항목이 둘러보기에서 숨겨집니다. 모두 보기로 다시 표시할 수 있습니다."
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tudo o que está listado no momento será ocultado da navegação. Use \"Mostrar Tudo\" para trazê-lo de volta."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "当前列出的所有内容都将在浏览时隐藏。使用“显示全部”可恢复。"
+          }
+        }
+      }
+    },
     "Exit Picture in Picture" : {
       "localizations" : {
         "de" : {
@@ -13127,6 +13179,162 @@
         }
       }
     },
+    "Hide All" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Alle ausblenden"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ocultar todo"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tout masquer"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Nascondi tutto"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "すべて非表示"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "모두 숨기기"
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ocultar Tudo"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "隐藏全部"
+          }
+        }
+      }
+    },
+    "Hide All Categories?" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Alle Kategorien ausblenden?"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "¿Ocultar todas las categorías?"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Masquer toutes les catégories ?"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Nascondere tutte le categorie?"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "すべてのカテゴリを非表示にしますか？"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "모든 카테고리를 숨길까요?"
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ocultar todas as categorias?"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "隐藏所有类别？"
+          }
+        }
+      }
+    },
+    "Hide All Channels?" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Alle Kanäle ausblenden?"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "¿Ocultar todos los canales?"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Masquer toutes les chaînes ?"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Nascondere tutti i canali?"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "すべてのチャンネルを非表示にしますか？"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "모든 채널을 숨길까요?"
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ocultar todos os canais?"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "隐藏所有频道？"
+          }
+        }
+      }
+    },
     "Hide and reorder categories and channels for the active playlist." : {
       "localizations" : {
         "de" : {
@@ -13283,54 +13491,54 @@
         }
       }
     },
-    "Hide channels to remove them from this category, or drag to reorder. Reset restores the provider's order and shows everything." : {
+    "Hide channels to remove them from this category, or drag to reorder." : {
       "localizations" : {
         "de" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Blende Kanäle aus, um sie aus dieser Kategorie zu entfernen, oder ziehe sie, um sie neu anzuordnen. Zurücksetzen stellt die Reihenfolge des Anbieters wieder her und zeigt alles an."
+            "value" : "Blende Kanäle aus, um sie aus dieser Kategorie zu entfernen, oder ziehe sie, um sie neu anzuordnen."
           }
         },
         "es" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Oculta canales para quitarlos de esta categoría, o arrastra para reordenar. «Restablecer» restaura el orden del proveedor y lo muestra todo."
+            "value" : "Oculta canales para quitarlos de esta categoría, o arrastra para reordenar."
           }
         },
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Masquez des chaînes pour les retirer de cette catégorie, ou glissez pour les réorganiser. Réinitialiser rétablit l’ordre du fournisseur et affiche tout."
+            "value" : "Masquez des chaînes pour les retirer de cette catégorie, ou glissez pour les réorganiser."
           }
         },
         "it" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Nascondi i canali per rimuoverli da questa categoria, oppure trascina per riordinarli. \"Reimposta\" ripristina l'ordine del provider e mostra tutto."
+            "value" : "Nascondi i canali per rimuoverli da questa categoria, oppure trascina per riordinarli."
           }
         },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "チャンネルを非表示にしてこのカテゴリから削除するか、ドラッグして並べ替えます。「リセット」でプロバイダの順序に戻り、すべてが表示されます。"
+            "value" : "チャンネルを非表示にしてこのカテゴリから削除するか、ドラッグして並べ替えます。"
           }
         },
         "ko" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "채널을 숨겨 이 카테고리에서 제거하거나, 드래그하여 순서를 변경하세요. 재설정하면 공급자의 순서로 복원되고 모두 표시됩니다."
+            "value" : "채널을 숨겨 이 카테고리에서 제거하거나, 드래그하여 순서를 변경하세요."
           }
         },
         "pt" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Oculte canais para removê-los desta categoria ou arraste para reordenar. Redefinir restaura a ordem do provedor e mostra tudo."
+            "value" : "Oculte canais para removê-los desta categoria ou arraste para reordenar."
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "隐藏频道以将其从此类别中移除，或拖动以重新排列。“重置”可恢复服务商的顺序并显示全部。"
+            "value" : "隐藏频道以将其从此类别中移除，或拖动以重新排列。"
           }
         }
       }
@@ -16208,54 +16416,54 @@
         }
       }
     },
-    "Lock a category to hide it from child profiles. Drag to reorder. Reset restores the playlist's order and shows everything." : {
+    "Lock a category to hide it from child profiles. Drag to reorder." : {
       "localizations" : {
         "de" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Sperre eine Kategorie, um sie in Kinderprofilen auszublenden. Ziehe zum Umsortieren. „Zurücksetzen“ stellt die Reihenfolge der Playlist wieder her und zeigt alles an."
+            "value" : "Sperre eine Kategorie, um sie in Kinderprofilen auszublenden. Ziehe zum Umsortieren."
           }
         },
         "es" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Bloquea una categoría para ocultarla de los perfiles infantiles. Arrastra para reordenar. «Restablecer» restaura el orden de la lista de reproducción y lo muestra todo."
+            "value" : "Bloquea una categoría para ocultarla de los perfiles infantiles. Arrastra para reordenar."
           }
         },
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Verrouillez une catégorie pour la masquer aux profils enfants. Glissez pour réorganiser. Réinitialiser rétablit l’ordre de la playlist et affiche tout."
+            "value" : "Verrouillez une catégorie pour la masquer aux profils enfants. Glissez pour réorganiser."
           }
         },
         "it" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Blocca una categoria per nasconderla ai profili bambino. Trascina per riordinare. \"Reimposta\" ripristina l'ordine della playlist e mostra tutto."
+            "value" : "Blocca una categoria per nasconderla ai profili bambino. Trascina per riordinare."
           }
         },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "カテゴリをロックすると、子供用プロファイルから非表示になります。ドラッグして並べ替えます。「リセット」でプレイリストの順序に戻り、すべてが表示されます。"
+            "value" : "カテゴリをロックすると、子供用プロファイルから非表示になります。ドラッグして並べ替えます。"
           }
         },
         "ko" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "카테고리를 잠가 어린이 프로필에서 숨기세요. 드래그하여 순서를 변경하세요. 재설정하면 재생목록의 순서로 복원되고 모두 표시됩니다."
+            "value" : "카테고리를 잠가 어린이 프로필에서 숨기세요. 드래그하여 순서를 변경하세요."
           }
         },
         "pt" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Bloqueie uma categoria para ocultá-la dos perfis infantis. Arraste para reordenar. Redefinir restaura a ordem da playlist e mostra tudo."
+            "value" : "Bloqueie uma categoria para ocultá-la dos perfis infantis. Arraste para reordenar."
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "锁定某个类别可将其对儿童个人资料隐藏。拖动以重新排列。“重置”可恢复播放列表的顺序并显示全部。"
+            "value" : "锁定某个类别可将其对儿童个人资料隐藏。拖动以重新排列。"
           }
         }
       }
@@ -19667,6 +19875,58 @@
         }
       }
     },
+    "No categories match your search." : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Keine Kategorien entsprechen deiner Suche."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ninguna categoría coincide con tu búsqueda."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Aucune catégorie ne correspond à votre recherche."
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Nessuna categoria corrisponde alla ricerca."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "検索に一致するカテゴリはありません。"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "검색과 일치하는 카테고리가 없습니다."
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Nenhuma categoria corresponde à sua busca."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "没有类别与您的搜索匹配。"
+          }
+        }
+      }
+    },
     "No Channels" : {
       "localizations" : {
         "de" : {
@@ -19715,6 +19975,58 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "无频道"
+          }
+        }
+      }
+    },
+    "No channels match your search." : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Keine Kanäle entsprechen deiner Suche."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ningún canal coincide con tu búsqueda."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Aucune chaîne ne correspond à votre recherche."
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Nessun canale corrisponde alla ricerca."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "検索に一致するチャンネルはありません。"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "검색과 일치하는 채널이 없습니다."
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Nenhum canal corresponde à sua busca."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "没有频道与您的搜索匹配。"
           }
         }
       }
@@ -25688,6 +26000,110 @@
         }
       }
     },
+    "Reset restores the playlist's order and shows everything." : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "„Zurücksetzen“ stellt die Reihenfolge der Playlist wieder her und zeigt alles an."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "«Restablecer» restaura el orden de la lista de reproducción y lo muestra todo."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Réinitialiser rétablit l’ordre de la playlist et affiche tout."
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "\"Reimposta\" ripristina l'ordine della playlist e mostra tutto."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "「リセット」でプレイリストの順序に戻り、すべてが表示されます。"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "재설정하면 재생목록의 순서로 복원되고 모두 표시됩니다."
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Redefinir restaura a ordem da playlist e mostra tudo."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "“重置”可恢复播放列表的顺序并显示全部。"
+          }
+        }
+      }
+    },
+    "Reset restores the provider's order and shows everything." : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Zurücksetzen stellt die Reihenfolge des Anbieters wieder her und zeigt alles an."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "«Restablecer» restaura el orden del proveedor y lo muestra todo."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Réinitialiser rétablit l’ordre du fournisseur et affiche tout."
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "\"Reimposta\" ripristina l'ordine del provider e mostra tutto."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "「リセット」でプロバイダの順序に戻り、すべてが表示されます。"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "재설정하면 공급자의 순서로 복원되고 모두 표시됩니다."
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Redefinir restaura a ordem do provedor e mostra tudo."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "“重置”可恢复服务商的顺序并显示全部。"
+          }
+        }
+      }
+    },
     "Restart" : {
       "localizations" : {
         "de" : {
@@ -27004,6 +27420,110 @@
         }
       }
     },
+    "Search Categories" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Kategorien suchen"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Buscar categorías"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Rechercher des catégories"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Cerca categorie"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "カテゴリを検索"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "카테고리 검색"
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Buscar categorias"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "搜索类别"
+          }
+        }
+      }
+    },
+    "Search Channels" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Kanäle suchen"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Buscar canales"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Rechercher des chaînes"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Cerca canali"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "チャンネルを検索"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "채널 검색"
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Buscar canais"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "搜索频道"
+          }
+        }
+      }
+    },
     "Search for movies, series, or live TV channels" : {
       "localizations" : {
         "de" : {
@@ -28144,6 +28664,58 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "显示全部"
+          }
+        }
+      }
+    },
+    "Show All and Hide All apply to whatever the list is showing, so you can search first and bulk-apply to the matches." : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "„Alle anzeigen“ und „Alle ausblenden“ gelten für das, was die Liste gerade zeigt – du kannst also erst suchen und die Aktion dann auf die Treffer anwenden."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "«Mostrar todo» y «Ocultar todo» se aplican a lo que muestra la lista, así que puedes buscar primero y aplicarlo a las coincidencias."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "« Tout afficher » et « Tout masquer » s’appliquent à ce que la liste affiche : vous pouvez donc d’abord rechercher, puis appliquer l’action aux résultats."
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "\"Mostra tutto\" e \"Nascondi tutto\" si applicano a ciò che la lista sta mostrando, quindi puoi prima cercare e poi applicarli ai risultati."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "「すべて表示」と「すべて非表示」はリストに表示されている内容に適用されるため、先に検索してから一致した項目にまとめて適用できます。"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "모두 보기와 모두 숨기기는 목록에 표시된 항목에 적용되므로, 먼저 검색한 뒤 일치하는 항목에 일괄 적용할 수 있습니다."
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "\"Mostrar Tudo\" e \"Ocultar Tudo\" se aplicam ao que a lista está exibindo, então você pode buscar primeiro e aplicar em massa aos resultados."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "“显示全部”和“隐藏全部”作用于列表当前显示的内容，因此你可以先搜索，再对匹配项批量应用。"
           }
         }
       }
