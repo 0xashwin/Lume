@@ -66,6 +66,14 @@ struct HomeView: View {
     @State private var playingMedia: PlayableMedia?
     @State private var showingSync = false
     @State private var showingSettings = false
+    /// Shown when a channel's "Start Multi-View" is picked without Lume Pro.
+    @State private var showingPaywall = false
+    #if os(tvOS)
+        @Environment(DeepLinkRouter.self) private var router
+    #else
+        /// Non-nil while Multi-View is up; carries the channel it opened with.
+        @State private var multiViewLaunch: MultiViewLaunch?
+    #endif
 
     #if os(tvOS)
         /// Hero selected on the immersive home. Drives navigation
@@ -215,6 +223,12 @@ struct HomeView: View {
                     FullScreenPlayerView(media: media)
                 }
             #endif
+            #if os(iOS)
+                .fullScreenCover(item: $multiViewLaunch) { launch in
+                    MultiViewScreen(seed: launch.seed)
+            }
+            #endif
+            .paywall(isPresented: $showingPaywall, highlight: .multiView)
         }
     }
 
@@ -271,7 +285,14 @@ struct HomeView: View {
         onRemove: ((HomeMediaItem) -> Void)? = nil
     ) -> some View {
         if !items.isEmpty {
-            HomeRow(title: title, items: items, onPlayLive: playChannel, onRemove: onRemove, animationNamespace: animationNamespace)
+            HomeRow(
+                title: title,
+                items: items,
+                onPlayLive: playChannel,
+                onRemove: onRemove,
+                onStartMultiView: startMultiView,
+                animationNamespace: animationNamespace
+            )
         }
     }
 
@@ -352,6 +373,29 @@ struct HomeView: View {
     }
 
     // MARK: - Playback
+
+    /// Opens Multi-View seeded with a channel from one of the rails, or the
+    /// paywall when the viewer isn't on Lume Pro. Mirrors `LiveTVView`'s pair of
+    /// the same name — the rails are a second entry point to the same feature.
+    private func startMultiView(with stream: LiveStream) {
+        guard let playlist = activePlaylist,
+              let media = PlayableMedia.from(stream: stream, playlist: playlist) else { return }
+        guard premium.isPremium else {
+            showingPaywall = true
+            return
+        }
+        #if os(macOS)
+            // The window is a singleton, so it cannot be built around a launch:
+            // hand the channel over and let the grid adopt it on appear.
+            MultiViewLaunchQueue.shared.pending = [media]
+            openWindow(id: "multiview")
+        #elseif os(tvOS)
+            // Presented by `MainTabView`, above the tab bar — see the router.
+            router.multiViewLaunch = MultiViewLaunch(seed: [media])
+        #else
+            multiViewLaunch = MultiViewLaunch(seed: [media])
+        #endif
+    }
 
     private func playChannel(_ stream: LiveStream) {
         guard let playlist = activePlaylist,

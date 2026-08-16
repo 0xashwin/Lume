@@ -99,7 +99,8 @@ struct LiveTVView: View {
                     playlistPrefix: playlistPrefix,
                     sort: contentSort,
                     onPlay: { playChannel($0) },
-                    onPlayCatchup: { playCatchup($0, cell: $1) }
+                    onPlayCatchup: { playCatchup($0, cell: $1) },
+                    onStartMultiView: { startMultiView(with: $0) }
                 )
             } else {
                 channelList(for: section)

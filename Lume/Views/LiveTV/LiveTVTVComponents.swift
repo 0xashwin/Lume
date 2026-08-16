@@ -334,6 +334,7 @@
                         sort: contentSort,
                         onPlay: onPlay,
                         onPlayCatchup: onPlayCatchup,
+                        onStartMultiView: onStartMultiView,
                         focusToken: guideFocusToken,
                         onDidClaimFocus: { guideFocusToken = 0 }
                     )
