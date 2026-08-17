@@ -54,6 +54,13 @@ private struct MultiViewPickerPresentation: ViewModifier {
                     playlistsInUse: playlistsInUse(target.id),
                     onPick: { onPick($0, target.id) }
                 )
+                #if os(macOS)
+                // A macOS sheet is sized by its content, and a `List` has no
+                // ideal height to offer — without a frame the picker opened as
+                // a bare toolbar (title and search field) with the channel list
+                // collapsed to nothing. Every other sheet here does the same.
+                .frame(minWidth: 460, idealWidth: 520, minHeight: 480, idealHeight: 600)
+                #endif
             }
         #endif
     }
