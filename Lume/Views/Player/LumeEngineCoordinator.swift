@@ -77,6 +77,16 @@ final class LumeEngineCoordinator: NSObject, ObservableObject {
     var onRecovered: (() -> Void)?
     var startupTimeout: TimeInterval = 40
 
+    /// Silences this player without pausing it — Multi-View mutes every tile
+    /// except the one carrying the audio.
+    var isMuted = false {
+        didSet { session?.renderer.isMuted = isMuted }
+    }
+
+    /// Set before `configure` for a Multi-View tile: with several tiles playing
+    /// at once, Picture in Picture belongs to the full-screen player alone.
+    var isEmbedded = false
+
     /// The engine's video surface for the hosting representable.
     private(set) var displayLayer: LumeDisplayLayer?
 
@@ -111,6 +121,7 @@ final class LumeEngineCoordinator: NSObject, ObservableObject {
         self.session = session
         displayLayer = session.renderer.displayLayer
         session.renderer.audioTimePitchAlgorithm = .timeDomain
+        session.renderer.isMuted = isMuted
 
         eventTask = Task { [events = session.events] in
             for await event in events {
@@ -131,7 +142,9 @@ final class LumeEngineCoordinator: NSObject, ObservableObject {
                 self.mediaInfo = info
                 self.publishTracks(info: info)
                 self.publishVideoInfo(info: info)
-                self.pipBridge = PictureInPictureBridge(session: session, mediaInfo: info)
+                if !self.isEmbedded {
+                    self.pipBridge = PictureInPictureBridge(session: session, mediaInfo: info)
+                }
                 // Resume position is handled by the engine via
                 // configuration.startPosition (seek-before-first-read).
                 if media.startTime > 1, !media.isLive, !info.isSeekable {

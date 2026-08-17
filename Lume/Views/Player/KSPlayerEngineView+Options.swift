@@ -11,12 +11,14 @@ import Foundation
 import KSPlayer
 import SwiftUI
 
-@available(iOS 16.0, macOS 13.0, tvOS 16.0, *)
-extension KSPlayerEngineView {
+/// Turns the user's saved KSPlayer settings into a `KSOptions` for one stream.
+/// Shared by the full-screen engine view and the Multi-View tiles, which need
+/// the same decoder/buffer tuning but must not claim Picture in Picture.
+enum KSPlayerOptionsFactory {
     /// Process-wide KSPlayer configuration, applied exactly once on first
     /// access (static `let` init is lazy and thread-safe). These are global
-    /// settings, so assigning them on every `makeOptions()` call was a needless
-    /// side effect from a view body.
+    /// settings, so assigning them on every `make` call was a needless side
+    /// effect from a view body.
     static let configureGlobalOptions: Void = {
         KSOptions.secondPlayerType = KSMEPlayer.self
         KSOptions.isAutoPlay = true
@@ -29,8 +31,11 @@ extension KSPlayerEngineView {
         #endif
     }()
 
-    func makeOptions() -> KSOptions {
-        _ = Self.configureGlobalOptions
+    /// - Parameter allowsPictureInPicture: `false` for a Multi-View tile — four
+    ///   tiles each allowed to start PiP from inline would fight over the one
+    ///   PiP window.
+    static func make(for media: PlayableMedia, allowsPictureInPicture: Bool = true) -> KSOptions {
+        _ = configureGlobalOptions
 
         let settings = KSPlayerOptions.load()
         // System-proxy use and the primary engine are process-wide statics with
@@ -51,7 +56,7 @@ extension KSPlayerEngineView {
         options.videoAdaptable = settings.adaptive
         options.nobuffer = settings.noBuffer
         options.codecLowDelay = settings.codecLowDelay
-        options.canStartPictureInPictureAutomaticallyFromInline = settings.autoPip
+        options.canStartPictureInPictureAutomaticallyFromInline = allowsPictureInPicture && settings.autoPip
         options.autoSelectEmbedSubtitle = settings.autoSelectSubtitle
         options.maxBufferDuration = Double(settings.maxBuffer)
         options.preferredForwardBufferDuration = Double(media.isLive ? settings.liveBuffer : settings.vodBuffer)
@@ -62,5 +67,12 @@ extension KSPlayerEngineView {
             options.automaticWindowResize = false
         #endif
         return options
+    }
+}
+
+@available(iOS 16.0, macOS 13.0, tvOS 16.0, *)
+extension KSPlayerEngineView {
+    func makeOptions() -> KSOptions {
+        KSPlayerOptionsFactory.make(for: media)
     }
 }

@@ -281,6 +281,19 @@ struct LumeApp: App {
             .environment(PremiumManager.shared)
             .windowStyle(.hiddenTitleBar)
             .windowResizability(.contentMinSize)
+
+            // A single window rather than a `WindowGroup` per grid: Multi-View
+            // owns its own channel picker, so there is nothing to open it "for",
+            // and a second grid would just contend for the same decoders.
+            Window("Multi-View", id: "multiview") {
+                MultiViewScreen()
+                    .frame(minWidth: 900, minHeight: 520)
+            }
+            .modelContainer(catalogContainer)
+            .environment(TraktService.shared)
+            .environment(PremiumManager.shared)
+            .windowStyle(.hiddenTitleBar)
+            .windowResizability(.contentMinSize)
         #endif
     }
 }

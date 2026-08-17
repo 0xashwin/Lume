@@ -60,6 +60,11 @@ struct MainTabView: View {
     var body: some View {
         @Bindable var router = router
         return tabView(selection: $router.selectedTab)
+        #if os(tvOS)
+            // Multi-View owns the screen while it is up: tvOS focus is not
+            // clipped by z-order, so the tab bar behind would still take presses.
+            .disabled(router.isMultiViewPresented)
+        #endif
             .environment(router)
             .environment(\.contentRestriction, contentRestriction)
         #if os(iOS)
@@ -93,6 +98,21 @@ struct MainTabView: View {
                         .transition(.opacity)
                 }
             }
+        #if os(tvOS)
+            .overlay {
+                if let launch = router.multiViewLaunch {
+                    MultiViewScreen(
+                        seed: launch.seed,
+                        onClose: { router.multiViewLaunch = nil }
+                    )
+                    // A launch's own id, so a grid started from a channel is a
+                    // new view rather than the previous one re-rendered — which
+                    // would keep the earlier session and drop the seed.
+                    .id(launch.id)
+                    .transition(.opacity)
+                }
+            }
+        #endif
             .animation(.easeInOut(duration: 0.2), value: playlistSwitch?.isSwitching)
     }
 
