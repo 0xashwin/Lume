@@ -285,19 +285,29 @@ struct MultiViewScreen: View {
         // The arrangement depends on the container's aspect, not its size class:
         // an iPad in portrait and in landscape are both `.regular`, yet only one
         // of them can show two tiles side by side and keep them watchable.
+        //
+        // Every tile sits at the same place in the view tree whatever the
+        // arrangement, and is placed by an explicit frame rather than by nested
+        // stacks. Stacks would make a spotlight swap — or any layout change — a
+        // structural move, and a tile that moves in the tree is a tile whose
+        // player is torn down and whose stream reconnects. This way the tiles
+        // only travel.
         GeometryReader { proxy in
-            let rows = session.layout.rows(isPortrait: proxy.size.height > proxy.size.width)
-            VStack(spacing: tileSpacing) {
-                ForEach(Array(rows.enumerated()), id: \.offset) { _, row in
-                    HStack(spacing: tileSpacing) {
-                        ForEach(row, id: \.self) { index in
-                            if session.slots.indices.contains(index) {
-                                tile(at: index)
-                            }
-                        }
+            let frames = session.layout.frames(in: proxy.size, spacing: tileSpacing)
+            ZStack {
+                ForEach(Array(session.slots.enumerated()), id: \.element.id) { index, slot in
+                    if frames.indices.contains(index) {
+                        tile(slot: slot, at: index)
+                            .frame(width: frames[index].width, height: frames[index].height)
+                            .position(x: frames[index].midX, y: frames[index].midY)
                     }
                 }
             }
+            // Keyed on the slot order rather than on the slots themselves: a
+            // channel arriving in a tile must not drag the whole grid through a
+            // move animation, but a swap reorders them and should.
+            .animation(.easeInOut(duration: 0.3), value: session.slots.map(\.id))
+            .animation(.easeInOut(duration: 0.3), value: session.layout)
         }
         .padding(gridInset)
         // Make room for the controls rather than sitting under them: the tiles
@@ -357,13 +367,16 @@ struct MultiViewScreen: View {
         #endif
     }
 
-    private func tile(at index: Int) -> some View {
-        let slot = session.slots[index]
-        return MultiViewTile(
+    private func tile(slot: MultiViewSlot, at index: Int) -> some View {
+        MultiViewTile(
             slot: slot,
             hasAudio: session.isAudioSlot(slot.id),
             focusedTile: $focusedTile,
             showsControls: showsChrome,
+            onPromote: isPromotable(index) ? {
+                session.promote(slot.id)
+                revealChrome()
+            } : nil,
             onFocusAudio: {
                 session.focusAudio(on: slot.id)
                 revealChrome()
@@ -376,9 +389,15 @@ struct MultiViewScreen: View {
             },
             onRemove: { session.setMedia(nil, in: slot.id) }
         )
-        // Identity follows the slot, not its position, so filling or clearing one
-        // tile never tears down a sibling's player.
-        .id(slot.id)
+    }
+
+    /// Whether selecting the tile at `index` should swap it onto the stage: only
+    /// in the spotlight layout, only off the stage, and only once it has a
+    /// channel — an empty tile's tap belongs to the channel picker.
+    private func isPromotable(_ index: Int) -> Bool {
+        guard session.hasSpotlight, session.slots.indices.contains(index) else { return false }
+        let slot = session.slots[index]
+        return !session.isStageSlot(slot.id) && slot.media != nil
     }
 
     /// Picks up channels queued for the Multi-View window. macOS only: every

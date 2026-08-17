@@ -153,7 +153,7 @@ extension MultiViewScreen {
             }
             .pickerStyle(.segmented)
             .labelsHidden()
-            .frame(maxWidth: 180)
+            .frame(maxWidth: 230)
         #endif
     }
 

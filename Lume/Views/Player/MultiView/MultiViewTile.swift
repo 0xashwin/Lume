@@ -28,12 +28,22 @@ struct MultiViewTile: View {
     /// settled grid is nothing but video. tvOS has no "…": the actions hang off
     /// a long press.
     var showsControls = true
+    /// Supplied only for a tile that is off the stage in the spotlight layout.
+    /// Selecting such a tile swaps it onto the stage — moving the audio there is
+    /// a side effect of that, not the point — so its presence is also what tells
+    /// the tile it is a rail tile rather than a cell of a uniform grid.
+    var onPromote: (() -> Void)?
     var onFocusAudio: () -> Void
     var onPickChannel: () -> Void
     var onRemove: () -> Void
 
     private var isTileFocused: Bool {
         focusedTile == slot.id
+    }
+
+    /// What a tap — or a Select press — on the tile does.
+    private var primaryAction: () -> Void {
+        onPromote ?? onFocusAudio
     }
 
     private var cornerRadius: CGFloat {
@@ -55,6 +65,7 @@ struct MultiViewTile: View {
             }
             .accessibilityElement(children: .contain)
             .accessibilityLabel(accessibilityLabel)
+            .accessibilityHint(accessibilityHint)
     }
 
     /// White rather than the accent colour: the accent resolves to white on tvOS
@@ -84,6 +95,12 @@ struct MultiViewTile: View {
             : Text("\(media.title), muted")
     }
 
+    /// Only a rail tile needs one: everywhere else the tile's own label already
+    /// says what selecting it would change.
+    private var accessibilityHint: Text {
+        onPromote == nil ? Text(verbatim: "") : Text("Shows this channel in the large tile")
+    }
+
     @ViewBuilder
     private var content: some View {
         if let media = slot.media {
@@ -98,7 +115,7 @@ struct MultiViewTile: View {
     @ViewBuilder
     private func filledTile(_ media: PlayableMedia) -> some View {
         #if os(tvOS)
-            Button(action: onFocusAudio) {
+            Button(action: primaryAction) {
                 tileBody(media)
             }
             .buttonStyle(TVCardButtonStyle(focusScale: 1.02))
@@ -110,7 +127,7 @@ struct MultiViewTile: View {
             ZStack(alignment: .topTrailing) {
                 tileBody(media)
                     .contentShape(Rectangle())
-                    .onTapGesture(perform: onFocusAudio)
+                    .onTapGesture(perform: primaryAction)
 
                 Menu {
                     tileActions
@@ -164,7 +181,17 @@ struct MultiViewTile: View {
 
     @ViewBuilder
     private var tileActions: some View {
-        if !hasAudio {
+        // A rail tile gets the promotion instead of "Play Audio Here": on stage
+        // it will be audible anyway, and offering both would let the viewer pull
+        // the sound off the big tile — the one thing the spotlight promises not
+        // to do.
+        if let onPromote {
+            Button {
+                onPromote()
+            } label: {
+                Label("Show Large", systemImage: "rectangle.inset.filled")
+            }
+        } else if !hasAudio {
             Button {
                 onFocusAudio()
             } label: {

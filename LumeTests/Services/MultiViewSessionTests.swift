@@ -7,6 +7,7 @@
 //  and the playlist-in-use bookkeeping the channel picker warns from.
 //
 
+import CoreGraphics
 import Foundation
 @testable import Lume
 import Testing
@@ -34,27 +35,91 @@ struct MultiViewSessionTests {
     // MARK: - Layout
 
     @Test func `two tiles sit side by side in landscape and stack in portrait`() {
-        #expect(MultiViewLayout.two.rows(isPortrait: false) == [[0, 1]])
-        #expect(MultiViewLayout.two.rows(isPortrait: true) == [[0], [1]])
+        #expect(MultiViewLayout.two.arrangement(isPortrait: false) == .grid(rows: [[0, 1]]))
+        #expect(MultiViewLayout.two.arrangement(isPortrait: true) == .grid(rows: [[0], [1]]))
     }
 
     @Test func `three tiles put the odd one on its own full-width row`() {
-        #expect(MultiViewLayout.three.rows(isPortrait: false) == [[0, 1], [2]])
-        #expect(MultiViewLayout.three.rows(isPortrait: true) == [[0], [1], [2]])
+        #expect(MultiViewLayout.three.arrangement(isPortrait: false) == .grid(rows: [[0, 1], [2]]))
+        #expect(MultiViewLayout.three.arrangement(isPortrait: true) == .grid(rows: [[0], [1], [2]]))
     }
 
     @Test func `four tiles stay a two by two grid in both orientations`() {
-        #expect(MultiViewLayout.four.rows(isPortrait: false) == [[0, 1], [2, 3]])
-        #expect(MultiViewLayout.four.rows(isPortrait: true) == [[0, 1], [2, 3]])
+        #expect(MultiViewLayout.four.arrangement(isPortrait: false) == .grid(rows: [[0, 1], [2, 3]]))
+        #expect(MultiViewLayout.four.arrangement(isPortrait: true) == .grid(rows: [[0, 1], [2, 3]]))
+    }
+
+    @Test func `the spotlight rails the three off-stage tiles beside a wide container and under a tall one`() {
+        #expect(MultiViewLayout.spotlight.arrangement(isPortrait: false) == .spotlight(rail: [1, 2, 3], edge: .trailing))
+        #expect(MultiViewLayout.spotlight.arrangement(isPortrait: true) == .spotlight(rail: [1, 2, 3], edge: .bottom))
     }
 
     @Test func `every layout lays out exactly its slot count once`() {
         for layout in MultiViewLayout.allCases {
             for isPortrait in [true, false] {
-                let indices = layout.rows(isPortrait: isPortrait).flatMap(\.self)
+                let indices = layout.arrangement(isPortrait: isPortrait).placedIndices
                 #expect(indices.sorted() == Array(0 ..< layout.slotCount))
             }
         }
+    }
+
+    // MARK: - Geometry
+
+    /// A 16:9 container, the shape every tvOS display and most landscape phones
+    /// hand the grid.
+    private let landscape = CGSize(width: 1600, height: 900)
+
+    @Test func `grid tiles fill the container and never overlap`() {
+        for layout in MultiViewLayout.allCases {
+            for size in [landscape, CGSize(width: 900, height: 1600)] {
+                let frames = layout.frames(in: size, spacing: 8)
+                #expect(frames.count == layout.slotCount)
+                #expect(frames.allSatisfy { $0.width > 0 && $0.height > 0 })
+                #expect(frames.allSatisfy { $0.maxX <= size.width + 0.001 && $0.maxY <= size.height + 0.001 })
+                for (first, second) in pairs(frames) {
+                    #expect(!first.insetBy(dx: 0.5, dy: 0.5).intersects(second.insetBy(dx: 0.5, dy: 0.5)))
+                }
+            }
+        }
+    }
+
+    @Test func `the spotlight stage is far bigger than the tiles beside it`() {
+        let frames = MultiViewLayout.spotlight.frames(in: landscape, spacing: 8)
+        let stage = frames[0]
+        // Full height, since the rail is alongside rather than underneath.
+        #expect(stage.height == landscape.height)
+        #expect(stage.width > landscape.width * 0.7)
+        for rail in frames.dropFirst() {
+            #expect(rail.minX > stage.maxX - 0.001)
+            #expect(rail.width * rail.height < stage.width * stage.height / 5)
+        }
+    }
+
+    @Test func `a tall container puts the spotlight rail under the stage`() {
+        let size = CGSize(width: 900, height: 1600)
+        let frames = MultiViewLayout.spotlight.frames(in: size, spacing: 8)
+        #expect(frames[0].width == size.width)
+        #expect(frames.dropFirst().allSatisfy { $0.minY > frames[0].maxY - 0.001 })
+        // The three rail tiles share the width in a single row.
+        #expect(Set(frames.dropFirst().map(\.minY)).count == 1)
+    }
+
+    @Test func `a collapsed container produces no negative frames`() {
+        for layout in MultiViewLayout.allCases {
+            let frames = layout.frames(in: .zero, spacing: 8)
+            #expect(frames.allSatisfy { $0.width >= 0 && $0.height >= 0 })
+        }
+    }
+
+    /// Every unordered pair, for the overlap check.
+    private func pairs(_ frames: [CGRect]) -> [(CGRect, CGRect)] {
+        var result: [(CGRect, CGRect)] = []
+        for (index, frame) in frames.enumerated() {
+            for other in frames[(index + 1)...] {
+                result.append((frame, other))
+            }
+        }
+        return result
     }
 
     @Test func `only the grid's top row has nothing above it`() {
@@ -70,6 +135,13 @@ struct MultiViewSessionTests {
         #expect(MultiViewLayout.four.isInTopRow(1, isPortrait: false))
         #expect(!MultiViewLayout.four.isInTopRow(2, isPortrait: false))
         #expect(!MultiViewLayout.four.isInTopRow(3, isPortrait: false))
+
+        // The stage runs the full height, so nothing is above it; of the rail
+        // only its first tile has nothing above it either.
+        #expect(MultiViewLayout.spotlight.isInTopRow(0, isPortrait: false))
+        #expect(MultiViewLayout.spotlight.isInTopRow(1, isPortrait: false))
+        #expect(!MultiViewLayout.spotlight.isInTopRow(2, isPortrait: false))
+        #expect(!MultiViewLayout.spotlight.isInTopRow(3, isPortrait: false))
     }
 
     @Test func `a stacked grid puts only its first tile on the top row`() {
@@ -77,6 +149,9 @@ struct MultiViewSessionTests {
         #expect(!MultiViewLayout.two.isInTopRow(1, isPortrait: true))
         #expect(MultiViewLayout.three.isInTopRow(0, isPortrait: true))
         #expect(!MultiViewLayout.three.isInTopRow(1, isPortrait: true))
+        // A rail under the stage leaves only the stage on the top row.
+        #expect(MultiViewLayout.spotlight.isInTopRow(0, isPortrait: true))
+        #expect(!MultiViewLayout.spotlight.isInTopRow(1, isPortrait: true))
     }
 
     @Test func `the smallest layout that fits a seed is chosen`() {
@@ -191,6 +266,78 @@ struct MultiViewSessionTests {
         session.layout = .two
         #expect(session.slots.count == 2)
         #expect(session.isAudioSlot(session.slots[0].id))
+    }
+
+    // MARK: - Spotlight
+
+    @Test func `promoting a tile trades it with the one on stage`() {
+        let session = MultiViewSession(
+            seed: [channel(1), channel(2), channel(3), channel(4)],
+            layout: .spotlight
+        )
+        let originalIDs = session.slots.map(\.id)
+        session.promote(originalIDs[2])
+        #expect(session.slots.map(\.media?.title) == ["Channel 3", "Channel 2", "Channel 1", "Channel 4"])
+        // The tiles trade places rather than being rebuilt — a new identity in
+        // either position would tear a running player down.
+        #expect(session.slots.map(\.id) == [originalIDs[2], originalIDs[1], originalIDs[0], originalIDs[3]])
+    }
+
+    @Test func `the audio follows the tile promoted to the stage`() {
+        let session = MultiViewSession(seed: [channel(1), channel(2)], layout: .spotlight)
+        session.promote(session.slots[1].id)
+        #expect(session.isAudioSlot(session.slots[0].id))
+        #expect(session.slots[0].media?.title == "Channel 2")
+    }
+
+    @Test func `promoting the tile already on stage changes nothing`() {
+        let session = MultiViewSession(seed: [channel(1), channel(2)], layout: .spotlight)
+        let originalIDs = session.slots.map(\.id)
+        session.promote(originalIDs[0])
+        #expect(session.slots.map(\.id) == originalIDs)
+        #expect(session.slots[0].media?.title == "Channel 1")
+    }
+
+    @Test func `switching into the spotlight moves the audio onto the stage`() {
+        let session = MultiViewSession(seed: [channel(1), channel(2)], layout: .two)
+        session.focusAudio(on: session.slots[1].id)
+        session.layout = .spotlight
+        #expect(session.isAudioSlot(session.slots[0].id))
+    }
+
+    @Test func `a channel dropped onto the stage takes the audio from a rail tile`() {
+        let session = MultiViewSession(layout: .spotlight)
+        session.setMedia(channel(2), in: session.slots[1].id)
+        #expect(session.isAudioSlot(session.slots[1].id))
+        session.setMedia(channel(1), in: session.slots[0].id)
+        #expect(session.isAudioSlot(session.slots[0].id))
+    }
+
+    @Test func `an empty stage leaves the audio on a rail tile that is playing`() {
+        let session = MultiViewSession(seed: [channel(1), channel(2)], layout: .spotlight)
+        session.setMedia(nil, in: session.slots[0].id)
+        #expect(session.isAudioSlot(session.slots[1].id))
+    }
+
+    @Test func `only the spotlight has a stage`() {
+        let session = MultiViewSession(seed: [channel(1)], layout: .four)
+        #expect(!session.hasSpotlight)
+        #expect(!session.isStageSlot(session.slots[0].id))
+        session.layout = .spotlight
+        #expect(session.hasSpotlight)
+        #expect(session.isStageSlot(session.slots[0].id))
+        #expect(!session.isStageSlot(session.slots[1].id))
+    }
+
+    @Test func `the spotlight keeps the four tiles the grid already had`() {
+        let session = MultiViewSession(
+            seed: [channel(1), channel(2), channel(3), channel(4)],
+            layout: .four
+        )
+        let originalIDs = session.slots.map(\.id)
+        session.layout = .spotlight
+        #expect(session.slots.count == 4)
+        #expect(session.slots.map(\.id) == originalIDs)
     }
 
     // MARK: - Picker bookkeeping
