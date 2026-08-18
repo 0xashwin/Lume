@@ -192,17 +192,23 @@ struct MainTabView: View {
                     LiveTVView()
                 }
 
-                // An explicit label is required: the `Tab(_:systemImage:value:role:)`
-                // convenience is 26-only, and the label-less initializer's
-                // `DefaultTabLabel` renders nothing in the pre-Liquid Glass macOS 15
-                // tab bar — the search tab was invisible there. Supplying the label
-                // keeps `role: .search` (so 26 still gets the dedicated search
-                // treatment) while staying visible on macOS 15 / iOS 18.
-                Tab(value: AppTab.search, role: .search) {
-                    SearchView()
-                } label: {
-                    Label("Search", systemImage: "magnifyingglass")
-                }
+                #if os(macOS)
+                    // macOS 15's tab bar drops a `role: .search` tab entirely — even
+                    // with an explicit label (the previous workaround), the search tab
+                    // never renders, leaving no way to reach Search on macOS 15. Fall
+                    // back to a plain tab, matching the four above, which render fine.
+                    // iOS/visionOS keep `role: .search` below for the dedicated search
+                    // treatment.
+                    Tab("Search", systemImage: "magnifyingglass", value: AppTab.search) {
+                        SearchView()
+                    }
+                #else
+                    Tab(value: AppTab.search, role: .search) {
+                        SearchView()
+                    } label: {
+                        Label("Search", systemImage: "magnifyingglass")
+                    }
+                #endif
             }
         }
     #endif
