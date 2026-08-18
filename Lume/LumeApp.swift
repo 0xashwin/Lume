@@ -27,6 +27,9 @@ struct LumeApp: App {
     @State private var profileManager: ProfileManager
     @State private var playlistSwitch = PlaylistSwitchModel()
     @State private var parentalControls: ParentalControls
+    #if os(iOS)
+        @UIApplicationDelegateAdaptor(LumeAppDelegate.self) private var appDelegate
+    #endif
 
     init() {
         let (catalog, cloud) = Self.makeModelContainers()
@@ -202,6 +205,10 @@ struct LumeApp: App {
                     // can persist download state from its delegate callbacks.
                     #if !os(tvOS)
                         DownloadManager.shared.configure(container: catalogContainer)
+                        // Re-adopt transfers the background session kept running
+                        // while the app was away, and settle any the system
+                        // dropped, before the Downloads UI reads their status.
+                        await DownloadManager.shared.restoreBackgroundSession()
                     #endif
 
                     // Commit any watch progress that a previous session buffered
