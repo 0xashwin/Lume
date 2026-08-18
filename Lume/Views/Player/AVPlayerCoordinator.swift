@@ -74,6 +74,26 @@ final class AVPlayerCoordinator: NSObject, ObservableObject {
         }
     }
 
+    /// Silences this player without pausing it — Multi-View mutes every tile
+    /// except the one carrying the audio.
+    var isMuted: Bool {
+        get { player.isMuted }
+        set { player.isMuted = newValue }
+    }
+
+    /// Set before `attach` for a Multi-View tile. Several tiles play at once, so
+    /// a tile must claim neither Picture in Picture nor the AirPlay route —
+    /// those are single-stream affordances belonging to the full-screen player,
+    /// and four players each grabbing external playback fight over one route.
+    var isEmbedded = false {
+        didSet {
+            player.allowsExternalPlayback = !isEmbedded
+            #if os(iOS)
+                player.usesExternalPlaybackWhileExternalScreenIsActive = !isEmbedded
+            #endif
+        }
+    }
+
     var onTime: ((TimeInterval) -> Void)?
     var onDuration: ((TimeInterval) -> Void)?
 
@@ -123,6 +143,14 @@ final class AVPlayerCoordinator: NSObject, ObservableObject {
         super.init()
     }
 
+    /// Multi-View tiles must be marked embedded *before* the container mounts —
+    /// `attach(layer:)` is where Picture in Picture would otherwise be wired, and
+    /// that runs during layout, ahead of any `onAppear`.
+    convenience init(isEmbedded: Bool) {
+        self.init()
+        self.isEmbedded = isEmbedded
+    }
+
     // MARK: - Layer attachment
 
     /// The container view hands its `AVPlayerLayer` over once it mounts. PiP can
@@ -131,7 +159,9 @@ final class AVPlayerCoordinator: NSObject, ObservableObject {
         playerLayer = layer
         layer.player = player
         applyVideoGravity()
-        setUpPictureInPicture(with: layer)
+        if !isEmbedded {
+            setUpPictureInPicture(with: layer)
+        }
     }
 
     // MARK: - Configure / reload

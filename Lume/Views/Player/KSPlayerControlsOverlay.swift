@@ -33,6 +33,9 @@ import SwiftUI
         var onTogglePlay: () -> Void
         var onResetHideTimer: () -> Void
         var onScheduleHide: () -> Void
+        /// Raises the OpenSubtitles browser. `nil` when the search isn't
+        /// available for this stream, which also drops the menu entry.
+        var onSearchSubtitles: (() -> Void)?
 
         @Environment(\.modelContext) private var modelContext
         /// Mirrors the backing model's favorite flag; refreshed when the media
@@ -213,7 +216,7 @@ import SwiftUI
 
         private var secondaryControls: some View {
             HStack(spacing: 4) {
-                if !subtitleTracks.isEmpty { subtitleMenu }
+                if !subtitleTracks.isEmpty || onSearchSubtitles != nil { subtitleMenu }
                 if audioTracks.count > 1 { audioTrackMenu }
                 if !media.isLive { playbackRateMenu }
                 contentModeButton
@@ -250,6 +253,15 @@ import SwiftUI
                         onResetHideTimer()
                     } label: {
                         checkmarkLabel(track.name, checked: selectedSubtitle?.subtitleID == track.subtitleID)
+                    }
+                }
+                if let onSearchSubtitles {
+                    Divider()
+                    Button {
+                        onSearchSubtitles()
+                        onResetHideTimer()
+                    } label: {
+                        Label("Search Online…", systemImage: "magnifyingglass")
                     }
                 }
             } label: {
@@ -357,6 +369,8 @@ import SwiftUI
         /// stacking per-icon glass (prohibited) is avoided.
         private func pillGlyph(_ systemName: String, dimmed: Bool = false) -> some View {
             Image(systemName: systemName)
+                // Covers every toggling glyph in the bar — play/pause, mute, heart.
+                .symbolReplaceTransition(value: systemName)
                 .font(.system(size: 16, weight: .semibold))
                 .foregroundStyle(dimmed ? .white.opacity(0.55) : .white)
                 .frame(width: 44, height: 44)

@@ -52,6 +52,15 @@ struct LiveTVView: View {
     @State private var showingSync = false
     @State private var playingMedia: PlayableMedia?
     @State private var showingSettings = false
+    #if os(tvOS)
+        @Environment(DeepLinkRouter.self) private var router
+    #else
+        /// Non-nil while Multi-View is up; carries the channels it opened with,
+        /// when it was started from a channel rather than the toolbar.
+        @State private var multiViewLaunch: MultiViewLaunch?
+    #endif
+    @State private var showingPaywall = false
+    @State private var premium = PremiumManager.shared
 
     @AppStorage(SortStorageKey.liveCategories) private var categorySortRaw: String = CategorySortOption.playlist.rawValue
     @AppStorage(SortStorageKey.liveContent) private var contentSortRaw: String = ContentSortOption.playlist.rawValue
@@ -89,8 +98,9 @@ struct LiveTVView: View {
                     scope: section.scope,
                     playlistPrefix: playlistPrefix,
                     sort: contentSort,
-                    onPlay: { playChannel($0) },
-                    onPlayCatchup: { playCatchup($0, cell: $1) }
+                    onPlay: { playChannel($0, scope: section.scope) },
+                    onPlayCatchup: { playCatchup($0, cell: $1) },
+                    onStartMultiView: { startMultiView(with: $0) }
                 )
             } else {
                 channelList(for: section)
@@ -102,14 +112,22 @@ struct LiveTVView: View {
     @ViewBuilder
     private func channelList(for section: LiveTVSection) -> some View {
         #if os(tvOS)
-            TVChannelsList(scope: section.scope, playlistPrefix: playlistPrefix, sort: contentSort) { stream in
-                playChannel(stream)
-            }
+            TVChannelsList(
+                scope: section.scope,
+                playlistPrefix: playlistPrefix,
+                sort: contentSort,
+                onStartMultiView: { startMultiView(with: $0) },
+                onPlay: { playChannel($0, scope: section.scope) }
+            )
             .frame(maxWidth: .infinity)
         #else
-            ChannelsList(scope: section.scope, playlistPrefix: playlistPrefix, sort: contentSort) { stream in
-                playChannel(stream)
-            }
+            ChannelsList(
+                scope: section.scope,
+                playlistPrefix: playlistPrefix,
+                sort: contentSort,
+                onStartMultiView: { startMultiView(with: $0) },
+                onPlay: { playChannel($0, scope: section.scope) }
+            )
         #endif
     }
 
@@ -159,6 +177,16 @@ struct LiveTVView: View {
                         layoutModePicker
                             .frame(maxWidth: 240)
                     }
+                    // Its own ToolbarItem with a titled Label, for the same
+                    // reason `LibraryToolbar` splits its buttons up: an item
+                    // pushed into the "..." overflow needs a menu representation.
+                    ToolbarItem(placement: .automatic) {
+                        Button {
+                            openMultiView()
+                        } label: {
+                            Label("Multi-View", systemImage: "rectangle.split.2x2")
+                        }
+                    }
                 }
             }
             #endif
@@ -187,6 +215,12 @@ struct LiveTVView: View {
                 FullScreenPlayerView(media: media)
             }
             #endif
+            #if os(iOS)
+            .fullScreenCover(item: $multiViewLaunch) { launch in
+                MultiViewScreen(seed: launch.seed)
+            }
+            #endif
+            .paywall(isPresented: $showingPaywall, highlight: .multiView)
         }
     }
 
@@ -247,8 +281,10 @@ struct LiveTVView: View {
                 displayedSection: displayed,
                 layoutModeRaw: $layoutModeRaw,
                 contentSort: contentSort,
-                onPlay: { playChannel($0) },
+                onPlay: { playChannel($0, scope: displayed?.scope) },
                 onPlayCatchup: { playCatchup($0, cell: $1) },
+                onOpenMultiView: { openMultiView() },
+                onStartMultiView: { startMultiView(with: $0) },
                 playlistPrefix: playlistPrefix
             )
         }
@@ -311,9 +347,11 @@ struct LiveTVView: View {
             : sections.first
     }
 
-    private func playChannel(_ stream: LiveStream) {
+    /// `scope` is the section the channel was picked from; it travels with the
+    /// media so in-player channel surfing stays inside that list.
+    private func playChannel(_ stream: LiveStream, scope: LiveChannelScope?) {
         guard let playlist = activePlaylist,
-              let media = PlayableMedia.from(stream: stream, playlist: playlist) else { return }
+              let media = PlayableMedia.from(stream: stream, playlist: playlist, scope: scope) else { return }
         present(media)
     }
 
@@ -330,6 +368,36 @@ struct LiveTVView: View {
         present(media)
     }
 
+    /// Opens Multi-View on a channel picked from the list, so the grid starts
+    /// with something playing rather than two empty tiles.
+    private func startMultiView(with stream: LiveStream) {
+        guard let playlist = activePlaylist,
+              let media = PlayableMedia.from(stream: stream, playlist: playlist)
+        else {
+            return
+        }
+        openMultiView(seed: [media])
+    }
+
+    /// Opens Multi-View, or the paywall when the viewer isn't on Lume Pro.
+    private func openMultiView(seed: [PlayableMedia] = []) {
+        guard premium.isPremium else {
+            showingPaywall = true
+            return
+        }
+        #if os(macOS)
+            // The window is a singleton, so it cannot be built around a launch:
+            // hand the channels over and let the grid adopt them on appear.
+            MultiViewLaunchQueue.shared.pending = seed
+            openWindow(id: "multiview")
+        #elseif os(tvOS)
+            // Presented by `MainTabView`, above the tab bar — see the router.
+            router.multiViewLaunch = MultiViewLaunch(seed: seed)
+        #else
+            multiViewLaunch = MultiViewLaunch(seed: seed)
+        #endif
+    }
+
     private func present(_ media: PlayableMedia) {
         if ExternalPlayback.open(media) { return }
         #if os(macOS)
@@ -340,163 +408,13 @@ struct LiveTVView: View {
     }
 }
 
-// MARK: - Category Sidebar
-
-struct CategorySidebar: View {
-    let sections: [LiveTVSection]
-    @Binding var selectedSection: LiveTVSection?
-
-    var body: some View {
-        List(sections) { section in
-            let isSelected = selectedSection?.id == section.id
-            Button {
-                selectedSection = section
-            } label: {
-                HStack(spacing: 8) {
-                    if let icon = section.icon {
-                        Image(systemName: icon)
-                            .font(.subheadline)
-                            .foregroundStyle(isSelected ? Color.accentColor : Color.secondary)
-                    }
-                    section.titleText
-                        .font(.headline)
-                        .foregroundStyle(isSelected ? Color.accentColor : Color.primary)
-                    Spacer()
-                }
-                .contentShape(Rectangle())
-            }
-            .buttonStyle(.plain)
-            .listRowBackground(
-                isSelected
-                    ? Color.accentColor.opacity(0.15)
-                    : Color.clear
-            )
-        }
-        #if !os(tvOS)
-        .listStyle(.sidebar)
-        #endif
-    }
-}
-
-// MARK: - iOS Category Bar
-
-#if os(iOS)
-    /// iOS category selector. A horizontal pill strip is unscannable once a
-    /// playlist syncs hundreds of categories, so the current section is shown as a
-    /// single button that opens a searchable list of every section instead.
-    struct CategoryBar: View {
-        let sections: [LiveTVSection]
-        @Binding var selectedSection: LiveTVSection?
-
-        @State private var showingPicker = false
-
-        /// The section the button reflects — the user's selection, or the first
-        /// available one if that selection has since disappeared (mirrors
-        /// `displayedSection(in:)`).
-        private var currentSection: LiveTVSection? {
-            guard let selectedSection else { return sections.first }
-            return sections.first { $0.id == selectedSection.id } ?? sections.first
-        }
-
-        var body: some View {
-            Button {
-                showingPicker = true
-            } label: {
-                HStack(spacing: 8) {
-                    if let icon = currentSection?.icon {
-                        Image(systemName: icon)
-                            .font(.subheadline)
-                            .foregroundStyle(.secondary)
-                    }
-                    (currentSection?.titleText ?? Text("Select a Category"))
-                        .font(.headline)
-                        .foregroundStyle(.primary)
-                        .lineLimit(1)
-                    Spacer()
-                    Image(systemName: "chevron.up.chevron.down")
-                        .font(.caption.weight(.semibold))
-                        .foregroundStyle(.secondary)
-                }
-                .padding(.horizontal)
-                .padding(.vertical, 10)
-                .contentShape(Rectangle())
-            }
-            .buttonStyle(.plain)
-            .background(.bar)
-            .sheet(isPresented: $showingPicker) {
-                CategoryPickerSheet(sections: sections, selectedSection: $selectedSection)
-            }
-
-            Divider()
-        }
-    }
-
-    /// Searchable list of every Live TV section. Type to filter hundreds of
-    /// synced categories down to a handful; the virtual collections stay pinned
-    /// at the top while the search field is empty.
-    private struct CategoryPickerSheet: View {
-        let sections: [LiveTVSection]
-        @Binding var selectedSection: LiveTVSection?
-
-        @Environment(\.dismiss) private var dismiss
-        @State private var query = ""
-
-        private var filteredSections: [LiveTVSection] {
-            let trimmed = query.trimmingCharacters(in: .whitespaces)
-            guard !trimmed.isEmpty else { return sections }
-            return sections.filter { $0.title.localizedCaseInsensitiveContains(trimmed) }
-        }
-
-        var body: some View {
-            NavigationStack {
-                List(filteredSections) { section in
-                    let isSelected = selectedSection?.id == section.id
-                    Button {
-                        selectedSection = section
-                        dismiss()
-                    } label: {
-                        HStack(spacing: 12) {
-                            if let icon = section.icon {
-                                Image(systemName: icon)
-                                    .foregroundStyle(.secondary)
-                            }
-                            section.titleText
-                                .foregroundStyle(.primary)
-                            Spacer()
-                            if isSelected {
-                                Image(systemName: "checkmark")
-                                    .fontWeight(.semibold)
-                                    .foregroundStyle(.tint)
-                            }
-                        }
-                        .contentShape(Rectangle())
-                    }
-                    .buttonStyle(.plain)
-                }
-                .listStyle(.plain)
-                .overlay {
-                    if filteredSections.isEmpty {
-                        ContentUnavailableView.search(text: query)
-                    }
-                }
-                .searchable(text: $query, prompt: "Search categories")
-                .navigationTitle("Categories")
-                .navigationBarTitleDisplayMode(.inline)
-                .toolbar {
-                    ToolbarItem(placement: .confirmationAction) {
-                        Button("Done") { dismiss() }
-                    }
-                }
-            }
-        }
-    }
-#endif
-
 // MARK: - Channels List
 
 struct ChannelsList: View {
     let scope: LiveChannelScope
     let playlistPrefix: String
+    /// Seeds Multi-View with this channel, gated on Lume Pro by the host.
+    let onStartMultiView: (LiveStream) -> Void
     let onPlay: (LiveStream) -> Void
     @Environment(\.modelContext) private var modelContext
     @Environment(\.contentRestriction) private var restriction
@@ -512,9 +430,16 @@ struct ChannelsList: View {
     /// Drives the "Clear Recently Watched" confirmation alert.
     @State private var confirmingClear = false
 
-    init(scope: LiveChannelScope, playlistPrefix: String, sort: ContentSortOption, onPlay: @escaping (LiveStream) -> Void) {
+    init(
+        scope: LiveChannelScope,
+        playlistPrefix: String,
+        sort: ContentSortOption,
+        onStartMultiView: @escaping (LiveStream) -> Void,
+        onPlay: @escaping (LiveStream) -> Void
+    ) {
         self.scope = scope
         self.playlistPrefix = playlistPrefix
+        self.onStartMultiView = onStartMultiView
         self.onPlay = onPlay
         _streams = Query(LiveChannelQuery.descriptor(for: scope, sort: sort))
     }
@@ -582,7 +507,12 @@ struct ChannelsList: View {
                                     .contentShape(Rectangle())
                             }
                             .buttonStyle(.plain)
-                            .recentlyWatchedRemoveMenu(scope == .recentlyWatched ? { removeFromRecentlyWatched(stream) } : nil)
+                            .liveChannelMenu(
+                                isFavorite: stream.isFavorite,
+                                onToggleFavorite: { LiveChannelFavorites.toggle(stream, in: modelContext) },
+                                onStartMultiView: { onStartMultiView(stream) },
+                                onRemoveFromRecents: scope == .recentlyWatched ? { removeFromRecentlyWatched(stream) } : nil
+                            )
                             .onAppear {
                                 if stream.id == visible.last?.id, visibleCount < channels.count {
                                     visibleCount = min(visibleCount + LiveChannelQuery.pageSize, channels.count)

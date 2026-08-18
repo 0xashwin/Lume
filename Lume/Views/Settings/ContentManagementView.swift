@@ -23,8 +23,10 @@ struct ContentManagementView: View {
     @State private var selectedType: CategoryType = .live
 
     /// True while a category is lifted for placement on tvOS — used to disable
-    /// the type picker and Reset so they can't steal focus mid-move.
+    /// the type picker and the bulk actions so they can't steal focus mid-move.
     @State private var isReordering = false
+
+    @State private var showHideAllConfirmation = false
 
     /// Every category across all playlists; scoped and sorted in-memory. Category
     /// counts are small (tens–low hundreds per playlist), so an in-memory pass is
@@ -37,6 +39,7 @@ struct ContentManagementView: View {
         @State private var selectedCategory: Category?
         /// Drives the drill-in to favorites reordering, same rationale as above.
         @State private var favoritesRoute: FavoritesRoute?
+        @State private var searchText = ""
     #endif
 
     var body: some View {
@@ -50,6 +53,9 @@ struct ContentManagementView: View {
                     description: Text("Add a playlist to manage its content.")
                 )
             }
+        }
+        .hideAllConfirmation("Hide All Categories?", isPresented: $showHideAllConfirmation) {
+            ContentOrganizer.hideAll(listedCategories)
         }
         #if os(tvOS)
         // tvOS pushes via NavigationLink(value:) from TVReorderableContentList.
@@ -93,12 +99,36 @@ struct ContentManagementView: View {
             }
     }
 
+    /// What the screen is actually showing, and therefore what the bulk hide /
+    /// show actions apply to. Identical to `categories` unless a search narrows
+    /// it, which is what makes "hide all, search, show all matches" work.
+    private var listedCategories: [Category] {
+        #if os(tvOS)
+            categories
+        #else
+            guard !searchText.isEmpty else { return categories }
+            return categories.filter { $0.name.localizedCaseInsensitiveContains(searchText) }
+        #endif
+    }
+
     // MARK: - Mutations
 
     private func move(from source: IndexSet, to destination: Int) {
         ContentOrganizer.reorder(categories, from: source, to: destination)
     }
 
+    #if !os(tvOS)
+        /// A filtered list's offsets don't map onto the full group, so reordering
+        /// is only offered when nothing is filtered out.
+        private var moveHandler: ((IndexSet, Int) -> Void)? {
+            guard searchText.isEmpty else { return nil }
+            return move
+        }
+    #endif
+
+    /// Reset deliberately spans the whole type rather than the listed subset:
+    /// `customOrder` is stamped densely across a group, so clearing part of one
+    /// would leave it half-ordered.
     private func resetCurrentType() {
         ContentOrganizer.resetOrder(categories)
         ContentOrganizer.showAll(categories)
@@ -177,9 +207,12 @@ struct ContentManagementView: View {
             HStack {
                 TVSettingsSectionLabel("Categories")
                 Spacer()
-                Button("Reset") { resetCurrentType() }
-                    .buttonStyle(TVSettingsActionButtonStyle())
-                    .disabled(isReordering)
+                ContentBulkActionButtons(
+                    showAll: { ContentOrganizer.showAll(listedCategories) },
+                    hideAll: { showHideAllConfirmation = true },
+                    reset: resetCurrentType
+                )
+                .disabled(isReordering)
             }
 
             if isReordering {
@@ -246,12 +279,25 @@ struct ContentManagementView: View {
                     .listRowBackground(Color.clear)
                 }
 
+                if !categories.isEmpty {
+                    Section {
+                        ContentBulkActionsRow(
+                            showAll: { ContentOrganizer.showAll(listedCategories) },
+                            hideAll: { showHideAllConfirmation = true },
+                            reset: resetCurrentType
+                        )
+                    }
+                }
+
                 Section {
                     if categories.isEmpty {
                         Text("Nothing to manage yet. Sync this playlist first.")
                             .foregroundStyle(.secondary)
+                    } else if listedCategories.isEmpty {
+                        Text("No categories match your search.")
+                            .foregroundStyle(.secondary)
                     } else {
-                        ForEach(categories) { category in
+                        ForEach(listedCategories) { category in
                             ContentManageRow(
                                 title: category.name,
                                 isHidden: category.isHidden,
@@ -262,7 +308,7 @@ struct ContentManagementView: View {
                                 onDrillIn: { selectedCategory = $0 }
                             )
                         }
-                        .onMove(perform: move)
+                        .onMove(perform: moveHandler)
                     }
                 } header: {
                     Text("Categories")
@@ -273,6 +319,7 @@ struct ContentManagementView: View {
             #if os(macOS)
             .listStyle(.inset(alternatesRowBackgrounds: true))
             #endif
+            .searchable(text: $searchText, prompt: Text("Search Categories"))
             .platformNavigationTitle("Content")
             #if os(iOS)
                 .navigationBarTitleDisplayMode(.inline)
@@ -283,10 +330,6 @@ struct ContentManagementView: View {
                             EditButton()
                         }
                     #endif
-                    ToolbarItem(placement: .automatic) {
-                        Button("Reset", role: .destructive) { resetCurrentType() }
-                            .disabled(categories.isEmpty)
-                    }
                 }
         }
 
@@ -294,7 +337,10 @@ struct ContentManagementView: View {
             let lead = selectedType == .live
                 ? String(localized: "Hide categories to remove them from Live TV, or tap a category to manage its channels.")
                 : String(localized: "Hide categories to remove them from \(selectedType.label).")
-            return lead + " " + String(localized: "Lock a category to hide it from child profiles. Drag to reorder. Reset restores the playlist's order and shows everything.")
+            let controls = String(localized: "Lock a category to hide it from child profiles. Drag to reorder.")
+            let bulk = String(localized: "Show All and Hide All apply to whatever the list is showing, so you can search first and bulk-apply to the matches.")
+            let reset = String(localized: "Reset restores the playlist's order and shows everything.")
+            return [lead, controls, bulk, reset].joined(separator: " ")
         }
     #endif
 }

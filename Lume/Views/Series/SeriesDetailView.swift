@@ -351,6 +351,7 @@ struct SeriesDetailView: View {
                 } label: {
                     Image(systemName: series.isFavorite ? "heart.fill" : "heart")
                         .foregroundStyle(series.isFavorite ? .red : .primary)
+                        .symbolReplaceTransition(value: series.isFavorite)
                 }
                 .help(series.isFavorite ? "Remove from Favorites" : "Add to Favorites")
             }

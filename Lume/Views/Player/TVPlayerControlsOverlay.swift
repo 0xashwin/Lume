@@ -37,6 +37,9 @@
         /// the host so channel switching works identically whether the controls
         /// are showing or hidden.
         var onSwitchChannel: (MoveCommandDirection) -> Void
+        /// Raises the OpenSubtitles browser. `nil` when the search isn't
+        /// available for this stream, which also drops the menu entry.
+        var onSearchSubtitles: (() -> Void)?
 
         /// `internal` (not `private`) so the derived-data extension in
         /// `TVPlayerControlsOverlay+Data.swift` can read this view's state.
@@ -274,6 +277,7 @@
 
                 Button(action: onTogglePlay) {
                     Image(systemName: coordinator.isPlaying ? "pause.fill" : "play.fill")
+                        .symbolReplaceTransition(value: coordinator.isPlaying)
                 }
                 .buttonStyle(TVPlayerCircleButtonStyle(diameter: 78, glyphSize: 30))
                 .focused($focus, equals: .transport)
@@ -348,6 +352,7 @@
         private var favoriteButton: some View {
             Button(action: toggleFavorite) {
                 Image(systemName: isFavorite ? "heart.fill" : "heart")
+                    .symbolReplaceTransition(value: isFavorite)
             }
             .buttonStyle(TVPlayerCircleButtonStyle())
             .focused($focus, equals: .favorite)
@@ -383,7 +388,7 @@
         @ViewBuilder
         private var subtitleMenu: some View {
             let tracks = coordinator.textTrackOptions
-            if !tracks.isEmpty {
+            if !tracks.isEmpty || onSearchSubtitles != nil {
                 Menu {
                     Button {
                         coordinator.selectTextTrack(id: nil)
@@ -405,6 +410,14 @@
                             } else {
                                 Text(track.label)
                             }
+                        }
+                    }
+                    if let onSearchSubtitles {
+                        Button {
+                            onSearchSubtitles()
+                            onResetHideTimer()
+                        } label: {
+                            Label("Search Online…", systemImage: "magnifyingglass")
                         }
                     }
                 } label: {

@@ -400,9 +400,18 @@ class XtreamClient: APIClient {
         return URL(string: "\(playlist.serverURL)/series/\(playlist.username)/\(playlist.password)/\(episode.episodeId).\(ext)")
     }
 
-    /// Builds a playback URL for a live stream
-    func buildLiveStreamURL(for stream: LiveStream, playlist: Playlist, format: StreamFormat = .m3u8) -> URL? {
-        URL(string: "\(playlist.serverURL)/live/\(playlist.username)/\(playlist.password)/\(stream.streamId).\(format.rawValue)")
+    /// Builds a playback URL for a live stream. `format` overrides the
+    /// playlist's own container preference; when omitted the playlist decides,
+    /// falling back to HLS.
+    func buildLiveStreamURL(for stream: LiveStream, playlist: Playlist, format: StreamFormat? = nil) -> URL? {
+        let ext = Self.resolvedFormat(format, playlist: playlist).rawValue
+        return URL(string: "\(playlist.serverURL)/live/\(playlist.username)/\(playlist.password)/\(stream.streamId).\(ext)")
+    }
+
+    /// HLS is the fallback because it is what every Xtream URL Lume ever built
+    /// used before the container became configurable.
+    private nonisolated static func resolvedFormat(_ requested: StreamFormat?, playlist: Playlist) -> StreamFormat {
+        requested ?? playlist.streamFormat.xtreamFormat ?? .m3u8
     }
 
     /// `Y-m-d:H-i` is the start format Xtream Codes panels expect in a timeshift
@@ -428,11 +437,12 @@ class XtreamClient: APIClient {
         playlist: Playlist,
         start: Date,
         durationMinutes: Int,
-        format: StreamFormat = .m3u8
+        format: StreamFormat? = nil
     ) -> URL? {
         guard durationMinutes > 0 else { return nil }
+        let ext = Self.resolvedFormat(format, playlist: playlist).rawValue
         let startString = Self.timeshiftStartFormatter.string(from: start)
-        return URL(string: "\(playlist.serverURL)/timeshift/\(playlist.username)/\(playlist.password)/\(durationMinutes)/\(startString)/\(stream.streamId).\(format.rawValue)")
+        return URL(string: "\(playlist.serverURL)/timeshift/\(playlist.username)/\(playlist.password)/\(durationMinutes)/\(startString)/\(stream.streamId).\(ext)")
     }
 }
 

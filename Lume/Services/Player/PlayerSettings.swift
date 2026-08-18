@@ -115,6 +115,11 @@ enum PlayerSettings {
     /// in the built-in player.
     static let externalPlayerKey = "player.externalPlayer"
 
+    /// Raw value of the `ExternalPlayerScope` the hand-off is limited to —
+    /// VOD, live TV, or both. Unset (or unrecognised) means VOD only; see
+    /// `ExternalPlayerScope.default`.
+    static let externalPlayerScopeKey = "player.externalPlayerScope"
+
     // MARK: - Playback behaviour
 
     /// Engine-independent playback preferences for episodic content. Both default
@@ -291,6 +296,8 @@ enum PlayerSettings {
     /// everything else.
     enum Lume {
         static let hardwareDecodeKey = "player.lume.hardwareDecode"
+        static let deinterlaceModeKey = "player.lume.deinterlaceMode"
+        static let deinterlaceRateKey = "player.lume.deinterlaceRate"
         static let httpReconnectKey = "player.lume.httpReconnect"
         static let liveBufferKey = "player.lume.liveBuffer"
         static let vodBufferKey = "player.lume.vodBuffer"
@@ -319,7 +326,8 @@ enum PlayerSettings {
         /// values so each `@AppStorage` binding reverts to its default.
         static var allKeys: [String] {
             [
-                hardwareDecodeKey, httpReconnectKey, liveBufferKey, vodBufferKey,
+                hardwareDecodeKey, deinterlaceModeKey, deinterlaceRateKey,
+                httpReconnectKey, liveBufferKey, vodBufferKey,
                 videoQueueDepthKey, audioQueueDepthKey, stallThresholdKey,
                 ioTimeoutKey, probeSizeKey, analyzeDurationKey
             ]

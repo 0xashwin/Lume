@@ -76,9 +76,12 @@ enum LiveChannelHistory {
     /// The channel to jump back to — the live stream watched immediately before
     /// the current one — resolved into a `PlayableMedia`. `nil` when no prior
     /// channel has been recorded or it can no longer be resolved (e.g. removed
-    /// in a sync).
+    /// in a sync). `scope` is the list playback is currently surfing; it carries
+    /// over so recall doesn't drop the viewer out of it (the navigator falls
+    /// back to the channel's category when the recalled channel isn't in it).
     static func recallMedia(
         in context: ModelContext,
+        scope: LiveChannelScope? = nil,
         profileID: UUID? = ActiveProfileStore.current,
         defaults: UserDefaults = .standard
     ) -> PlayableMedia? {
@@ -87,7 +90,7 @@ enum LiveChannelHistory {
         descriptor.fetchLimit = 1
         guard let stream = try? context.fetch(descriptor).first,
               let playlist = LiveChannelNavigator.playlist(for: stream, in: context) else { return nil }
-        return PlayableMedia.from(stream: stream, playlist: playlist)
+        return PlayableMedia.from(stream: stream, playlist: playlist, scope: scope)
     }
 
     /// Drop a profile's live-TV view history. Called when a profile is deleted so

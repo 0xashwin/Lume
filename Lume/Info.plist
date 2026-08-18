@@ -39,6 +39,7 @@
 		<string>vnd.youtube</string>
 		<string>infuse</string>
 		<string>vlc-x-callback</string>
+		<string>open-vidhub</string>
 	</array>
 	<key>NSSupportsLiveActivities</key>
 	<true/>

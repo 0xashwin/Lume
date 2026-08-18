@@ -81,8 +81,10 @@ enum LiveTVSection: Identifiable, Hashable {
 
 // MARK: - Scope
 
-/// What a Live TV channel list / guide should show.
-enum LiveChannelScope: Hashable {
+/// What a Live TV channel list / guide should show. Travels with a channel into
+/// the player (`PlayableMedia.channelScope`) so in-player surfing stays inside
+/// the list the viewer started from — see `LiveChannelNavigator`.
+nonisolated enum LiveChannelScope: Hashable, Codable {
     /// Channels in a single synced category (carries the category id).
     case category(String)
     /// Every favorited channel in the active playlist.
