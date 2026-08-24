@@ -115,9 +115,9 @@ struct XtreamClientURLTests {
         let url = try #require(client.buildCatchupURL(for: stream, playlist: playlist, start: start, durationMinutes: 90))
         let string = url.absoluteString
         #expect(string.hasPrefix("http://example.com:8080/timeshift/testuser/testpass/90/"))
-        #expect(string.hasSuffix("/777.m3u8"))
+        #expect(string.hasSuffix("/777.ts"))
         // The start segment is the Xtream `Y-m-d:H-i` wall-clock format.
-        #expect(string.range(of: #"/\d{4}-\d{2}-\d{2}:\d{2}-\d{2}/777\.m3u8$"#, options: .regularExpression) != nil)
+        #expect(string.range(of: #"/\d{4}-\d{2}-\d{2}:\d{2}-\d{2}/777\.ts$"#, options: .regularExpression) != nil)
     }
 
     @Test func `build catchup URL rejects non-positive duration`() {

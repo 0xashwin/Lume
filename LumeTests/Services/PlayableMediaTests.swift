@@ -121,7 +121,7 @@ struct PlayableMediaTests {
         #expect(media.contentRef == .live("l-3"))
         #expect(media.startTime == 0)
         #expect(media.url.absoluteString.contains("/timeshift/user/pass/60/"))
-        #expect(media.url.absoluteString.hasSuffix("/300.m3u8"))
+        #expect(media.url.absoluteString.hasSuffix("/300.ts"))
     }
 
     @Test func `catchup returns nil without archive`() {
