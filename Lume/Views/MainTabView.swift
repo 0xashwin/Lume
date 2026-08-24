@@ -192,23 +192,23 @@ struct MainTabView: View {
                     LiveTVView()
                 }
 
-                #if os(macOS)
-                    // macOS 15's tab bar drops a `role: .search` tab entirely — even
-                    // with an explicit label (the previous workaround), the search tab
-                    // never renders, leaving no way to reach Search on macOS 15. Fall
-                    // back to a plain tab, matching the four above, which render fine.
-                    // iOS/visionOS keep `role: .search` below for the dedicated search
-                    // treatment.
+                // macOS 15's tab bar drops a `role: .search` tab entirely — even
+                // with an explicit label (the previous workaround), the search tab
+                // never renders, leaving no way to reach Search there. macOS 26
+                // renders the role correctly, as do iOS/visionOS 18+, so only
+                // macOS 15 falls back to a plain tab and every other system keeps
+                // the dedicated search treatment.
+                if #unavailable(macOS 26) {
                     Tab("Search", systemImage: "magnifyingglass", value: AppTab.search) {
                         SearchView()
                     }
-                #else
+                } else {
                     Tab(value: AppTab.search, role: .search) {
                         SearchView()
                     } label: {
                         Label("Search", systemImage: "magnifyingglass")
                     }
-                #endif
+                }
             }
         }
     #endif
