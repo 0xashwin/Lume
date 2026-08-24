@@ -15,9 +15,11 @@ struct MainTabView: View {
     @Environment(PlaylistSwitchModel.self) private var playlistSwitch: PlaylistSwitchModel?
     @Environment(ProfileManager.self) private var profileManager: ProfileManager?
     @Query private var playlists: [Playlist]
-    /// Categories marked restricted. Fetched once here so a single source feeds
-    /// the restriction context every content surface reads from the environment.
+    /// Categories marked restricted, and categories hidden in Content
+    /// Management. Fetched once here so a single source feeds the restriction
+    /// context every content surface reads from the environment.
     @Query(filter: #Predicate<Category> { $0.isRestricted }) private var restrictedCategories: [Category]
+    @Query(filter: #Predicate<Category> { $0.isHidden }) private var hiddenCategories: [Category]
 
     @AppStorage(SyncFrequency.storageKey) private var syncFrequencyRaw: String = SyncFrequency.defaultValue.rawValue
     @AppStorage(PlaylistSelectionStore.key) private var selectedPlaylistID: String = ""
@@ -48,12 +50,14 @@ struct MainTabView: View {
         CommandLine.arguments.contains("-ui-testing")
     }
 
-    /// Hides restricted categories (and their content) from every browse, Home
-    /// and Search surface while a child profile is active.
+    /// Hides categories (and their content) from every browse, Home and Search
+    /// surface: the ones hidden in Content Management always, the restricted
+    /// ones while a child profile is active.
     private var contentRestriction: ContentRestriction {
         ContentRestriction(
             isActive: profileManager?.activeProfileIsChild ?? false,
-            restrictedCategoryIDs: Set(restrictedCategories.map(\.id))
+            restrictedCategoryIDs: Set(restrictedCategories.map(\.id)),
+            hiddenCategoryIDs: Set(hiddenCategories.map(\.id))
         )
     }
 

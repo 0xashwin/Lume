@@ -48,7 +48,7 @@ enum GenreDerivation {
         }.value
     }
 
-    /// Scopes the sampled rows to the active playlist and viewer (the parental
+    /// Scopes the sampled rows to the active playlist and viewer (the
     /// `excludingRestricted` filter, inlined so this stays `nonisolated`), then
     /// derives the distinct genres. Runs on the caller's background context.
     private nonisolated static func derive(
@@ -56,10 +56,10 @@ enum GenreDerivation {
         restriction: ContentRestriction,
         rows: [some GenreCarrying]
     ) -> [String] {
-        let restricted = restriction.isActive ? restriction.restrictedCategoryIDs : []
+        let excluded = restriction.excludedCategoryIDs
         let genres = rows.lazy
             .filter { $0.id.hasPrefix(playlistPrefix) }
-            .filter { restricted.isEmpty || !restricted.contains($0.categoryId ?? "") }
+            .filter { excluded.isEmpty || !excluded.contains($0.categoryId ?? "") }
             .map(\.genre)
         return GenreParser.distinctByFrequency(Array(genres))
     }
