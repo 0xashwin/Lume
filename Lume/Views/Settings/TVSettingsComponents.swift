@@ -21,10 +21,14 @@
         static let rowCornerRadius: CGFloat = 10
         static let labelFontSize: CGFloat = 18
         static let secondaryFontSize: CGFloat = 20
+        static let statusFontSize: CGFloat = 24
+        static let titleFontSize: CGFloat = 46
         static let contentMaxWidth: CGFloat = 760
         /// Width of the Settings detail pane content (sits next to the sidebar, so
         /// it gets a touch more room than the full-screen `contentMaxWidth`).
         static let detailMaxWidth: CGFloat = 860
+        /// Width of a secondary column sitting beside a `contentMaxWidth` one.
+        static let sideColumnWidth: CGFloat = 560
         static let background = Color(white: 0.09)
     }
 
@@ -32,6 +36,14 @@
         /// The flat dark fill shared by every tvOS settings surface.
         func tvSettingsBackground() -> some View {
             background(TVSettingsMetrics.background.ignoresSafeArea())
+        }
+
+        /// The quiet secondary line shared by the status and empty-state
+        /// messages, inset to line up with the row labels above it.
+        func tvSettingsSecondaryText() -> some View {
+            font(.system(size: TVSettingsMetrics.statusFontSize))
+                .foregroundStyle(.secondary)
+                .padding(.horizontal, TVSettingsMetrics.rowHPadding)
         }
     }
 

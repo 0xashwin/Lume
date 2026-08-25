@@ -30,5 +30,13 @@ final class DeepLinkRouter {
         var isMultiViewPresented: Bool {
             multiViewLaunch != nil
         }
+
+        /// Whether the playlist/profile quick-switch modal is covering the app.
+        /// Like Multi-View it is presented from `MainTabView` as a plain overlay
+        /// rather than a `fullScreenCover`, because a tvOS cover always dismisses
+        /// itself on Menu and nothing stops it — neither `onExitCommand` nor
+        /// `interactiveDismissDisabled`. The modal needs Menu for itself so a PIN
+        /// pad nested over it can consume the press first.
+        var isQuickSwitchPresented = false
     #endif
 }
