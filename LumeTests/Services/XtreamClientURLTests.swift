@@ -120,10 +120,30 @@ struct XtreamClientURLTests {
         #expect(string.range(of: #"/\d{4}-\d{2}-\d{2}:\d{2}-\d{2}/777\.ts$"#, options: .regularExpression) != nil)
     }
 
+    @Test func `build catchup URL uses advertised server timezone`() throws {
+        let client = makeClient()
+        let stream = LiveStream(id: "l-4", streamId: 778, name: "Catchup Channel")
+        let start = Date(timeIntervalSince1970: 1_700_000_000)
+        let utcPlaylist = makePlaylist()
+        utcPlaylist.serverTimezone = "UTC"
+        let newYorkPlaylist = makePlaylist()
+        newYorkPlaylist.serverTimezone = "America/New_York"
+
+        let utcURL = try #require(client.buildCatchupURL(
+            for: stream, playlist: utcPlaylist, start: start, durationMinutes: 60
+        ))
+        let newYorkURL = try #require(client.buildCatchupURL(
+            for: stream, playlist: newYorkPlaylist, start: start, durationMinutes: 60
+        ))
+
+        #expect(utcURL.absoluteString.contains("/2023-11-14:22-13/"))
+        #expect(newYorkURL.absoluteString.contains("/2023-11-14:17-13/"))
+    }
+
     @Test func `build catchup URL rejects non-positive duration`() {
         let client = makeClient()
         let playlist = makePlaylist()
-        let stream = LiveStream(id: "l-4", streamId: 778, name: "Catchup Channel")
+        let stream = LiveStream(id: "l-5", streamId: 779, name: "Catchup Channel")
         #expect(client.buildCatchupURL(for: stream, playlist: playlist, start: Date(), durationMinutes: 0) == nil)
     }
 
