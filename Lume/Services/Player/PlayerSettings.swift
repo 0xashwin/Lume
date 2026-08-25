@@ -128,10 +128,14 @@ enum PlayerSettings {
         /// Automatically start the next episode once the current one finishes.
         static let autoPlayNextKey = "player.autoPlayNext"
         /// Surface a focused "Next Episode" button once the current episode is
-        /// near its end (mirrors the ≥90% "watched" line).
+        /// near its end — IntroDB's outro window when one is known and plausible,
+        /// otherwise the ≥90% "watched" line, and never before it.
         static let showNextEpisodeButtonKey = "player.showNextEpisodeButton"
         /// Surface a "Skip Intro" / "Skip Recap" button while the playhead sits
         /// inside an intro or recap window known to IntroDB (TV episodes only).
+        /// The IntroDB fetch this gates is shared with `showNextEpisodeButton`:
+        /// the same response also carries the outro window that sets when the
+        /// Next Episode button arms, so either toggle being on triggers it.
         static let showSkipIntroButtonKey = "player.showSkipIntroButton"
 
         static let autoPlayNextDefault = true
@@ -140,11 +144,15 @@ enum PlayerSettings {
 
         /// Whether the skip-intro affordance is enabled, read off `UserDefaults`
         /// directly (so the player host needn't hold an `@AppStorage` that would
-        /// re-render the whole player tree when toggled). Honours the default
-        /// when the key was never written.
+        /// re-render the whole player tree when toggled).
         static var showSkipIntroButton: Bool {
-            UserDefaults.standard.object(forKey: showSkipIntroButtonKey) as? Bool
-                ?? showSkipIntroButtonDefault
+            UserDefaults.standard.bool(showSkipIntroButtonKey, default: showSkipIntroButtonDefault)
+        }
+
+        /// Whether the next-episode affordance is enabled, read off `UserDefaults`
+        /// directly for the same reason as `showSkipIntroButton`.
+        static var showNextEpisodeButton: Bool {
+            UserDefaults.standard.bool(showNextEpisodeButtonKey, default: showNextEpisodeButtonDefault)
         }
     }
 

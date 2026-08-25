@@ -157,6 +157,7 @@ struct HomeView: View {
                             onSelectHero: { selectedHero = $0 },
                             rows: { homeRows }
                         )
+                        .tvQuickSwitchHint(interacted: selectedHero != nil)
                     #else
                         ScrollView {
                             LazyVStack(alignment: .leading, spacing: 28) {

@@ -30,8 +30,9 @@ struct LumeEngineEngineView: View {
     /// end-of-episode Next Up affordances; `nil` when there is nothing to play
     /// next.
     var nextUpMedia: PlayableMedia?
-    /// Intro / recap windows for the active episode (from IntroDB), driving the
-    /// in-player Skip Intro button. `nil` when there is nothing to skip.
+    /// Intro / recap / outro windows for the active episode (from IntroDB). The
+    /// openers drive the in-player Skip Intro button; the outro sets when the
+    /// Next Episode button arms. `nil` when IntroDB knows nothing about it.
     var skipSegments: IntroSegments?
     /// When true, an initial-load failure reports to the host via
     /// `onPlaybackFailed` (which decides what to try next) instead of raising
@@ -120,30 +121,21 @@ struct LumeEngineEngineView: View {
                     .transition(.opacity.animation(.easeInOut(duration: 0.2)))
             }
 
-            if let nextUpMedia {
-                PlayerNextUpOverlay(
-                    nextMedia: nextUpMedia,
-                    clock: clock,
-                    controlsVisible: isControlsVisible,
-                    onPlayNext: { onSelectMedia?($0) }
-                )
-            }
-
-            if let skipSegments {
-                PlayerSkipIntroOverlay(
-                    segments: skipSegments,
-                    clock: clock,
-                    controlsVisible: isControlsVisible,
-                    onSeek: { time in
-                        coordinator.seek(to: time)
-                        #if os(tvOS)
-                            // The skip button held focus; hand it back to the
-                            // tap-catcher so the remote keeps working.
-                            Task { @MainActor in catcherFocused = true }
-                        #endif
-                    }
-                )
-            }
+            PlayerEpisodeOverlays(
+                segments: skipSegments,
+                nextUpMedia: nextUpMedia,
+                clock: clock,
+                controlsVisible: isControlsVisible,
+                onSeek: { time in
+                    coordinator.seek(to: time)
+                    #if os(tvOS)
+                        // The skip button held focus; hand it back to the
+                        // tap-catcher so the remote keeps working.
+                        Task { @MainActor in catcherFocused = true }
+                    #endif
+                },
+                onSelectMedia: { onSelectMedia?($0) }
+            )
 
             #if os(tvOS)
                 if isChannelBrowserOpen {

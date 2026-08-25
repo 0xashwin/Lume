@@ -50,7 +50,7 @@
         private var header: some View {
             VStack(alignment: .leading, spacing: 4) {
                 Text("Subtitles")
-                    .font(.system(size: 46, weight: .bold))
+                    .font(.system(size: TVSettingsMetrics.titleFontSize, weight: .bold))
                 // The stream's own name — data, so verbatim.
                 Text(verbatim: media.title)
                     .font(.system(size: 26))
@@ -91,7 +91,7 @@
                         ProgressView()
                         Text("Searching…")
                     }
-                    .tvSubtitleStatusText()
+                    .tvSettingsSecondaryText()
                 case let .failed(message):
                     Text(verbatim: message)
                         .font(.system(size: 24))
@@ -99,10 +99,10 @@
                         .padding(.horizontal, TVSettingsMetrics.rowHPadding)
                 case .unsupported:
                     Text("Subtitle search is only available for movies and episodes.")
-                        .tvSubtitleStatusText()
+                        .tvSettingsSecondaryText()
                 case .empty:
                     Text("No subtitles found for this title.")
-                        .tvSubtitleStatusText()
+                        .tvSettingsSecondaryText()
                 case .results:
                     LazyVStack(spacing: 8) {
                         ForEach(results) { subtitle in
@@ -125,20 +125,11 @@
 
                     if let remaining = service.remainingDownloads {
                         Text("\(remaining) downloads left today.")
-                            .tvSubtitleStatusText()
+                            .tvSettingsSecondaryText()
                             .padding(.top, 4)
                     }
                 }
             }
-        }
-    }
-
-    private extension View {
-        /// The quiet secondary line the status messages share.
-        func tvSubtitleStatusText() -> some View {
-            font(.system(size: 24))
-                .foregroundStyle(.secondary)
-                .padding(.horizontal, TVSettingsMetrics.rowHPadding)
         }
     }
 
@@ -195,7 +186,7 @@
             ScrollView {
                 VStack(alignment: .leading, spacing: 8) {
                     Text("Languages")
-                        .font(.system(size: 46, weight: .bold))
+                        .font(.system(size: TVSettingsMetrics.titleFontSize, weight: .bold))
                         .padding(.bottom, 18)
 
                     LazyVStack(spacing: 8) {
