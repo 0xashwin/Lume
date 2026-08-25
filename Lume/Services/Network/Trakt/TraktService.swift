@@ -107,7 +107,9 @@ final class TraktService {
 
             while !Task.isCancelled, Date() < deadline {
                 try await Task.sleep(for: .seconds(interval))
-                if Task.isCancelled { return }
+                if Task.isCancelled {
+                    return
+                }
 
                 do {
                     let response = try await client.pollForToken(deviceCode: code.deviceCode)
@@ -239,9 +241,32 @@ final class TraktService {
         do {
             let movies = try await client.watchedMovies(accessToken: accessToken)
             let shows = try await client.watchedShows(accessToken: accessToken)
-            lastImport = TraktWatchedImporter.apply(movies: movies, shows: shows, in: context)
+            lastImport = await TraktWatchedImporter.apply(
+                movies: movies,
+                shows: shows,
+                in: context,
+                hydrate: episodeHydrator(for: context)
+            )
         } catch {
             lastImport = .failure
+        }
+    }
+
+    /// Pulls a series' episodes from its provider, mirroring what the series
+    /// detail screen does on first open. Xtream and Stalker only expose episodes
+    /// through a per-series call, so a show the user has never opened has no
+    /// local episodes for the import to mark. Returns nothing for m3u, whose
+    /// episodes already arrive with the catalog sync.
+    private func episodeHydrator(for context: ModelContext) -> (Series) async -> [ParsedEpisode] {
+        let playlists = (try? context.fetch(FetchDescriptor<Playlist>())) ?? []
+        let manager = ContentSyncManager(modelContainer: context.container)
+        return { series in
+            guard let playlist = playlists.first(where: { series.id.hasPrefix($0.id.uuidString) }) else { return [] }
+            return await (try? manager.fetchEpisodes(
+                seriesId: series.seriesId,
+                seriesElementId: series.id,
+                playlist: playlist
+            )) ?? []
         }
     }
 
@@ -251,9 +276,13 @@ final class TraktService {
     /// concurrent refreshes into a single request.
     private func validAccessToken() async -> String? {
         guard let current = tokens else { return nil }
-        if !current.needsRefresh { return current.accessToken }
+        if !current.needsRefresh {
+            return current.accessToken
+        }
 
-        if let refreshTask { return await refreshTask.value }
+        if let refreshTask {
+            return await refreshTask.value
+        }
 
         let task = Task { [weak self] () -> String? in
             guard let self else { return nil }

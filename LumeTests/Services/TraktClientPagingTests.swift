@@ -125,8 +125,12 @@ struct TraktClientPagingTests {
 
         #expect(shows.count == 1)
         #expect(shows.first?.seasons.first?.episodes.first?.number == 1)
-        // Without `extended=progress` Trakt returns no season progress at all.
-        #expect(TraktStubProtocol.requestedQueries(host: "api.trakt.tv").first?["extended"] == "progress")
+        // Without `extended=progress` Trakt returns no season progress at all,
+        // and that mode is capped at 100 items per page — asking for 250 would
+        // make the reported page count disagree with the applied limit.
+        let query = TraktStubProtocol.requestedQueries(host: "api.trakt.tv").first
+        #expect(query?["extended"] == "progress")
+        #expect(query?["limit"] == "100")
     }
 
     @Test func `a show without seasons decodes as no progress`() async throws {

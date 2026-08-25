@@ -39,10 +39,15 @@ nonisolated struct TraktClient {
 
     private let baseURL = "https://api.trakt.tv"
 
-    /// Requested page size for paginated collections. Trakt's documented maximum;
-    /// endpoints that cap lower (watched shows with `extended=progress`) simply
-    /// return fewer items and a larger page count.
+    /// Requested page size for paginated collections. Trakt's documented maximum.
     private static let pageSize = 250
+
+    /// Page size for `extended=progress`, which Trakt caps at 100 because it
+    /// carries the season/episode progress. Asking for more doesn't just return
+    /// fewer items: `X-Pagination-Page-Count` is computed against the *applied*
+    /// limit, so a mismatched request risks a page walk that ends early and
+    /// silently imports a fraction of the history. Request what will be applied.
+    private static let progressPageSize = 100
 
     /// Hard stop on the page walk so a server that keeps reporting more pages
     /// can't spin the import forever.
@@ -188,6 +193,7 @@ nonisolated struct TraktClient {
         try await allPages(
             "/sync/watched/shows",
             query: [URLQueryItem(name: "extended", value: "progress")],
+            pageSize: Self.progressPageSize,
             accessToken: accessToken
         )
     }
@@ -207,6 +213,7 @@ nonisolated struct TraktClient {
     private func allPages<T: Decodable>(
         _ path: String,
         query: [URLQueryItem] = [],
+        pageSize: Int = TraktClient.pageSize,
         accessToken: String
     ) async throws -> [T] {
         var items: [T] = []
@@ -216,12 +223,14 @@ nonisolated struct TraktClient {
         while page <= pageCount, page <= Self.pageWalkLimit {
             let pageQuery = query + [
                 URLQueryItem(name: "page", value: String(page)),
-                URLQueryItem(name: "limit", value: String(Self.pageSize))
+                URLQueryItem(name: "limit", value: String(pageSize))
             ]
             var request = try makeRequest(path: path, method: "GET", query: pageQuery, accessToken: accessToken)
             request.setValue("application/json", forHTTPHeaderField: "Accept")
             let (batch, response): ([T], HTTPURLResponse) = try await send(request)
-            if batch.isEmpty { break }
+            if batch.isEmpty {
+                break
+            }
             items += batch
 
             if let header = response.value(forHTTPHeaderField: "X-Pagination-Page-Count"),
@@ -274,7 +283,9 @@ nonisolated struct TraktClient {
         let (data, response) = try await session.data(for: request)
         guard let http = response as? HTTPURLResponse else { throw TraktError.invalidResponse }
         guard (200 ... 299).contains(http.statusCode) else {
-            if http.statusCode == 401 { throw TraktError.notAuthenticated }
+            if http.statusCode == 401 {
+                throw TraktError.notAuthenticated
+            }
             throw TraktError.server(http.statusCode)
         }
 
@@ -389,8 +400,12 @@ struct TraktSyncItems: Encodable {
 
     func encode(to encoder: Encoder) throws {
         var container = encoder.container(keyedBy: CodingKeys.self)
-        if !movies.isEmpty { try container.encode(movies, forKey: .movies) }
-        if !shows.isEmpty { try container.encode(shows, forKey: .shows) }
+        if !movies.isEmpty {
+            try container.encode(movies, forKey: .movies)
+        }
+        if !shows.isEmpty {
+            try container.encode(shows, forKey: .shows)
+        }
     }
 
     enum CodingKeys: String, CodingKey {
