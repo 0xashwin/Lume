@@ -211,7 +211,9 @@ struct SearchView: View {
         // Scope to the active playlist unless cross-playlist search is on. Every
         // category id is prefixed with its playlist's UUID (see Category.id),
         // which appears nowhere else, so matching it within categoryId limits
-        // results to that playlist.
+        // results to that playlist. Hidden/restricted categories are excluded in
+        // the fetch rather than afterwards, so `resultLimit` isn't spent on rows
+        // the viewer will never see.
         let request = SearchRequest(
             query: query,
             playlistID: playlist?.id.uuidString ?? "",
@@ -219,6 +221,7 @@ struct SearchView: View {
             wantMovies: wantMovies,
             wantSeries: wantSeries,
             wantLive: wantLive,
+            excludedCategoryIDs: restriction.excludedCategoryIDs,
             limit: resultLimit
         )
         let container = modelContext.container
@@ -275,80 +278,6 @@ struct SearchView: View {
         )) ?? []
         let byId = Dictionary(fetched.map { ($0.id, $0) }, uniquingKeysWith: { first, _ in first })
         return ids.compactMap { byId[$0] }
-    }
-}
-
-// MARK: - Off-main search fetch
-
-/// The matched rows' persistent identifiers, grouped by type. Plain value type
-/// so it can cross back from the background fetch context.
-private nonisolated struct SearchHits {
-    var movies: [PersistentIdentifier] = []
-    var series: [PersistentIdentifier] = []
-    var streams: [PersistentIdentifier] = []
-}
-
-/// The settled query and the per-type toggles, bundled so the off-main fetch
-/// takes a single `Sendable` value.
-private nonisolated struct SearchRequest {
-    let query: String
-    let playlistID: String
-    let restrictToPlaylist: Bool
-    let wantMovies: Bool
-    let wantSeries: Bool
-    let wantLive: Bool
-    let limit: Int
-}
-
-/// Runs the bounded `localizedStandardContains` fetches on a background
-/// `ModelContext` and returns only identifiers — never managed objects, which
-/// can't cross actor boundaries.
-private nonisolated enum SearchFetcher {
-    static func fetch(container: ModelContainer, request: SearchRequest) -> SearchHits {
-        let query = request.query
-        let playlistID = request.playlistID
-        let restrictToPlaylist = request.restrictToPlaylist
-        let limit = request.limit
-        let context = ModelContext(container)
-        var hits = SearchHits()
-
-        if request.wantMovies {
-            var descriptor = FetchDescriptor<Movie>(
-                predicate: #Predicate { movie in
-                    movie.name.localizedStandardContains(query)
-                        && (!restrictToPlaylist || (movie.categoryId?.localizedStandardContains(playlistID) ?? false))
-                },
-                sortBy: [SortDescriptor(\.name)]
-            )
-            descriptor.fetchLimit = limit
-            hits.movies = ((try? context.fetch(descriptor)) ?? []).map(\.persistentModelID)
-        }
-
-        if request.wantSeries {
-            var descriptor = FetchDescriptor<Series>(
-                predicate: #Predicate { series in
-                    series.name.localizedStandardContains(query)
-                        && (!restrictToPlaylist || (series.categoryId?.localizedStandardContains(playlistID) ?? false))
-                },
-                sortBy: [SortDescriptor(\.name)]
-            )
-            descriptor.fetchLimit = limit
-            hits.series = ((try? context.fetch(descriptor)) ?? []).map(\.persistentModelID)
-        }
-
-        if request.wantLive {
-            var descriptor = FetchDescriptor<LiveStream>(
-                predicate: #Predicate { stream in
-                    stream.name.localizedStandardContains(query)
-                        && (!restrictToPlaylist || (stream.categoryId?.localizedStandardContains(playlistID) ?? false))
-                },
-                sortBy: [SortDescriptor(\.name)]
-            )
-            descriptor.fetchLimit = limit
-            hits.streams = ((try? context.fetch(descriptor)) ?? []).map(\.persistentModelID)
-        }
-
-        return hits
     }
 }
 
