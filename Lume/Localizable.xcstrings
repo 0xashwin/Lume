@@ -1016,6 +1016,64 @@
         }
       }
     },
+    "%lld show%@ will be marked the first time you open them." : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$lld Serien werden beim ersten Öffnen markiert."
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$lld show%2$@ will be marked the first time you open them."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$lld serie%2$@ se marcarán la primera vez que las abras."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$lld série%2$@ seront marquées à la première ouverture."
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$lld serie verranno contrassegnate alla prima apertura."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$lld件の番組は、最初に開いたときにマークされます。"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$lld개 시리즈는 처음 열 때 표시됩니다."
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$lld série%2$@ serão marcadas na primeira vez que as abrir."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$lld 部剧集将在首次打开时标记。"
+          }
+        }
+      }
+    },
     "%lld subtitle downloads left today." : {
       "localizations" : {
         "de" : {

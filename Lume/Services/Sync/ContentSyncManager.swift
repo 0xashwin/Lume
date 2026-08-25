@@ -56,6 +56,10 @@ extension Series {
             context.insert(episode)
             episodes.append(episode)
         }
+        // A Trakt import can only mark episodes that exist, so anything it
+        // parked for this series is applied here — the one place episodes ever
+        // materialize for Xtream and Stalker.
+        TraktWatchedImporter.applyPending(to: self)
         try? context.save()
     }
 }
