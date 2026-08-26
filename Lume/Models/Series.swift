@@ -85,6 +85,17 @@ final class Series {
     var categoryId: String?
     @Relationship(deleteRule: .cascade) var episodes: [Episode] = []
 
+    // MARK: Episode cache (Xtream / Stalker — lazy-fetched on the detail screen)
+
+    /// When this series' episode list was last pulled from the provider; nil
+    /// means never. Playlist sync doesn't touch episodes for the lazy pipelines,
+    /// so without a stamp a device that already cached a season would never see
+    /// a newly added episode. See `episodesAreStale(lastSyncedAt:)`.
+    var episodesFetchedAt: Date?
+    /// The provider's `lastModified` at the time of that fetch, so a bumped
+    /// value invalidates the cache immediately.
+    var episodesFetchedLastModified: String?
+
     var isFavorite: Bool = false
     /// A user-defined order for the unified Favorites collection, spanning movies,
     /// series and live channels. `nil` means "follow the default order"; once the
@@ -167,5 +178,24 @@ extension Series {
     var recommendationVote: RecommendationVote? {
         get { RecommendationVote(rawValue: recommendationVoteRaw) }
         set { recommendationVoteRaw = newValue?.rawValue ?? 0 }
+    }
+
+    /// Whether the lazily-fetched episode list should be pulled again.
+    ///
+    /// Xtream and Stalker episodes are fetched per-series on the detail screen
+    /// and are never swept by playlist sync, so a cached season would otherwise
+    /// stick forever — an episode the provider added shows up on whichever
+    /// device happened to open the series afterwards and stays missing on the
+    /// others. Sync is what reopens the question: a `lastModified` the provider
+    /// bumped is the exact signal, and a playlist that has synced since the
+    /// fetch covers portals that don't maintain the field.
+    ///
+    /// - Parameter lastSyncedAt: the owning playlist's `lastSyncDate`, stamped
+    ///   only when a sync finishes successfully.
+    func episodesAreStale(lastSyncedAt: Date?) -> Bool {
+        guard let episodesFetchedAt else { return true }
+        if episodesFetchedLastModified != lastModified { return true }
+        guard let lastSyncedAt else { return false }
+        return lastSyncedAt > episodesFetchedAt
     }
 }

@@ -15,9 +15,11 @@ struct MainTabView: View {
     @Environment(PlaylistSwitchModel.self) private var playlistSwitch: PlaylistSwitchModel?
     @Environment(ProfileManager.self) private var profileManager: ProfileManager?
     @Query private var playlists: [Playlist]
-    /// Categories marked restricted. Fetched once here so a single source feeds
-    /// the restriction context every content surface reads from the environment.
+    /// Categories marked restricted, and categories hidden in Content
+    /// Management. Fetched once here so a single source feeds the restriction
+    /// context every content surface reads from the environment.
     @Query(filter: #Predicate<Category> { $0.isRestricted }) private var restrictedCategories: [Category]
+    @Query(filter: #Predicate<Category> { $0.isHidden }) private var hiddenCategories: [Category]
 
     @AppStorage(SyncFrequency.storageKey) private var syncFrequencyRaw: String = SyncFrequency.defaultValue.rawValue
     @AppStorage(PlaylistSelectionStore.key) private var selectedPlaylistID: String = ""
@@ -62,12 +64,14 @@ struct MainTabView: View {
         CommandLine.arguments.contains("-ui-testing")
     }
 
-    /// Hides restricted categories (and their content) from every browse, Home
-    /// and Search surface while a child profile is active.
+    /// Hides categories (and their content) from every browse, Home and Search
+    /// surface: the ones hidden in Content Management always, the restricted
+    /// ones while a child profile is active.
     private var contentRestriction: ContentRestriction {
         ContentRestriction(
             isActive: profileManager?.activeProfileIsChild ?? false,
-            restrictedCategoryIDs: Set(restrictedCategories.map(\.id))
+            restrictedCategoryIDs: Set(restrictedCategories.map(\.id)),
+            hiddenCategoryIDs: Set(hiddenCategories.map(\.id))
         )
     }
 
@@ -75,9 +79,17 @@ struct MainTabView: View {
         @Bindable var router = router
         return tabView(selection: $router.selectedTab)
         #if os(tvOS)
-            // Multi-View owns the screen while it is up: tvOS focus is not
-            // clipped by z-order, so the tab bar behind would still take presses.
-            .disabled(router.isMultiViewPresented)
+            .disabled(blockingOverlayOwnsScreen || router.isQuickSwitchPresented)
+            // Attached OUTSIDE `.disabled` so the same button closes the modal it
+            // opened, and above the tabs but below every player: the engines are
+            // presented as `fullScreenCover`s from inside a tab, so their own
+            // `onPlayPauseCommand` sits above this one in the focused chain and is
+            // never shadowed. The guard covers the plain overlays instead, which
+            // tvOS focus reaches straight through.
+            .onPlayPauseCommand {
+                guard playPauseTogglesQuickSwitch else { return }
+                router.isQuickSwitchPresented.toggle()
+            }
         #endif
             .environment(router)
             .environment(\.contentRestriction, contentRestriction)
@@ -98,7 +110,9 @@ struct MainTabView: View {
                 enqueueDueSyncs(playlists)
             }
             .onChange(of: selectedPlaylistID) {
-                // On playlist switch, sync the newly selected one if it's due.
+                // On playlist switch, sync the newly selected one if it's due —
+                // unless the switch asked to land in the cached catalog instead.
+                guard playlistSwitch?.consumeDeferredDueSync() != true else { return }
                 if let playlist = playlists.active(for: selectedPlaylistID) {
                     enqueueDueSyncs([playlist])
                 }
@@ -112,14 +126,18 @@ struct MainTabView: View {
             }
             .syncCover(item: $activeSyncPlaylist, onDismiss: promoteNextIfIdle)
             .downloadsSheet(isPresented: $showsDownloads)
-            .overlay {
-                if playlistSwitch?.isSwitching == true {
-                    PlaylistSwitchOverlay(playlistName: playlistSwitch?.targetName ?? "")
-                        .transition(.opacity)
-                }
-            }
+            .switchProgressOverlay(playlist: playlistSwitch, profile: profileManager)
         #if os(tvOS)
-            .overlay {
+            .overlay { tvOverlays }
+        #endif
+    }
+
+    #if os(tvOS)
+        /// The plain overlays layered over the tabs. One always-mounted container,
+        /// so the fade is a transaction over this layer instead of over every
+        /// animatable attribute in every live tab.
+        private var tvOverlays: some View {
+            ZStack {
                 if let launch = router.multiViewLaunch {
                     MultiViewScreen(
                         seed: launch.seed,
@@ -131,12 +149,18 @@ struct MainTabView: View {
                     .id(launch.id)
                     .transition(.opacity)
                 }
-            }
-        #endif
-            .animation(.easeInOut(duration: 0.2), value: playlistSwitch?.isSwitching)
-    }
 
-    #if os(tvOS)
+                if router.isQuickSwitchPresented {
+                    // Built only while presented: a permanently mounted list of
+                    // focusable rows would regrow the focus/AX responder walk
+                    // that `activeOnly(_:selection:)` exists to contain.
+                    TVQuickSwitchOverlay(router: router, playlists: playlists)
+                        .transition(.opacity)
+                }
+            }
+            .animation(.easeInOut(duration: 0.2), value: router.isQuickSwitchPresented)
+        }
+
         private func tabView(selection: Binding<AppTab>) -> some View {
             TabView(selection: selection) {
                 Tab(value: AppTab.search) {
@@ -177,6 +201,29 @@ struct MainTabView: View {
             }
         }
 
+        /// Whether something layered over the tabs owns the screen: tvOS focus is
+        /// not clipped by z-order, so the tab bar and the cards behind a plain
+        /// overlay would still take presses. The playlist switch is deliberately
+        /// absent — it settles in under half a second, and disabling the tabs for
+        /// it would move focus and hand it back somewhere else.
+        private var blockingOverlayOwnsScreen: Bool {
+            router.isMultiViewPresented
+                || activeSyncPlaylist != nil
+                || profileManager?.isSwitching == true
+        }
+
+        /// Whether Play/Pause may toggle the quick-switch modal right now. Off
+        /// while a blocking overlay owns the screen, and off when neither column
+        /// would have a focusable row — an empty modal over a disabled tab bar has
+        /// nothing to hand focus to, and so nothing to deliver Menu either.
+        private var playPauseTogglesQuickSwitch: Bool {
+            if router.isQuickSwitchPresented {
+                return true
+            }
+            guard !blockingOverlayOwnsScreen else { return false }
+            return !playlists.isEmpty || profileManager?.isReady == true
+        }
+
         /// tvOS `TabView` keeps every *visited* tab's view hierarchy alive, and
         /// each remote press triggers a focus/accessibility responder walk over
         /// the whole window — a device trace showed those walks dominating the
@@ -212,16 +259,22 @@ struct MainTabView: View {
                     LiveTVView()
                 }
 
-                // An explicit label is required: the `Tab(_:systemImage:value:role:)`
-                // convenience is 26-only, and the label-less initializer's
-                // `DefaultTabLabel` renders nothing in the pre-Liquid Glass macOS 15
-                // tab bar — the search tab was invisible there. Supplying the label
-                // keeps `role: .search` (so 26 still gets the dedicated search
-                // treatment) while staying visible on macOS 15 / iOS 18.
-                Tab(value: AppTab.search, role: .search) {
-                    SearchView()
-                } label: {
-                    Label("Search", systemImage: "magnifyingglass")
+                // macOS 15's tab bar drops a `role: .search` tab entirely — even
+                // with an explicit label (the previous workaround), the search tab
+                // never renders, leaving no way to reach Search there. macOS 26
+                // renders the role correctly, as do iOS/visionOS 18+, so only
+                // macOS 15 falls back to a plain tab and every other system keeps
+                // the dedicated search treatment.
+                if #unavailable(macOS 26) {
+                    Tab("Search", systemImage: "magnifyingglass", value: AppTab.search) {
+                        SearchView()
+                    }
+                } else {
+                    Tab(value: AppTab.search, role: .search) {
+                        SearchView()
+                    } label: {
+                        Label("Search", systemImage: "magnifyingglass")
+                    }
                 }
             }
         }

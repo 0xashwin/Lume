@@ -56,9 +56,10 @@ struct SettingsView: View {
 
     #if os(tvOS)
         /// The globally-selected playlist, shared with the content tabs. tvOS has
-        /// no toolbar switcher, so the Playlists settings pane is where the active
-        /// playlist is chosen. Not `private`: read by the SettingsView+Playlists
-        /// extension (separate file).
+        /// no toolbar switcher: this pane is the management surface where the
+        /// active playlist is chosen, and the Play/Pause quick-switch overlay the
+        /// fast path that writes the same key. Not `private`: read by the
+        /// SettingsView+Playlists extension (separate file).
         @AppStorage(PlaylistSelectionStore.key) var selectedPlaylistID: String = ""
         /// Routes the switch through the blocking overlay (see PlaylistSwitchModel).
         /// Not `private`: read by the SettingsView+Playlists extension.

@@ -35,6 +35,12 @@ extension Series {
     /// de-duping against any already present (Episode.id is unique). Mutating the
     /// `episodes` relationship directly updates any observing SwiftUI view, so the
     /// caller must run this on the same context the view renders from.
+    ///
+    /// Additive on purpose: a refresh merges in episodes the provider has added
+    /// since the last fetch and never deletes, so a provider hiccup (a short or
+    /// empty `get_series_info` response) can't wipe rows that carry watch
+    /// progress. Call only after a *successful* fetch — it stamps the episode
+    /// cache, which suppresses further refreshes until it goes stale again.
     func insertEpisodes(_ parsed: [ParsedEpisode], into context: ModelContext) {
         let existingIds = Set(episodes.map(\.id))
         for parsed in parsed where !existingIds.contains(parsed.id) {
@@ -56,6 +62,12 @@ extension Series {
             context.insert(episode)
             episodes.append(episode)
         }
+        // A Trakt import can only mark episodes that exist, so anything it
+        // parked for this series is applied here — the one place episodes ever
+        // materialize for Xtream and Stalker.
+        TraktWatchedImporter.applyPending(to: self)
+        episodesFetchedAt = Date()
+        episodesFetchedLastModified = lastModified
         try? context.save()
     }
 }

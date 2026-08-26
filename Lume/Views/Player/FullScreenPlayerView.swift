@@ -79,11 +79,12 @@ struct FullScreenPlayerView: View {
     /// the per-tick clock path.
     @State private var nextUpMedia: PlayableMedia?
 
-    /// Intro / recap timestamps for the active episode (from IntroDB), driving
-    /// the in-player Skip Intro button. `nil` for movies, live channels, and
-    /// episodes IntroDB doesn't know — resolved whenever the active stream
-    /// changes. Read only when the player tree is (re)built, never on the
-    /// per-tick clock path. See `PlayerSkipIntroOverlay`.
+    /// Intro / recap / outro windows for the active episode (from IntroDB). The
+    /// openers drive the in-player Skip Intro button; the outro sets when the
+    /// Next Episode button arms. `nil` for movies, live channels, and episodes
+    /// IntroDB doesn't know — resolved whenever the active stream changes. Read
+    /// only when the player tree is (re)built, never on the per-tick clock path.
+    /// See `PlayerSkipIntroOverlay` / `PlayerNextUpOverlay`.
     @State private var skipSegments: IntroSegments?
 
     init(media: PlayableMedia) {
@@ -232,20 +233,23 @@ struct FullScreenPlayerView: View {
             )
         }
         .task(id: activeMedia.id) {
-            // Resolve the next episode for the active stream. Runs on appear and
-            // whenever the stream swaps (manual pick or auto-advance), so the
-            // queued episode always trails the one on screen.
+            // Resolve the next episode and the IntroDB segments for the active
+            // stream. Runs on appear and whenever the stream swaps (manual pick
+            // or auto-advance), so the queued episode always trails the one on
+            // screen. The segments feed two affordances — the skip-intro button
+            // (intro/recap windows) and the next-up arm time (outro window) — so
+            // the fetch needs one of them to be both enabled and reachable; the
+            // outro is dead weight with no next episode to advance to. Resolving
+            // the lookup key touches SwiftData on the main actor; the fetch
+            // itself is off it.
             nextUpMedia = activeMedia.isLive
                 ? nil
                 : NextEpisodeResolver.nextMedia(after: activeMedia.contentRef, in: modelContext)
-        }
-        .task(id: activeMedia.id) {
-            // Resolve the IntroDB skip windows for the active episode. Runs on
-            // appear and whenever the stream swaps. Gated on the user setting so
-            // a disabled feature makes no network call. Resolving the lookup key
-            // touches SwiftData on the main actor; the fetch itself is off it.
             skipSegments = nil
-            guard PremiumManager.shared.isPremium, PlayerSettings.Playback.showSkipIntroButton, !activeMedia.isLive,
+            guard PremiumManager.shared.isPremium,
+                  PlayerSettings.Playback.showSkipIntroButton
+                  || (PlayerSettings.Playback.showNextEpisodeButton && nextUpMedia != nil),
+                  !activeMedia.isLive,
                   let lookup = IntroSkipResolver.lookup(for: activeMedia.contentRef, in: modelContext)
             else { return }
             skipSegments = try? await IntroDBClient.shared.segments(
