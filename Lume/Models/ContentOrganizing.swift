@@ -67,6 +67,15 @@ enum ContentOrganizer {
         }
     }
 
+    /// Hides every item in a group — the counterpart to `showAll`, so a user with
+    /// a 10k-channel provider can start from a blank slate and opt content back
+    /// in rather than tapping thousands of per-row toggles.
+    static func hideAll(_ items: [some ContentItem]) {
+        for item in items {
+            item.isHidden = true
+        }
+    }
+
     private static func stampOrder(_ arranged: [some ContentItem]) {
         stamp(arranged, into: \.customOrder)
     }

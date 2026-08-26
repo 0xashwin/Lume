@@ -30,8 +30,9 @@ struct LumeEngineEngineView: View {
     /// end-of-episode Next Up affordances; `nil` when there is nothing to play
     /// next.
     var nextUpMedia: PlayableMedia?
-    /// Intro / recap windows for the active episode (from IntroDB), driving the
-    /// in-player Skip Intro button. `nil` when there is nothing to skip.
+    /// Intro / recap / outro windows for the active episode (from IntroDB). The
+    /// openers drive the in-player Skip Intro button; the outro sets when the
+    /// Next Episode button arms. `nil` when IntroDB knows nothing about it.
     var skipSegments: IntroSegments?
     /// When true, an initial-load failure reports to the host via
     /// `onPlaybackFailed` (which decides what to try next) instead of raising
@@ -52,6 +53,10 @@ struct LumeEngineEngineView: View {
     /// Drives bounded backoff reconnects when the stream drops mid-playback.
     @State private var reconnector = PlaybackRetryController()
     @State private var isControlsVisible = true
+    /// Presents the OpenSubtitles browser. Held here rather than in the controls
+    /// overlay: the overlay is removed when the controls auto-hide, which would
+    /// take a sheet anchored there down with it mid-search.
+    @State private var isSearchingSubtitles = false
     /// Set once the stream is given up on (initial-load failure with no fallback
     /// left, or the reconnect budget spent). Swaps the player for the
     /// `PlayerErrorIndicator` (Try Again / Back).
@@ -116,30 +121,21 @@ struct LumeEngineEngineView: View {
                     .transition(.opacity.animation(.easeInOut(duration: 0.2)))
             }
 
-            if let nextUpMedia {
-                PlayerNextUpOverlay(
-                    nextMedia: nextUpMedia,
-                    clock: clock,
-                    controlsVisible: isControlsVisible,
-                    onPlayNext: { onSelectMedia?($0) }
-                )
-            }
-
-            if let skipSegments {
-                PlayerSkipIntroOverlay(
-                    segments: skipSegments,
-                    clock: clock,
-                    controlsVisible: isControlsVisible,
-                    onSeek: { time in
-                        coordinator.seek(to: time)
-                        #if os(tvOS)
-                            // The skip button held focus; hand it back to the
-                            // tap-catcher so the remote keeps working.
-                            Task { @MainActor in catcherFocused = true }
-                        #endif
-                    }
-                )
-            }
+            PlayerEpisodeOverlays(
+                segments: skipSegments,
+                nextUpMedia: nextUpMedia,
+                clock: clock,
+                controlsVisible: isControlsVisible,
+                onSeek: { time in
+                    coordinator.seek(to: time)
+                    #if os(tvOS)
+                        // The skip button held focus; hand it back to the
+                        // tap-catcher so the remote keeps working.
+                        Task { @MainActor in catcherFocused = true }
+                    #endif
+                },
+                onSelectMedia: { onSelectMedia?($0) }
+            )
 
             #if os(tvOS)
                 if isChannelBrowserOpen {
@@ -160,6 +156,9 @@ struct LumeEngineEngineView: View {
                 )
                 .transition(.opacity)
             }
+        }
+        .subtitleSearch(isPresented: $isSearchingSubtitles, media: media) { subtitle in
+            coordinator.loadExternalSubtitle(subtitle)
         }
         .preferredColorScheme(.dark)
         .onAppear {
@@ -311,7 +310,8 @@ struct LumeEngineEngineView: View {
                 onResetHideTimer: { resetHideTimer() },
                 onSelectMedia: { onSelectMedia?($0) },
                 onPanelOpenChange: { setPanelOpen($0) },
-                onSwitchChannel: { switchLiveChannel($0) }
+                onSwitchChannel: { switchLiveChannel($0) },
+                onSearchSubtitles: subtitleSearchAction
             )
         #else
             LumeEngineControlsOverlay(
@@ -324,9 +324,19 @@ struct LumeEngineEngineView: View {
                 onClose: { closePlayer() },
                 onTogglePlay: { togglePlay() },
                 onResetHideTimer: { resetHideTimer() },
-                onScheduleHide: { scheduleHide() }
+                onScheduleHide: { scheduleHide() },
+                onSearchSubtitles: subtitleSearchAction
             )
         #endif
+    }
+
+    /// Raises the OpenSubtitles browser, or `nil` when this stream can't use it
+    /// (a live channel, no API key in the build, or an engine that can't
+    /// side-load a subtitle file).
+    private var subtitleSearchAction: (() -> Void)? {
+        guard OpenSubtitlesService.supportsSearch(for: media),
+              coordinator.supportsExternalSubtitles else { return nil }
+        return { isSearchingSubtitles = true }
     }
 
     // MARK: - Actions
@@ -351,7 +361,7 @@ struct LumeEngineEngineView: View {
                     for: media, offset: direction == .up ? 1 : -1, sort: sort, in: modelContext
                 )
             case .right:
-                target = LiveChannelHistory.recallMedia(in: modelContext)
+                target = LiveChannelHistory.recallMedia(in: modelContext, scope: media.channelScope)
             default:
                 return
             }

@@ -66,6 +66,14 @@ struct HomeView: View {
     @State private var playingMedia: PlayableMedia?
     @State private var showingSync = false
     @State private var showingSettings = false
+    /// Shown when a channel's "Start Multi-View" is picked without Lume Pro.
+    @State private var showingPaywall = false
+    #if os(tvOS)
+        @Environment(DeepLinkRouter.self) private var router
+    #else
+        /// Non-nil while Multi-View is up; carries the channel it opened with.
+        @State private var multiViewLaunch: MultiViewLaunch?
+    #endif
 
     #if os(tvOS)
         /// Hero selected on the immersive home. Drives navigation
@@ -90,8 +98,10 @@ struct HomeView: View {
         series.fetchLimit = 20
         _watchedSeries = Query(series)
 
+        // Channels hidden in Content Management drop out here, the same way Live
+        // TV drops them; a hidden *category* is handled by `excludingRestricted`.
         var streams = FetchDescriptor<LiveStream>(
-            predicate: #Predicate { $0.lastWatchedDate != nil },
+            predicate: #Predicate { $0.lastWatchedDate != nil && $0.isHidden == false },
             sortBy: [SortDescriptor(\.lastWatchedDate, order: .reverse)]
         )
         streams.fetchLimit = 20
@@ -115,7 +125,7 @@ struct HomeView: View {
         _favoriteSeries = Query(favSeries)
 
         var favStreams = FetchDescriptor<LiveStream>(
-            predicate: #Predicate { $0.isFavorite },
+            predicate: #Predicate { $0.isFavorite && $0.isHidden == false },
             sortBy: [SortDescriptor(\.favoriteOrder), SortDescriptor(\.name)]
         )
         favStreams.fetchLimit = 30
@@ -147,6 +157,7 @@ struct HomeView: View {
                             onSelectHero: { selectedHero = $0 },
                             rows: { homeRows }
                         )
+                        .tvQuickSwitchHint(interacted: selectedHero != nil)
                     #else
                         ScrollView {
                             LazyVStack(alignment: .leading, spacing: 28) {
@@ -201,11 +212,11 @@ struct HomeView: View {
                     }
                 }
             #endif
-                .task(id: "\(playlists.count)-\(selectedPlaylistID)-\(activePlaylist?.lastSyncDate?.timeIntervalSince1970 ?? 0)") {
-                    await loadTrending(cacheKey: "\(playlists.count)-\(selectedPlaylistID)-\(activePlaylist?.lastSyncDate?.timeIntervalSince1970 ?? 0)")
+                .task(id: trendingKey) {
+                    await loadTrending(cacheKey: trendingKey)
                 }
-                .task(id: "watchlist-\(trakt.isConnected)-\(selectedPlaylistID)") {
-                    await loadWatchlist(cacheKey: "watchlist-\(trakt.isConnected)-\(selectedPlaylistID)")
+                .task(id: watchlistKey) {
+                    await loadWatchlist(cacheKey: watchlistKey)
                 }
                 .task(id: recommendationsKey) {
                     await loadRecommendations()
@@ -215,6 +226,12 @@ struct HomeView: View {
                     FullScreenPlayerView(media: media)
                 }
             #endif
+            #if os(iOS)
+                .fullScreenCover(item: $multiViewLaunch) { launch in
+                    MultiViewScreen(seed: launch.seed)
+            }
+            #endif
+            .paywall(isPresented: $showingPaywall, highlight: .multiView)
         }
     }
 
@@ -271,8 +288,28 @@ struct HomeView: View {
         onRemove: ((HomeMediaItem) -> Void)? = nil
     ) -> some View {
         if !items.isEmpty {
-            HomeRow(title: title, items: items, onPlayLive: playChannel, onRemove: onRemove, animationNamespace: animationNamespace)
+            HomeRow(
+                title: title,
+                items: items,
+                onPlayLive: playChannel,
+                onRemove: onRemove,
+                onStartMultiView: startMultiView,
+                animationNamespace: animationNamespace
+            )
         }
+    }
+
+    /// Identity of the trending/hero load, and the key its session memo is
+    /// stored under. Includes the visibility token so hiding a category in
+    /// Content Management reloads the rows instead of replaying a cached list
+    /// that was matched against the whole catalog.
+    var trendingKey: String {
+        let synced = activePlaylist?.lastSyncDate?.timeIntervalSince1970 ?? 0
+        return "\(playlists.count)-\(selectedPlaylistID)-\(synced)-\(restriction.visibilityToken)"
+    }
+
+    var watchlistKey: String {
+        "watchlist-\(trakt.isConnected)-\(selectedPlaylistID)-\(restriction.visibilityToken)"
     }
 
     // MARK: - Playlist scoping
@@ -353,6 +390,29 @@ struct HomeView: View {
 
     // MARK: - Playback
 
+    /// Opens Multi-View seeded with a channel from one of the rails, or the
+    /// paywall when the viewer isn't on Lume Pro. Mirrors `LiveTVView`'s pair of
+    /// the same name — the rails are a second entry point to the same feature.
+    private func startMultiView(with stream: LiveStream) {
+        guard let playlist = activePlaylist,
+              let media = PlayableMedia.from(stream: stream, playlist: playlist) else { return }
+        guard premium.isPremium else {
+            showingPaywall = true
+            return
+        }
+        #if os(macOS)
+            // The window is a singleton, so it cannot be built around a launch:
+            // hand the channel over and let the grid adopt it on appear.
+            MultiViewLaunchQueue.shared.pending = [media]
+            openWindow(id: "multiview")
+        #elseif os(tvOS)
+            // Presented by `MainTabView`, above the tab bar — see the router.
+            router.multiViewLaunch = MultiViewLaunch(seed: [media])
+        #else
+            multiViewLaunch = MultiViewLaunch(seed: [media])
+        #endif
+    }
+
     private func playChannel(_ stream: LiveStream) {
         guard let playlist = activePlaylist,
               let media = PlayableMedia.from(stream: stream, playlist: playlist) else { return }
@@ -368,13 +428,14 @@ struct HomeView: View {
 // MARK: - For You
 
 private extension HomeView {
-    /// Refresh the row when the active playlist or the favorites/history queries
-    /// change. This only re-resolves the list (cheap, and re-validates each entry
-    /// against live state) — the engine still throttles the actual re-ranking to
+    /// Refresh the row when the active playlist, the favorites/history queries or
+    /// the hidden categories change. This only re-resolves the list (cheap, and
+    /// re-validates each entry against live state) — the engine still throttles the actual re-ranking to
     /// its recalculation interval.
     var recommendationsKey: String {
         let counts = "\(watchedMovies.count)-\(watchedSeries.count)-\(favoriteMovies.count)-\(favoriteSeries.count)"
-        return "rec-\(recommendationsEnabled)-\(premium.isPremium)-\(isSyncBusy)-\(recommendationsRecalcToken)-\(counts)-\(selectedPlaylistID)"
+        let visibility = restriction.visibilityToken
+        return "rec-\(recommendationsEnabled)-\(premium.isPremium)-\(isSyncBusy)-\(recommendationsRecalcToken)-\(counts)-\(selectedPlaylistID)-\(visibility)"
     }
 
     /// True while a playlist sync, iCloud sync or EPG import is running. The For
@@ -405,7 +466,7 @@ private extension HomeView {
         defer { Perf.end(interval) }
 
         let engine = RecommendationEngine(modelContainer: modelContext.container)
-        let scored = await engine.recommendations()
+        let scored = await engine.recommendations(excluding: restriction.excludedCategoryIDs)
         var items: [HomeMediaItem] = []
         for recommendation in scored {
             switch recommendation.kind {

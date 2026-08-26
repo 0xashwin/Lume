@@ -88,6 +88,12 @@
             return nil
         }
 
+        /// The scope of the section whose channels are listed — handed to the
+        /// picked channel so surfing continues inside the column it came from.
+        private var selectedScope: LiveChannelScope? {
+            sections.first { $0.id == selectedSectionID }?.scope
+        }
+
         var body: some View {
             ZStack(alignment: .leading) {
                 scrim
@@ -346,10 +352,12 @@
             rail.append(contentsOf: categories.map(LiveTVSection.category))
             sections = rail
 
-            // Pre-select the playing channel's own category, not a virtual
-            // section it may also appear in, so the rail mirrors where the
-            // channel actually lives.
-            let initialID = rail.first { $0.id == stream.categoryId }?.id ?? rail.first?.id
+            // Open on the list playback was launched from, so the browser agrees
+            // with what up/down surfs. Without one, pre-select the playing
+            // channel's own category rather than a virtual section it may also
+            // appear in, so the rail mirrors where the channel actually lives.
+            let launchedID = media.channelScope.flatMap { scope in rail.first { $0.scope == scope }?.id }
+            let initialID = launchedID ?? rail.first { $0.id == stream.categoryId }?.id ?? rail.first?.id
             selectedSectionID = initialID
             if let initialID, let section = rail.first(where: { $0.id == initialID }) {
                 channels = fetchChannels(scope: section.scope)
@@ -457,7 +465,7 @@
                 return
             }
             guard let playlist = LiveChannelNavigator.playlist(for: stream, in: modelContext),
-                  let target = PlayableMedia.from(stream: stream, playlist: playlist) else { return }
+                  let target = PlayableMedia.from(stream: stream, playlist: playlist, scope: selectedScope) else { return }
             onSelect(target)
         }
 

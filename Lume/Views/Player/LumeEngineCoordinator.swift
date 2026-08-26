@@ -20,7 +20,9 @@ final class SubtitleCueModel: ObservableObject {
     /// Assigns only on an actual change, so an unchanged cue repeated across
     /// ticks doesn't invalidate the leaf ten times a second.
     func update(_ newText: String?) {
-        if text != newText { text = newText }
+        if text != newText {
+            text = newText
+        }
     }
 }
 
@@ -75,6 +77,16 @@ final class LumeEngineCoordinator: NSObject, ObservableObject {
     var onRecovered: (() -> Void)?
     var startupTimeout: TimeInterval = 40
 
+    /// Silences this player without pausing it — Multi-View mutes every tile
+    /// except the one carrying the audio.
+    var isMuted = false {
+        didSet { session?.renderer.isMuted = isMuted }
+    }
+
+    /// Set before `configure` for a Multi-View tile: with several tiles playing
+    /// at once, Picture in Picture belongs to the full-screen player alone.
+    var isEmbedded = false
+
     /// The engine's video surface for the hosting representable.
     private(set) var displayLayer: LumeDisplayLayer?
 
@@ -89,6 +101,11 @@ final class LumeEngineCoordinator: NSObject, ObservableObject {
     private var startupTask: Task<Void, Never>?
     private var reportedFailure = false
     private var selectedSubtitleID: String?
+    /// The sidecar subtitle file loaded from the OpenSubtitles search, if any.
+    /// Kept so the track survives a switch to an embedded track and back — the
+    /// engine's sidecar loader is a one-shot parse, so re-selecting means
+    /// re-reading the file.
+    private var externalSubtitle: ExternalSubtitle?
 
     // MARK: Lifecycle
 
@@ -104,6 +121,7 @@ final class LumeEngineCoordinator: NSObject, ObservableObject {
         self.session = session
         displayLayer = session.renderer.displayLayer
         session.renderer.audioTimePitchAlgorithm = .timeDomain
+        session.renderer.isMuted = isMuted
 
         eventTask = Task { [events = session.events] in
             for await event in events {
@@ -124,7 +142,9 @@ final class LumeEngineCoordinator: NSObject, ObservableObject {
                 self.mediaInfo = info
                 self.publishTracks(info: info)
                 self.publishVideoInfo(info: info)
-                self.pipBridge = PictureInPictureBridge(session: session, mediaInfo: info)
+                if !self.isEmbedded {
+                    self.pipBridge = PictureInPictureBridge(session: session, mediaInfo: info)
+                }
                 // Resume position is handled by the engine via
                 // configuration.startPosition (seek-before-first-read).
                 if media.startTime > 1, !media.isLive, !info.isSeekable {
@@ -196,6 +216,10 @@ final class LumeEngineCoordinator: NSObject, ObservableObject {
         isBuffering = false
         hasStartedPlayback = false
         subtitleCues.update(nil)
+        // The sidecar lane belongs to the session that just went away; a fresh
+        // session starts with no cues, so the menu must not keep advertising it.
+        externalSubtitle = nil
+        selectedSubtitleID = nil
         isPipActive = false
     }
 
@@ -245,10 +269,16 @@ final class LumeEngineCoordinator: NSObject, ObservableObject {
 
     func selectTextTrack(id: String?) {
         selectedSubtitleID = id
+        if let external = externalSubtitle, id == Self.externalTrackID {
+            loadExternalSubtitleFile(external)
+            return
+        }
         let session = session
         let index = id.flatMap(Int32.init)
         Task { await session?.selectSubtitleTrack(index) }
-        if id == nil { subtitleCues.update(nil) }
+        if id == nil {
+            subtitleCues.update(nil)
+        }
         if let info = mediaInfo {
             publishTracks(info: info)
         }
@@ -268,6 +298,7 @@ final class LumeEngineCoordinator: NSObject, ObservableObject {
             configuration.startPosition = media.startTime
         }
         configuration.hardwareDecode = options.hardwareDecode ? .videoToolbox : .software
+        configuration.deinterlace = Self.deinterlacing(for: options)
         configuration.bufferTarget = Double(media.isLive ? options.liveBuffer : options.vodBuffer) / 1000
         configuration.videoQueueDepth = options.videoQueueDepth
         configuration.audioQueueDepth = options.audioQueueDepth
@@ -284,6 +315,22 @@ final class LumeEngineCoordinator: NSObject, ObservableObject {
             configuration.demuxer.maxAnalyzeDuration = analyzeDuration
         }
         return configuration
+    }
+
+    /// Translates the stored deinterlace choices into the engine's policy.
+    /// Kept out of `makeConfiguration` so it stays a pure mapping between two
+    /// vocabularies — Lume's settings on one side, the engine's on the other.
+    private static func deinterlacing(for options: LumeEngineOptions) -> VideoDecoder.Deinterlacing {
+        let mode: VideoDecoder.Deinterlacing.Mode = switch options.deinterlaceMode {
+        case .off: .off
+        case .auto: .auto
+        case .always: .always
+        }
+        let rate: VideoDecoder.Deinterlacing.Rate = switch options.deinterlaceRate {
+        case .field: .field
+        case .frame: .frame
+        }
+        return VideoDecoder.Deinterlacing(mode: mode, rate: rate)
     }
 
     private func handle(event: PlayerEvent) {
@@ -361,7 +408,7 @@ final class LumeEngineCoordinator: NSObject, ObservableObject {
                 isSelected: selectedAudioID.map { $0 == id } ?? fallbackSelected
             )
         }
-        textTrackOptions = info.subtitleTracks.enumerated().map { position, track in
+        var options = info.subtitleTracks.enumerated().map { position, track in
             let id = String(track.index)
             return PlayerTrackOption(
                 id: id,
@@ -369,6 +416,14 @@ final class LumeEngineCoordinator: NSObject, ObservableObject {
                 isSelected: selectedSubtitleID == id
             )
         }
+        if let external = externalSubtitle {
+            options.append(PlayerTrackOption(
+                id: Self.externalTrackID,
+                label: external.label,
+                isSelected: selectedSubtitleID == Self.externalTrackID
+            ))
+        }
+        textTrackOptions = options
     }
 
     private func publishVideoInfo(info: MediaInfo) {
@@ -382,7 +437,9 @@ final class LumeEngineCoordinator: NSObject, ObservableObject {
     }
 
     private func trackLabel(_ track: TrackInfo, fallback: String) -> String {
-        if let title = track.title, !title.isEmpty { return title }
+        if let title = track.title, !title.isEmpty {
+            return title
+        }
         if let language = track.language, !language.isEmpty {
             return Locale.current.localizedString(forLanguageCode: language) ?? language
         }
@@ -402,6 +459,45 @@ final class LumeEngineCoordinator: NSObject, ObservableObject {
         let now = session.renderer.currentTime
         guard let info = mediaInfo, now != .min else { return 0 }
         return max(0, MediaTime.seconds(now - info.startTime))
+    }
+}
+
+// MARK: - External subtitles
+
+extension LumeEngineCoordinator: ExternalSubtitleLoading {
+    /// Id for the sidecar track in the overlay's subtitle menu. Prefixed so it
+    /// can never collide with an embedded track's stream index.
+    static var externalTrackID: String {
+        "external"
+    }
+
+    func loadExternalSubtitle(_ subtitle: ExternalSubtitle) {
+        externalSubtitle = subtitle
+        selectedSubtitleID = Self.externalTrackID
+        loadExternalSubtitleFile(subtitle)
+    }
+
+    /// Hands the file to the engine, which parses it in full and replaces
+    /// whatever subtitle lane was active. On failure the track is dropped from
+    /// the menu rather than left selected but silent.
+    private func loadExternalSubtitleFile(_ subtitle: ExternalSubtitle) {
+        subtitleCues.update(nil)
+        if let info = mediaInfo {
+            publishTracks(info: info)
+        }
+        let session = session
+        Task {
+            do {
+                try await session?.loadExternalSubtitles(url: subtitle.fileURL.absoluteString)
+            } catch {
+                Logger.player.error("LumeEngine could not load external subtitles: \(LogRedaction.describe(error), privacy: .public)")
+                self.externalSubtitle = nil
+                self.selectedSubtitleID = nil
+                if let info = self.mediaInfo {
+                    self.publishTracks(info: info)
+                }
+            }
+        }
     }
 }
 

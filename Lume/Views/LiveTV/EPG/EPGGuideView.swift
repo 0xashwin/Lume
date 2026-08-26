@@ -19,6 +19,8 @@ struct EPGGuideView: View {
     let playlistPrefix: String
     let onPlay: (LiveStream) -> Void
     let onPlayCatchup: (LiveStream, EPGProgramCell) -> Void
+    /// Seeds Multi-View from a channel's long-press menu in the column.
+    let onStartMultiView: (LiveStream) -> Void
     /// tvOS: non-zero asks the guide to take real focus (a rail category was
     /// just activated); `onDidClaimFocus` resets it once claimed.
     let focusToken: Int
@@ -50,6 +52,7 @@ struct EPGGuideView: View {
         sort: ContentSortOption,
         onPlay: @escaping (LiveStream) -> Void,
         onPlayCatchup: @escaping (LiveStream, EPGProgramCell) -> Void = { _, _ in },
+        onStartMultiView: @escaping (LiveStream) -> Void = { _ in },
         focusToken: Int = 0,
         onDidClaimFocus: @escaping () -> Void = {}
     ) {
@@ -57,6 +60,7 @@ struct EPGGuideView: View {
         self.playlistPrefix = playlistPrefix
         self.onPlay = onPlay
         self.onPlayCatchup = onPlayCatchup
+        self.onStartMultiView = onStartMultiView
         self.focusToken = focusToken
         self.onDidClaimFocus = onDidClaimFocus
 
@@ -91,6 +95,7 @@ struct EPGGuideView: View {
                     dataVersion: dataVersion,
                     onPlay: onPlay,
                     onPlayCatchup: onPlayCatchup,
+                    onStartMultiView: onStartMultiView,
                     focusToken: focusToken,
                     onDidClaimFocus: onDidClaimFocus
                 )

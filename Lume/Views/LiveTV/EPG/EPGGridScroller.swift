@@ -19,6 +19,7 @@
 //  write per move instead of per-frame synchronization.
 //
 
+import SwiftData
 import SwiftUI
 
 /// Lays out the frozen panes (corner, ruler, channel column) beside the single
@@ -32,6 +33,8 @@ struct EPGGridScroller: View {
     let dataVersion: Int
     let onPlay: (LiveStream) -> Void
     let onPlayCatchup: (LiveStream, EPGProgramCell) -> Void
+    /// Seeds Multi-View from a channel's long-press menu in the column.
+    var onStartMultiView: (LiveStream) -> Void = { _ in }
     /// tvOS: non-zero asks the guide to take real focus (a rail category was
     /// just activated); `onDidClaimFocus` resets it once claimed.
     var focusToken = 0
@@ -44,6 +47,10 @@ struct EPGGridScroller: View {
     @State private var selection: EPGSelection?
     @State private var scrollRequest: EPGScrollRequest?
     #if os(tvOS)
+        /// For the channel actions' favourite toggle.
+        @Environment(\.modelContext) private var modelContext
+        /// The channel whose actions the hub's long press raised.
+        @State private var channelActions: EPGChannelRow?
         /// Whether the guide's focus strip holds real focus (driven by the
         /// UIKit strip's focus callbacks).
         @State private var surfaceFocused = false
@@ -86,7 +93,8 @@ struct EPGGridScroller: View {
                     metrics: metrics,
                     sync: sync,
                     focusedRowIndex: columnFocusRowIndex,
-                    onSelectChannel: { onPlay($0.stream) }
+                    onSelectChannel: { onPlay($0.stream) },
+                    onStartMultiView: { onStartMultiView($0.stream) }
                 )
 
                 grid
@@ -256,7 +264,7 @@ struct EPGGridScroller: View {
                     activateVirtualFocus()
                 },
                 onLongSelect: {
-                    showVirtualCellDetails()
+                    longSelectVirtualFocus()
                 },
                 railExitToken: railExitToken
             )
@@ -266,6 +274,26 @@ struct EPGGridScroller: View {
             .accessibilityLabel(Text(virtualFocusDescription))
             .onExitCommand {
                 handleMenu()
+            }
+            // The channel actions a long press offers everywhere else through a
+            // `contextMenu`. The guide has no focusable channel cell to hang one
+            // on — a single strip owns the whole grid's focus — so the hub's
+            // long press raises them itself.
+            .confirmationDialog(
+                channelActions?.name ?? "",
+                isPresented: Binding(
+                    get: { channelActions != nil },
+                    set: { if !$0 { channelActions = nil } }
+                ),
+                titleVisibility: .visible,
+                presenting: channelActions
+            ) { row in
+                Button(row.stream.isFavorite ? "Remove from Favorites" : "Add to Favorites") {
+                    LiveChannelFavorites.toggle(row.stream, in: modelContext)
+                }
+                Button("Start Multi-View") {
+                    onStartMultiView(row.stream)
+                }
             }
             // Runs on appear *and* on token change: a category activation both
             // rebuilds the guide (fresh scroller) and bumps the token, and the
@@ -488,6 +516,17 @@ struct EPGGridScroller: View {
                 playCell(rows[rowIndex], cell)
             default:
                 break
+            }
+        }
+
+        /// A long press means "tell me more about what's highlighted": the
+        /// programme's details on a cell, the channel's own actions on the hub —
+        /// which until now did nothing at all.
+        private func longSelectVirtualFocus() {
+            if case let .channel(rowIndex) = virtualFocus, rows.indices.contains(rowIndex) {
+                channelActions = rows[rowIndex]
+            } else {
+                showVirtualCellDetails()
             }
         }
 
