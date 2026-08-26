@@ -28,6 +28,12 @@
         let onClose: () -> Void
 
         @Environment(\.modelContext) private var modelContext
+        /// Keeps the browser honest about parental restrictions. It reaches here
+        /// because the player is a `fullScreenCover` presented from inside
+        /// `MainTabView`'s hierarchy, which is where the value is injected.
+        /// Without it a child could press left mid-playback and tune straight
+        /// into a locked category.
+        @Environment(\.contentRestriction) private var restriction
         /// The same sort choices the Live TV browse screen uses, so the browser
         /// mirrors the order the viewer knows from the channel list.
         @AppStorage(SortStorageKey.liveCategories)
@@ -343,7 +349,11 @@
                 predicate: #Predicate { $0.typeRaw == "live" && $0.isHidden == false }
             )
             let categories = categorySort.sort(
-                ((try? modelContext.fetch(descriptor)) ?? []).filter { $0.id.hasPrefix(playlistPrefix) }
+                LiveChannelQuery.visibleCategories(
+                    (try? modelContext.fetch(descriptor)) ?? [],
+                    playlistPrefix: playlistPrefix,
+                    restriction: restriction
+                )
             )
 
             var rail: [LiveTVSection] = []
@@ -375,7 +385,7 @@
             let sort = ContentSortOption(rawValue: contentSortRaw) ?? .playlist
             let descriptor = LiveChannelQuery.descriptor(for: scope, sort: sort)
             let fetched = (try? modelContext.fetch(descriptor)) ?? []
-            return LiveChannelQuery.scoped(fetched, scope: scope, playlistPrefix: playlistPrefix)
+            return LiveChannelQuery.scoped(fetched, scope: scope, playlistPrefix: playlistPrefix, restriction: restriction)
         }
 
         /// Swap the channel column to another section's channels. Debounced a

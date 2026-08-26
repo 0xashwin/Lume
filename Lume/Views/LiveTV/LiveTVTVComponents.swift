@@ -20,6 +20,10 @@
         let onStartMultiView: (LiveStream) -> Void
         let onPlay: (LiveStream) -> Void
         @Environment(\.modelContext) private var modelContext
+        /// Drops channels in categories locked away from a child profile — the
+        /// iOS list has always done this; this one didn't, so Favorites and
+        /// Recently Watched still surfaced them here.
+        @Environment(\.contentRestriction) private var restriction
         @Query private var streams: [LiveStream]
         /// Now/next EPG for the visible channels, resolved in one off-main fetch
         /// (see `ChannelEPGSnapshot`) instead of a per-row `@Query`.
@@ -47,7 +51,7 @@
         }
 
         private var scopedStreams: [LiveStream] {
-            LiveChannelQuery.scoped(streams, scope: scope, playlistPrefix: playlistPrefix)
+            LiveChannelQuery.scoped(streams, scope: scope, playlistPrefix: playlistPrefix, restriction: restriction)
         }
 
         var body: some View {
