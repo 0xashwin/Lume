@@ -68,34 +68,6 @@ struct ParentalMergePolicyTests {
 @MainActor
 @Suite(.serialized)
 struct CloudSyncParentalEngineTests {
-    private func makeContainer() throws -> ModelContainer {
-        let fullSchema = Schema([
-            Playlist.self, Lume.Category.self, LiveStream.self, Movie.self,
-            Series.self, Episode.self, CastMember.self, EPGListing.self, EPGSource.self,
-            SyncedPlaylist.self, UserContentState.self, SyncedEPGSource.self,
-            SyncedParentalPIN.self, SyncedCategoryRestriction.self
-        ])
-        let localConfig = ModelConfiguration(
-            "local",
-            schema: Schema([
-                Playlist.self, Lume.Category.self, LiveStream.self, Movie.self,
-                Series.self, Episode.self, CastMember.self, EPGListing.self, EPGSource.self
-            ]),
-            isStoredInMemoryOnly: true,
-            cloudKitDatabase: .none
-        )
-        let cloudConfig = ModelConfiguration(
-            "cloud",
-            schema: Schema([
-                SyncedPlaylist.self, UserContentState.self, SyncedEPGSource.self,
-                SyncedParentalPIN.self, SyncedCategoryRestriction.self
-            ]),
-            isStoredInMemoryOnly: true,
-            cloudKitDatabase: .none
-        )
-        return try ModelContainer(for: fullSchema, configurations: localConfig, cloudConfig)
-    }
-
     private func freshShadow() -> CloudSyncShadow {
         let suite = UserDefaults(suiteName: "cloudsync.parental.test.\(UUID().uuidString)")!
         return CloudSyncShadow(defaults: suite)
@@ -122,7 +94,7 @@ struct CloudSyncParentalEngineTests {
     }
 
     @Test func `a locally locked category exports a restriction record`() async throws {
-        let container = try makeContainer()
+        let container = try makeProfileTestContainer()
         let ctx = container.mainContext
         let (_, category) = try seedCategory(in: ctx, restricted: true)
 
@@ -137,7 +109,7 @@ struct CloudSyncParentalEngineTests {
     }
 
     @Test func `an unlocked category exports nothing`() async throws {
-        let container = try makeContainer()
+        let container = try makeProfileTestContainer()
         let ctx = container.mainContext
         _ = try seedCategory(in: ctx, restricted: false)
 
@@ -149,7 +121,7 @@ struct CloudSyncParentalEngineTests {
     }
 
     @Test func `a cloud restriction locks the category on this device`() async throws {
-        let container = try makeContainer()
+        let container = try makeProfileTestContainer()
         let ctx = container.mainContext
         let (_, category) = try seedCategory(in: ctx, restricted: false)
         ctx.insert(SyncedCategoryRestriction(categoryID: category.id))
@@ -163,7 +135,7 @@ struct CloudSyncParentalEngineTests {
     }
 
     @Test func `a cloud restriction stays pending until its category exists`() async throws {
-        let container = try makeContainer()
+        let container = try makeProfileTestContainer()
         let ctx = container.mainContext
         let shadow = freshShadow()
 
@@ -192,7 +164,7 @@ struct CloudSyncParentalEngineTests {
     }
 
     @Test func `unlocking a category deletes its cloud restriction`() async throws {
-        let container = try makeContainer()
+        let container = try makeProfileTestContainer()
         let ctx = container.mainContext
         let shadow = freshShadow()
         let (_, category) = try seedCategory(in: ctx, restricted: true)
@@ -211,7 +183,7 @@ struct CloudSyncParentalEngineTests {
     }
 
     @Test func `a restriction whose playlist is gone is garbage-collected`() async throws {
-        let container = try makeContainer()
+        let container = try makeProfileTestContainer()
         let ctx = container.mainContext
         // No playlist, local or cloud, owns this id.
         ctx.insert(SyncedCategoryRestriction(categoryID: "\(UUID().uuidString)-live-9"))
@@ -230,7 +202,7 @@ struct CloudSyncParentalEngineTests {
         ParentalControlsStore.clear()
         defer { ParentalControlsStore.clear() }
 
-        let container = try makeContainer()
+        let container = try makeProfileTestContainer()
         let ctx = container.mainContext
 
         // Push: a PIN set on this device reaches the cloud as a hash.
