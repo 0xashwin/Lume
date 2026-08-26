@@ -139,16 +139,74 @@ enum LiveChannelQuery {
         }
     }
 
-    /// Scopes a query's results to the active playlist. Category queries are
-    /// already isolated (category ids are playlist-prefixed), but the virtual
-    /// collections span every playlist, so they're filtered in-memory by the
-    /// shared id prefix — the same approach used throughout the app.
-    static func scoped(_ streams: [LiveStream], scope: LiveChannelScope, playlistPrefix: String) -> [LiveStream] {
+    /// Scopes a query's results to the active playlist *and* to what the current
+    /// viewer is allowed to see. Category queries are already isolated (category
+    /// ids are playlist-prefixed), but the virtual collections span every
+    /// playlist, so they're filtered in-memory by the shared id prefix — the same
+    /// approach used throughout the app.
+    ///
+    /// `restriction` is required rather than defaulted on purpose. Every channel
+    /// list in the app funnels through here, so making the compiler demand it at
+    /// each call site is what stops one surface from quietly shipping without the
+    /// parental filter — which is exactly how the tvOS list and the in-player
+    /// browser came to show a child channels from locked categories.
+    ///
+    /// The virtual collections need it most: Favorites and Recently Watched cut
+    /// across categories, so a channel favorited before its category was locked
+    /// would otherwise keep surfacing.
+    static func scoped(
+        _ streams: [LiveStream],
+        scope: LiveChannelScope,
+        playlistPrefix: String,
+        restriction: ContentRestriction
+    ) -> [LiveStream] {
         switch scope {
         case .category:
-            streams
+            streams.excludingRestricted(restriction)
         case .favorites, .recentlyWatched:
-            streams.filter { $0.id.hasPrefix(playlistPrefix) }
+            streams.filter { isVisible($0, playlistPrefix: playlistPrefix, restriction: restriction) }
+        }
+    }
+
+    /// Whether any of `streams` survives the filtering `scoped` applies to the
+    /// virtual collections. Short-circuits, so the Live TV rail can decide
+    /// whether to offer Favorites / Recently Watched without materialising the
+    /// list — and shares `isVisible` with `scoped`, so the rail can never offer
+    /// a section whose list then renders empty.
+    static func containsVisible(
+        _ streams: some Sequence<LiveStream>,
+        playlistPrefix: String,
+        restriction: ContentRestriction
+    ) -> Bool {
+        streams.contains { isVisible($0, playlistPrefix: playlistPrefix, restriction: restriction) }
+    }
+
+    /// The per-channel test the virtual collections apply: in the active
+    /// playlist, and not in a category locked away from this viewer.
+    private static func isVisible(
+        _ stream: LiveStream,
+        playlistPrefix: String,
+        restriction: ContentRestriction
+    ) -> Bool {
+        stream.id.hasPrefix(playlistPrefix) && !restriction.hides(categoryID: stream.categoryId)
+    }
+
+    /// The live categories of the active playlist this viewer may see: scoped by
+    /// playlist prefix, minus the ones hidden in Content Management, minus the
+    /// ones locked away from a child profile.
+    ///
+    /// Shared by the Live TV rail and the in-player channel browser so the two
+    /// cannot disagree about what a category rail contains — the browser used to
+    /// drop only `isHidden`, which put locked categories one remote press away
+    /// from a child mid-playback.
+    static func visibleCategories(
+        _ categories: [Category],
+        playlistPrefix: String,
+        restriction: ContentRestriction
+    ) -> [Category] {
+        categories.filter {
+            $0.type == .live && $0.id.hasPrefix(playlistPrefix)
+                && !$0.isHidden && !restriction.hides(categoryID: $0.id)
         }
     }
 }

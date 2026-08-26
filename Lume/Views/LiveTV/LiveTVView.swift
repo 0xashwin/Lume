@@ -307,7 +307,7 @@ struct LiveTVView: View {
     private var sortedCategories: [Category] {
         guard let playlistId = activePlaylist?.id else { return [] }
         let prefix = "\(playlistId.uuidString)-"
-        return categorySort.sort(categories.filter { $0.id.hasPrefix(prefix) && !restriction.hides(categoryID: $0.id) })
+        return categorySort.sort(LiveChannelQuery.visibleCategories(categories, playlistPrefix: prefix, restriction: restriction))
     }
 
     /// Whether the active playlist has any favorited / recently-watched channels,
@@ -315,15 +315,15 @@ struct LiveTVView: View {
     /// Channels in restricted categories are excluded while a child profile is
     /// active, so those collections never surface restricted content.
     private var hasFavorites: Bool {
-        !playlistPrefix.isEmpty && favoriteStreams.contains {
-            $0.id.hasPrefix(playlistPrefix) && !restriction.hides(categoryID: $0.categoryId)
-        }
+        !playlistPrefix.isEmpty && LiveChannelQuery.containsVisible(
+            favoriteStreams, playlistPrefix: playlistPrefix, restriction: restriction
+        )
     }
 
     private var hasRecents: Bool {
-        !playlistPrefix.isEmpty && recentStreams.contains {
-            $0.id.hasPrefix(playlistPrefix) && !restriction.hides(categoryID: $0.categoryId)
-        }
+        !playlistPrefix.isEmpty && LiveChannelQuery.containsVisible(
+            recentStreams, playlistPrefix: playlistPrefix, restriction: restriction
+        )
     }
 
     /// The rail's entries: the virtual collections (when non-empty) pinned above
@@ -445,8 +445,7 @@ struct ChannelsList: View {
     }
 
     private var scopedStreams: [LiveStream] {
-        LiveChannelQuery.scoped(streams, scope: scope, playlistPrefix: playlistPrefix)
-            .excludingRestricted(restriction)
+        LiveChannelQuery.scoped(streams, scope: scope, playlistPrefix: playlistPrefix, restriction: restriction)
     }
 
     /// Clears a channel's watch timestamp so it drops out of the Recently
