@@ -58,6 +58,11 @@ final class VLCPlayerCoordinator: NSObject, ObservableObject {
         }
     }
 
+    /// Set before `configure` for a Multi-View tile: with several tiles playing
+    /// at once, Picture in Picture belongs to the full-screen player alone. The
+    /// rest of the embedded surface lives in `VLCPlayerCoordinator+MultiView`.
+    var isEmbedded = false
+
     var onTime: ((TimeInterval) -> Void)?
     var onDuration: ((TimeInterval) -> Void)?
 
@@ -544,9 +549,11 @@ extension VLCPlayerCoordinator: VLCDrawable, VLCPictureInPictureDrawable, VLCPic
         hostView?.bounds ?? .zero
     }
 
-    /// VLCPictureInPictureDrawable
+    /// VLCPictureInPictureDrawable. Returning `nil` is how a Multi-View tile
+    /// opts out: on iOS/tvOS the coordinator has to be the drawable for VLC to
+    /// render at all, so PiP is declined here rather than by withholding it.
     func mediaController() -> (any VLCPictureInPictureMediaControlling)? {
-        self
+        isEmbedded ? nil : self
     }
 
     func pictureInPictureReady() -> ((any VLCPictureInPictureWindowControlling)?) -> Void {

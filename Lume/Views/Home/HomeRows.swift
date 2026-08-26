@@ -7,6 +7,7 @@
 //  file focused on data loading and screen composition.
 //
 
+import SwiftData
 import SwiftUI
 
 // MARK: - Row
@@ -21,6 +22,8 @@ struct HomeRow: View {
     /// When set, each card gains up/down vote actions. Only the "For You" row
     /// passes this; the others leave it nil.
     var onVote: ((HomeMediaItem, RecommendationVote) -> Void)?
+    /// Seeds Multi-View from a channel card's long-press menu.
+    var onStartMultiView: ((LiveStream) -> Void)?
     var animationNamespace: Namespace.ID?
 
     var body: some View {
@@ -34,7 +37,14 @@ struct HomeRow: View {
             ScrollView(.horizontal, showsIndicators: false) {
                 LazyHStack(spacing: PosterCardMetrics.railSpacing) {
                     ForEach(items) { item in
-                        HomeItemCell(item: item, onPlayLive: onPlayLive, onRemove: onRemove, onVote: onVote, animationNamespace: animationNamespace)
+                        HomeItemCell(
+                            item: item,
+                            onPlayLive: onPlayLive,
+                            onRemove: onRemove,
+                            onVote: onVote,
+                            onStartMultiView: onStartMultiView,
+                            animationNamespace: animationNamespace
+                        )
                     }
                 }
                 .padding(.horizontal)
@@ -51,7 +61,10 @@ private struct HomeItemCell: View {
     let onPlayLive: (LiveStream) -> Void
     var onRemove: ((HomeMediaItem) -> Void)?
     var onVote: ((HomeMediaItem, RecommendationVote) -> Void)?
+    var onStartMultiView: ((LiveStream) -> Void)?
     var animationNamespace: Namespace.ID?
+    /// For the channel menu's favourite toggle.
+    @Environment(\.modelContext) private var modelContext
 
     var body: some View {
         Group {
@@ -77,8 +90,37 @@ private struct HomeItemCell: View {
                 .posterCardButtonStyle()
             }
         }
-        .recentlyWatchedRemoveMenu(onRemove.map { action in { action(item) } })
+        .modifier(HomeItemMenu(
+            item: item,
+            onRemove: onRemove,
+            onStartMultiView: onStartMultiView,
+            onToggleFavorite: { stream in LiveChannelFavorites.toggle(stream, in: modelContext) }
+        ))
         .recommendationVoteMenu(onVote.map { action in { vote in action(item, vote) } })
+    }
+}
+
+/// The card's long-press menu. A channel gets the full channel menu — the same
+/// one its row in Live TV carries — while a movie or series keeps the remove
+/// action alone. One modifier rather than two stacked: only the outermost
+/// `contextMenu` on a view survives.
+private struct HomeItemMenu: ViewModifier {
+    let item: HomeMediaItem
+    let onRemove: ((HomeMediaItem) -> Void)?
+    let onStartMultiView: ((LiveStream) -> Void)?
+    let onToggleFavorite: (LiveStream) -> Void
+
+    func body(content: Content) -> some View {
+        if case let .live(stream) = item {
+            content.liveChannelMenu(
+                isFavorite: stream.isFavorite,
+                onToggleFavorite: { onToggleFavorite(stream) },
+                onStartMultiView: onStartMultiView.map { action in { action(stream) } },
+                onRemoveFromRecents: onRemove.map { action in { action(item) } }
+            )
+        } else {
+            content.recentlyWatchedRemoveMenu(onRemove.map { action in { action(item) } })
+        }
     }
 }
 

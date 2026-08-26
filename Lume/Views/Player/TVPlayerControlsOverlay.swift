@@ -37,10 +37,18 @@
         /// the host so channel switching works identically whether the controls
         /// are showing or hidden.
         var onSwitchChannel: (MoveCommandDirection) -> Void
+        /// Raises the OpenSubtitles browser. `nil` when the search isn't
+        /// available for this stream, which also drops the menu entry.
+        var onSearchSubtitles: (() -> Void)?
 
         /// `internal` (not `private`) so the derived-data extension in
         /// `TVPlayerControlsOverlay+Data.swift` can read this view's state.
         @Environment(\.modelContext) var modelContext
+        /// Parental filter for the Recent channels rail. That rail is a channel
+        /// list the viewer can tune from, so it owes the same filtering the Live
+        /// TV lists do — a channel watched before its category was locked must
+        /// not stay one tab away.
+        @Environment(\.contentRestriction) var restriction
 
         // Resolved SwiftData backing for the active stream.
         @State var episode: Episode?
@@ -385,7 +393,7 @@
         @ViewBuilder
         private var subtitleMenu: some View {
             let tracks = coordinator.textTrackOptions
-            if !tracks.isEmpty {
+            if !tracks.isEmpty || onSearchSubtitles != nil {
                 Menu {
                     Button {
                         coordinator.selectTextTrack(id: nil)
@@ -407,6 +415,14 @@
                             } else {
                                 Text(track.label)
                             }
+                        }
+                    }
+                    if let onSearchSubtitles {
+                        Button {
+                            onSearchSubtitles()
+                            onResetHideTimer()
+                        } label: {
+                            Label("Search Online…", systemImage: "magnifyingglass")
                         }
                     }
                 } label: {

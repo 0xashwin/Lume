@@ -36,3 +36,35 @@ func loadExampleJSON<T: Decodable>(_ filename: String, filePath: String = #fileP
     let decoder = JSONDecoder()
     return try decoder.decode(T.self, from: data)
 }
+
+/// Two-configuration in-memory container: the local catalog plus the CloudKit
+/// mirror's models, matching the app's split containers.
+///
+/// Both configurations pin `cloudKitDatabase: .none`: the catalog uses
+/// `@Attribute(.unique)`, which CloudKit forbids, so the default `.automatic`
+/// fails the load with `loadIssueModelContainer` on an entitled simulator host.
+func makeProfileTestContainer() throws -> ModelContainer {
+    let catalogModels: [any PersistentModel.Type] = [
+        Playlist.self, Lume.Category.self, LiveStream.self, Movie.self,
+        Series.self, Episode.self, CastMember.self, EPGListing.self, EPGSource.self
+    ]
+    let cloudModels: [any PersistentModel.Type] = [
+        SyncedPlaylist.self, UserContentState.self, UserProfile.self, SyncedEPGSource.self
+    ]
+    let localConfig = ModelConfiguration(
+        "local",
+        schema: Schema(catalogModels),
+        isStoredInMemoryOnly: true,
+        cloudKitDatabase: .none
+    )
+    let cloudConfig = ModelConfiguration(
+        "cloud",
+        schema: Schema(cloudModels),
+        isStoredInMemoryOnly: true,
+        cloudKitDatabase: .none
+    )
+    return try ModelContainer(
+        for: Schema(catalogModels + cloudModels),
+        configurations: localConfig, cloudConfig
+    )
+}

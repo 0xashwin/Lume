@@ -26,8 +26,9 @@ struct KSPlayerEngineView: View {
     /// end-of-episode Next Up affordances; `nil` when there is nothing to play
     /// next.
     var nextUpMedia: PlayableMedia?
-    /// Intro / recap windows for the active episode (from IntroDB), driving the
-    /// in-player Skip Intro button. `nil` when there is nothing to skip.
+    /// Intro / recap / outro windows for the active episode (from IntroDB). The
+    /// openers drive the in-player Skip Intro button; the outro sets when the
+    /// Next Episode button arms. `nil` when IntroDB knows nothing about it.
     var skipSegments: IntroSegments?
     /// When true, an initial-load failure reports to the host via
     /// `onPlaybackFailed` (which decides what to try next) instead of raising
@@ -90,6 +91,10 @@ struct KSPlayerEngineView: View {
     /// disarmed). See `handleState`.
     @State var stallWatchdog: Task<Void, Never>?
     @State private var isControlsVisible = true
+    /// Presents the OpenSubtitles browser. Held here rather than in the controls
+    /// overlay: the overlay is removed when the controls auto-hide, which would
+    /// take a sheet anchored there down with it mid-search.
+    @State var isSearchingSubtitles = false
     @State var isSeeking = false
     @State private var seekPosition: TimeInterval = 0
     /// PiP state and its observer task are `internal` (not `private`) so the
@@ -223,21 +228,13 @@ struct KSPlayerEngineView: View {
                         onResetHideTimer: { resetHideTimer() },
                         onSelectMedia: { onSelectMedia?($0) },
                         onPanelOpenChange: { setPanelOpen($0) },
-                        onSwitchChannel: { switchLiveChannel($0) }
+                        onSwitchChannel: { switchLiveChannel($0) },
+                        onSearchSubtitles: subtitleSearchAction
                     )
                     .transition(.opacity.animation(.easeInOut(duration: 0.2)))
                 }
 
-                if let nextUpMedia {
-                    PlayerNextUpOverlay(
-                        nextMedia: nextUpMedia,
-                        clock: clock,
-                        controlsVisible: isControlsVisible,
-                        onPlayNext: { onSelectMedia?($0) }
-                    )
-                }
-
-                skipIntroOverlay(controlsVisible: isControlsVisible) { time in
+                episodeOverlays(controlsVisible: isControlsVisible) { time in
                     engine.seek(to: time)
                     // The skip button held focus; hand it back to the tap-catcher
                     // so the remote keeps summoning controls.
@@ -262,6 +259,7 @@ struct KSPlayerEngineView: View {
                     .transition(.opacity)
                 }
             }
+            .subtitleSearch(isPresented: $isSearchingSubtitles, media: media, onPick: applyExternalSubtitle)
             .preferredColorScheme(.dark)
             .onAppear {
                 engine.attach(coordinator: coordinator)
@@ -420,16 +418,7 @@ struct KSPlayerEngineView: View {
                         .transition(.opacity.animation(.easeInOut(duration: 0.2)))
                 }
 
-                if let nextUpMedia {
-                    PlayerNextUpOverlay(
-                        nextMedia: nextUpMedia,
-                        clock: clock,
-                        controlsVisible: isControlsVisible,
-                        onPlayNext: { onSelectMedia?($0) }
-                    )
-                }
-
-                skipIntroOverlay(controlsVisible: isControlsVisible) { coordinator.seek(time: $0) }
+                episodeOverlays(controlsVisible: isControlsVisible) { coordinator.seek(time: $0) }
 
                 if isBuffering {
                     PlayerLoadingIndicator(title: hasStartedPlayback ? nil : media.title)
@@ -445,6 +434,7 @@ struct KSPlayerEngineView: View {
                     .transition(.opacity)
                 }
             }
+            .subtitleSearch(isPresented: $isSearchingSubtitles, media: media, onPick: applyExternalSubtitle)
             .preferredColorScheme(.dark)
             .onAppear {
                 scheduleHide()
@@ -506,7 +496,8 @@ struct KSPlayerEngineView: View {
                 onClose: { closePlayer() },
                 onTogglePlay: { togglePlay() },
                 onResetHideTimer: { resetHideTimer() },
-                onScheduleHide: { scheduleHide() }
+                onScheduleHide: { scheduleHide() },
+                onSearchSubtitles: subtitleSearchAction
             )
         }
 

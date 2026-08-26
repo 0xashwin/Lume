@@ -12,6 +12,7 @@ struct SettingsView: View {
     /// Not `private`: read by the SettingsView+Playlists extension (separate file).
     @State var showingAddPlaylist = false
     @State private var trakt = TraktService.shared
+    @State private var openSubtitles = OpenSubtitlesService.shared
     /// Premium entitlement + paywall presentation. Not `private`: read by the
     /// SettingsView+Playlists / +TVComponents extensions (separate files).
     @State var premium = PremiumManager.shared
@@ -29,6 +30,8 @@ struct SettingsView: View {
     @AppStorage(PlayerSettings.engineKey) var engineRaw: String = PlayerEngineKind.defaultValue.rawValue
     @AppStorage(PlayerSettings.enginePriorityKey) var enginePriorityRaw: String = ""
     @AppStorage(PlayerSettings.externalPlayerKey) var externalPlayerRaw: String = ""
+    @AppStorage(PlayerSettings.externalPlayerScopeKey)
+    var externalPlayerScopeRaw: String = ExternalPlayerScope.default.rawValue
     @AppStorage(PlayerSettings.Playback.autoPlayNextKey)
     var autoPlayNext = PlayerSettings.Playback.autoPlayNextDefault
     @AppStorage(PlayerSettings.Playback.showNextEpisodeButtonKey)
@@ -53,9 +56,10 @@ struct SettingsView: View {
 
     #if os(tvOS)
         /// The globally-selected playlist, shared with the content tabs. tvOS has
-        /// no toolbar switcher, so the Playlists settings pane is where the active
-        /// playlist is chosen. Not `private`: read by the SettingsView+Playlists
-        /// extension (separate file).
+        /// no toolbar switcher: this pane is the management surface where the
+        /// active playlist is chosen, and the Play/Pause quick-switch overlay the
+        /// fast path that writes the same key. Not `private`: read by the
+        /// SettingsView+Playlists extension (separate file).
         @AppStorage(PlaylistSelectionStore.key) var selectedPlaylistID: String = ""
         /// Routes the switch through the blocking overlay (see PlaylistSwitchModel).
         /// Not `private`: read by the SettingsView+Playlists extension.
@@ -120,6 +124,7 @@ struct SettingsView: View {
                     playbackSection
                     downloadsSection
                     playerSection
+                    externalPlayerSection
                     storageSection
                     supportSection
                     aboutSection
@@ -281,10 +286,26 @@ struct SettingsView: View {
                         }
                     }
                 }
+
+                if openSubtitles.isConfigured {
+                    NavigationLink {
+                        OpenSubtitlesIntegrationView()
+                    } label: {
+                        HStack {
+                            Label("OpenSubtitles", systemImage: "captions.bubble")
+                            Spacer()
+                            if let username = openSubtitles.username {
+                                Text(username)
+                                    .font(.caption)
+                                    .foregroundStyle(.secondary)
+                            }
+                        }
+                    }
+                }
             } header: {
                 Text("Integrations")
             } footer: {
-                Text("Sync watched movies and episodes, and show your Trakt watchlist on Home.")
+                Text("Sync watched movies and episodes, show your Trakt watchlist on Home, and download subtitles for anything that ships without them.")
             }
         }
 
@@ -351,7 +372,18 @@ struct SettingsView: View {
                 NavigationLink("VLCKit Options") { VLCEngineSettingsScreen() }
                 NavigationLink("KSPlayer Options") { KSEngineSettingsScreen() }
                 NavigationLink("Lume Engine Options") { LumeEngineSettingsScreen() }
+            } header: {
+                Text("Player")
+            } footer: {
+                Text("Lume plays each stream with your preferred engine and falls back to the next if it can't be played.")
+            }
+        }
 
+        /// Hand-off to a third-party player. Its own group — this bypasses the
+        /// engines above rather than configuring them — but headerless, so it
+        /// still reads as part of the Player block.
+        private var externalPlayerSection: some View {
+            Section {
                 Picker("External Player", selection: $externalPlayerRaw) {
                     Text("Off").tag("")
                     ForEach(ExternalPlayer.allCases) { player in
@@ -359,10 +391,20 @@ struct SettingsView: View {
                     }
                 }
                 .pickerStyle(.menu)
-            } header: {
-                Text("Player")
+
+                // Only meaningful once a player is selected — some players
+                // (Infuse, for one) handle VOD but not live streams.
+                if ExternalPlayer(rawValue: externalPlayerRaw) != nil {
+                    Picker("Use For", selection: $externalPlayerScopeRaw) {
+                        ForEach(ExternalPlayerScope.allCases) { scope in
+                            Text(scope.displayName).tag(scope.rawValue)
+                        }
+                    }
+                    .pickerStyle(.menu)
+                }
             } footer: {
-                Text("Lume plays each stream with your preferred engine and falls back to the next if it can't be played. Streams open in the selected external app instead, when one is installed.")
+                // swiftlint:disable:next line_length
+                Text("Streams open in the selected external app instead of Lume's player, when it is installed. Some apps — Infuse among them — play movies and series but no live channels, so you can limit the hand-off to one or the other.")
             }
         }
 
@@ -465,9 +507,11 @@ struct SettingsView: View {
         }
 
         /// The sidebar categories. Integrations is hidden unless the build has
-        /// Trakt credentials configured.
+        /// credentials for at least one of them.
         private var availableCategories: [SettingsCategory] {
-            SettingsCategory.allCases.filter { $0 != .integrations || trakt.isConfigured }
+            SettingsCategory.allCases.filter {
+                $0 != .integrations || trakt.isConfigured || openSubtitles.isConfigured
+            }
         }
 
         /// Content Management brings its own scroll/background, so it replaces the
@@ -522,7 +566,14 @@ struct SettingsView: View {
         }
 
         private var tvIntegrationsDetail: some View {
-            TVTraktIntegrationView()
+            VStack(alignment: .leading, spacing: 36) {
+                if trakt.isConfigured {
+                    TVTraktIntegrationView()
+                }
+                if openSubtitles.isConfigured {
+                    TVOpenSubtitlesIntegrationView()
+                }
+            }
         }
 
         private var tvSearchDetail: some View {

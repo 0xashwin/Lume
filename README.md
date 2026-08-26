@@ -123,6 +123,7 @@ adapted per size class
 - Full **program guide** with a scrollable timeline
 - **Custom EPG sources**: add external XMLTV feeds, refresh the guide on its own schedule, and sync manually — managed separately from playlist content
 - Catchup / time-shift support
+- **Multi-View**: watch up to four channels at once in a 2 / 3 / 2×2 grid, with the audio on whichever tile you pick — channels can come from different playlists, so a provider limited to one concurrent connection is no obstacle
 - Channel zapping with recently-watched history
 - **In-player channel browser** on tvOS (left-press overlay with category/channel grid)
 - Favorite channels and per-channel management
@@ -154,12 +155,13 @@ adapted per size class
 - Auto-mark-as-watched at 90% completion
 - **Next Up** overlay with auto-play for series episodes
 - **Skip Intro / Recap** overlay during playback, powered by IntroDB skip windows
+- **OpenSubtitles** search from the player's subtitle menu — find and load an external subtitle track for any movie or episode whose stream ships without one
 - Optional **Trakt** scrobbling — plus one-tap import of your existing Trakt watched history — and **TMDB** metadata enrichment
 - **Clear watch history** from Settings to reset progress, watched markers, and last-watched dates across all content
 
 #### 👤 Profiles
 - Multiple **user profiles**, each with its own watch history, progress, and favorites
-- Switch profiles from the top-left of Home (iOS / macOS) or in Settings (tvOS)
+- Switch profiles from the top-left of Home (iOS / macOS), on tvOS with the Siri Remote's **Play/Pause** button, which opens a quick-switch overlay for playlists and profiles, or from Settings on visionOS — Settings stays the place to add, edit and delete them
 - Profiles and their state **sync across your devices** via iCloud
 - **Parental controls**: mark profiles as child profiles, restrict categories (hidden from browsing and search), and protect them with a PIN required to leave a child profile or open Content Management
 
@@ -203,7 +205,7 @@ available on the platform).
 | **VLCKit** | VLCKit 4 (libVLC) | Maximum compatibility | Virtually any format/codec, hardware-accelerated 4K HDR, Picture in Picture, broadest IPTV support |
 | **KSPlayer** | FFmpeg (FFmpegKit) | Wide IPTV support | Handles most formats common in IPTV streams; configurable decoder (FFmpeg / VideoToolbox) |
 | **AVPlayer** | AVFoundation | HLS & MP4 | Native Apple player with **custom unified overlay** matching the other engines |
-| **Lume Engine** *(beta)* | [LumeEngine](https://github.com/bilipp/LumeEngine) (FFmpeg 8) | Long-running IPTV streams | Our own engine, built from scratch for stability on live streams: Apple-owned A/V sync, supervised pipelines, MPEG-TS wraparound handled at the demux boundary |
+| **Lume Engine** *(beta)* | [LumeEngine](https://github.com/bilipp/LumeEngine) (FFmpeg 8) | Long-running IPTV streams | Our own engine, built from scratch for stability on live streams: Apple-owned A/V sync, supervised pipelines, MPEG-TS wraparound handled at the demux boundary, deinterlacing that keeps hardware decoding |
 
 **Lume Engine** is opt-in: it sits at the *end* of the priority list until you move it
 up in **Settings**, so it is never silently promoted while it is in beta. It is
@@ -213,9 +215,11 @@ developed in the open in its own repository —
 failure modes it is built to make structurally impossible.
 
 Prefer a third-party app? Lume can hand streams off to an **external player** —
-**Infuse** or **VLC** — via their deep-link APIs, selectable in **Settings**.
-Downloads always play in Lume, and playback falls back to the built-in player when
-the selected app is not installed.
+**Infuse**, **VLC** or **VidHub** — via their deep-link APIs, selectable in **Settings**.
+Because not every app handles every stream — Infuse plays movies and series but no
+live channels — the hand-off covers **movies & series** by default, and can be
+switched to **live TV** or to both. Downloads always play in Lume, and playback falls
+back to the built-in player when the selected app is not installed.
 
 Send playback to the TV with **AirPlay** — a route picker sits in the player overlay.
 Full-screen video is delivered through Apple's AVPlayer: on iOS and iPadOS, picking a
@@ -241,6 +245,7 @@ Lume follows a clean, layered SwiftUI architecture:
 │    ├─ TMDBClient          metadata / artwork enrichment   │
 │    ├─ MDBListClient       aggregator ratings (IMDb, RT, …)│
 │    ├─ TraktService        OAuth device flow + scrobbling  │
+│    ├─ OpenSubtitlesClient external subtitle search        │
 │    ├─ ContentSyncManager  background catalog indexing     │
 │    └─ ImagePipeline        cached async image loading     │
 ├─────────────────────────────────────────────────────────┤
@@ -256,7 +261,7 @@ Lume follows a clean, layered SwiftUI architecture:
 - **Persistence** — SwiftData (8 model types, local catalog index)
 - **Playback** — VLCKit · KSPlayer (FFmpegKit) · AVPlayer · LumeEngine (FFmpeg 8, beta)
 - **Networking** — `URLSession` with typed endpoints, retry/backoff, and error classification
-- **Integrations** — TMDB (metadata), MDBList (ratings), Trakt (device OAuth + scrobbling)
+- **Integrations** — TMDB (metadata), MDBList (ratings), Trakt (device OAuth + scrobbling), OpenSubtitles (external subtitle tracks)
 - **Localization** — 9 languages via String Catalogs (English, German, French, Spanish, Italian, Portuguese, Japanese, Korean, Simplified Chinese)
 
 **Dependencies** (Swift Package Manager)
@@ -278,7 +283,7 @@ Lume/
 ├── ContentView.swift        Root view / login gate
 ├── Models/                  SwiftData models & sort options
 ├── Services/
-│   ├── Network/             Xtream, M3U, TMDB, MDBList, Trakt clients
+│   ├── Network/             Xtream, M3U, TMDB, MDBList, Trakt, OpenSubtitles clients
 │   ├── Sync/                Content sync manager & progress
 │   ├── Player/              Playable media, settings, history, NextUp
 │   └── Images/              Image cache & pipeline
@@ -311,6 +316,7 @@ The easiest way to use Lume is to [**download it from the App Store**](https://a
 - *(Optional)* a [Trakt](https://trakt.tv/oauth/applications) application for scrobbling
 - *(Optional)* an [MDBList](https://mdblist.com/preferences/) API key for IMDb / Rotten Tomatoes / Metacritic / Trakt / Letterboxd ratings
 - *(Optional)* an [IntroDB](https://introdb.app) API key for intro / recap skip windows
+- *(Optional)* an [OpenSubtitles](https://www.opensubtitles.com/consumers) consumer API key for in-player subtitle search
 
 ### Build & run
 
@@ -352,7 +358,7 @@ simulator-only build. Don't commit these personal signing changes back to the re
 
 ## Configuration
 
-Optional integrations (TMDB, MDBList, IntroDB, and Trakt) are configured through a
+Optional integrations (TMDB, MDBList, IntroDB, OpenSubtitles, and Trakt) are configured through a
 repo-root `.env` file. The `Scripts/inject-env.sh` build phase reads it and injects the
 values into the built app's `Info.plist` — keeping secrets out of source control. `.env`
 is gitignored, and if it is missing the dependent features simply degrade gracefully
@@ -374,6 +380,9 @@ MDBLIST_API_KEY=your_mdblist_api_key
 # IntroDB — intro / recap skip windows (read access works unauthenticated)
 INTRO_DB_API_KEY=your_introdb_api_key
 
+# OpenSubtitles — in-player subtitle search
+OPENSUBTITLES_API_KEY=your_opensubtitles_api_key
+
 # Trakt — watch scrobbling (device OAuth flow)
 TRAKT_CLIENT_ID=your_trakt_client_id
 TRAKT_CLIENT_SECRET=your_trakt_client_secret
@@ -384,6 +393,12 @@ Every key is optional — Lume builds and runs fine with an empty `.env` or none
 Trakt uses the **device OAuth flow** (no embedded web view), which works on tvOS as
 well as iOS/macOS. Tokens are stored securely in the Keychain.
 
+OpenSubtitles needs both halves: the API key above identifies the build, while
+*downloading* a subtitle needs a free [opensubtitles.com](https://www.opensubtitles.com)
+account signed in under Settings → Integrations → OpenSubtitles (the daily download
+allowance is per account). Searching works signed out. That session token is stored in
+the Keychain too.
+
 ---
 
 ## Testing
@@ -393,7 +408,7 @@ and UI automation (**XCTest**).
 
 | Target | Framework | Coverage |
 |---|---|---|
-| `LumeTests` | Swift Testing | DTO decoding, URL building, API client & retry, models, sort options, sync progress & content sync, playable media, player settings, Trakt token store, content organizing, **M3U parser/classifier/sync**, **MDBList client**, **Next Episode resolver**, **Gzip file streaming** |
+| `LumeTests` | Swift Testing | DTO decoding, URL building, API client & retry, models, sort options, sync progress & content sync, playable media, player settings, Trakt token store, content organizing, **M3U parser/classifier/sync**, **MDBList client**, **OpenSubtitles client & subtitle-search query**, **Next Episode resolver**, **Gzip file streaming** |
 | `LumeUITests` | XCTest | App launch & performance, login flow, tab navigation, playlist detail, settings, **M3U playlist import flow** |
 
 Run the full suite:

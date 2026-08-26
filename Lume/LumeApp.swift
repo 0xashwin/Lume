@@ -27,6 +27,9 @@ struct LumeApp: App {
     @State private var profileManager: ProfileManager
     @State private var playlistSwitch = PlaylistSwitchModel()
     @State private var parentalControls: ParentalControls
+    #if os(iOS)
+        @UIApplicationDelegateAdaptor(LumeAppDelegate.self) private var appDelegate
+    #endif
 
     init() {
         let (catalog, cloud) = Self.makeModelContainers()
@@ -202,6 +205,10 @@ struct LumeApp: App {
                     // can persist download state from its delegate callbacks.
                     #if !os(tvOS)
                         DownloadManager.shared.configure(container: catalogContainer)
+                        // Re-adopt transfers the background session kept running
+                        // while the app was away, and settle any the system
+                        // dropped, before the Downloads UI reads their status.
+                        await DownloadManager.shared.restoreBackgroundSession()
                     #endif
 
                     // Commit any watch progress that a previous session buffered
@@ -221,6 +228,11 @@ struct LumeApp: App {
                     // the token if stale) so watched-sync and the watchlist work
                     // from launch.
                     await TraktService.shared.restore()
+
+                    // Restore the OpenSubtitles session (a keychain read, no
+                    // network) so the in-player subtitle search can download
+                    // without sending the viewer to Settings first.
+                    OpenSubtitlesService.shared.restore()
 
                     // Resolve the active profile and claim any pre-profiles
                     // content state before the first sync, so the catalog the
@@ -270,6 +282,19 @@ struct LumeApp: App {
                     FullScreenPlayerView(media: media)
                         .frame(minWidth: 800, minHeight: 450)
                 }
+            }
+            .modelContainer(catalogContainer)
+            .environment(TraktService.shared)
+            .environment(PremiumManager.shared)
+            .windowStyle(.hiddenTitleBar)
+            .windowResizability(.contentMinSize)
+
+            // A single window rather than a `WindowGroup` per grid: Multi-View
+            // owns its own channel picker, so there is nothing to open it "for",
+            // and a second grid would just contend for the same decoders.
+            Window("Multi-View", id: "multiview") {
+                MultiViewScreen()
+                    .frame(minWidth: 900, minHeight: 520)
             }
             .modelContainer(catalogContainer)
             .environment(TraktService.shared)
