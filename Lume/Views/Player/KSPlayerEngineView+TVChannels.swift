@@ -57,7 +57,9 @@
                     for: media, offset: direction == .up ? 1 : -1, sort: sort, restriction: restriction, in: modelContext
                 )
             case .right:
-                target = LiveChannelHistory.recallMedia(in: modelContext, scope: media.channelScope)
+                target = LiveChannelHistory.recallMedia(
+                    in: modelContext, scope: media.channelScope, restriction: restriction
+                )
             default:
                 return
             }

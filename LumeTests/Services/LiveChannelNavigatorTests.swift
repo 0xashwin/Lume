@@ -294,10 +294,25 @@ struct LiveChannelNavigatorTests {
         ) == nil)
     }
 
+    @Test func `surfing off a hidden channel skips the other hidden ones`() throws {
+        // Bravo is playing but hidden, so it has no place in any browse list and
+        // surfing falls back to its category. That fallback re-admits Bravo — it
+        // needs a position to move off — but not Charlie, which is hidden too.
+        let (context, playlist) = try makeWorld(streams: threeChannels)
+        try hide(streamId: 101, playlist: playlist, in: context) // Bravo, playing
+        try hide(streamId: 102, playlist: playlist, in: context) // Charlie
+        let bravo = try media(forStreamId: 101, playlist: playlist, in: context)
+
+        let next = LiveChannelNavigator.adjacentMedia(
+            for: bravo, offset: 1, sort: .playlist, restriction: ContentRestriction(), in: context
+        )
+        #expect(next?.contentRef == liveRef(100, playlist)) // Alpha, wrapping past hidden Charlie
+    }
+
     @Test func `a hidden channel in a locked category surfs nowhere`() throws {
-        // The unfiltered-category fallback keeps a hidden channel from
-        // dead-ending, but it must not become a doorway: a child who somehow
-        // landed on one still can't rock into the rest of a locked category.
+        // The category fallback keeps a hidden channel from dead-ending, but it
+        // must not become a doorway: a child who somehow landed on one still
+        // can't rock into the rest of a locked category.
         let (context, playlist) = try makeWorld(streams: threeChannels)
         try hide(streamId: 101, playlist: playlist, in: context)
         let bravo = try media(forStreamId: 101, playlist: playlist, in: context)

@@ -85,7 +85,8 @@ struct VLCPlayerEngineView: View {
         private var liveContentSortRaw: String = ContentSortOption.playlist.rawValue
         @Environment(\.modelContext) private var modelContext
         /// Keeps channel surfing inside what this viewer may watch — a child
-        /// profile must not be able to rock up/down into a locked category.
+        /// profile must not be able to rock up/down, or recall the last channel,
+        /// into a category a parent locked or the user hid.
         @Environment(\.contentRestriction) private var restriction
     #endif
 
@@ -345,7 +346,9 @@ struct VLCPlayerEngineView: View {
                     for: media, offset: direction == .up ? 1 : -1, sort: sort, restriction: restriction, in: modelContext
                 )
             case .right:
-                target = LiveChannelHistory.recallMedia(in: modelContext, scope: media.channelScope)
+                target = LiveChannelHistory.recallMedia(
+                    in: modelContext, scope: media.channelScope, restriction: restriction
+                )
             default:
                 return
             }

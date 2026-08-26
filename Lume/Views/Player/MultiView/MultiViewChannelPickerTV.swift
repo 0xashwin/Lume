@@ -252,8 +252,11 @@
                 predicate: #Predicate { $0.typeRaw == "live" && $0.isHidden == false }
             )
             let categories = sort.sort(
-                ((try? modelContext.fetch(descriptor)) ?? [])
-                    .filter { $0.id.hasPrefix(prefix) && !restriction.hides(categoryID: $0.id) }
+                LiveChannelQuery.visibleCategories(
+                    (try? modelContext.fetch(descriptor)) ?? [],
+                    playlistPrefix: prefix,
+                    restriction: restriction
+                )
             )
 
             var rail: [LiveTVSection] = []
