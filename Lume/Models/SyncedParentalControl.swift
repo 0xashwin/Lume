@@ -42,8 +42,9 @@ final class SyncedParentalPIN {
     /// singletons; correctness rests on the shadow baseline, not this clock.
     var updatedAt: Date = Date()
 
+    /// `id` is left to its default — the singleton id is the only value it ever
+    /// takes, and assigning it here again just says the same thing twice.
     init(pinHash: String, updatedAt: Date = Date()) {
-        id = Self.singletonID
         self.pinHash = pinHash
         self.updatedAt = updatedAt
     }

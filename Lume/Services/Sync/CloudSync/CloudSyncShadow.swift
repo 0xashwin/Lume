@@ -141,16 +141,20 @@ final nonisolated class CloudSyncShadow {
     /// merge, never data loss).
     func reset() {
         guard !playlists.isEmpty || !content.isEmpty || !epgSources.isEmpty
-            || !categoryRestrictions.isEmpty || parentalPIN != nil else { return }
+            || !categoryRestrictions.isEmpty else { return }
         playlists.removeAll()
         content.removeAll()
         epgSources.removeAll()
-        // Category restrictions are catalog-derived, so a vanished catalog makes
-        // their baseline as stale as the content one. The PIN isn't, but clearing
-        // it is still right: with no baseline the next pass reads the surviving
-        // cloud PIN as a value to pull back, never as a local deletion to push.
+        // Category restrictions are catalog-derived (their local side is
+        // `Category.isRestricted`), so a vanished catalog makes their baseline as
+        // stale as the content one.
         categoryRestrictions.removeAll()
-        parentalPIN = nil
+        // The PIN baseline is deliberately *kept*. Its local side is the
+        // keychain, which a lost `default.store` doesn't touch, so the baseline
+        // still describes reality. Dropping it would turn "the parent removed the
+        // PIN on another device" (local hash, cloud empty, no baseline) into a
+        // local edit to push — re-arming the very PIN the shadow exists to let
+        // us delete.
         isDirty = true
     }
 

@@ -26,6 +26,7 @@
 //
 
 import Foundation
+import OSLog
 import SwiftData
 
 extension CloudSyncEngine {
@@ -41,14 +42,39 @@ extension CloudSyncEngine {
     // MARK: - PIN
 
     private func reconcileParentalPIN(into result: inout CloudSyncReconcileResult) throws {
+        let local: ParentalPINValues?
+        switch ParentalControlsStore.storedHash() {
+        case let .hash(hash):
+            local = ParentalPINValues(hash: hash)
+        case .notSet:
+            local = nil
+        case .unavailable:
+            // The keychain refused the read — this pass is running with the
+            // device locked (the pre-suspension flush fires as the screen locks,
+            // and a CloudKit push can wake the process). "Couldn't look" is not
+            // "the parent removed the PIN": merging on it would push a deletion
+            // and clear the PIN on every other device. Leave the shadow and both
+            // stores alone; the next unlocked pass reconciles it.
+            Logger.sync.info("Parental PIN keychain unreadable (device locked?) — skipping PIN merge this pass")
+            result.parentalPending += 1
+            return
+        }
+
         let mirror = try fetchParentalPINMirror()
         let verdict = CloudSyncMerge.reconcile(
-            local: ParentalControlsStore.storedHash().map { ParentalPINValues(hash: $0) },
+            local: local,
             cloud: mirror.map { ParentalPINValues(hash: $0.pinHash) },
             shadow: shadow.parentalPINShadow(),
             mergeConflict: ParentalPINValues.mergeConflict
         )
+        applyPINVerdict(verdict, mirror: mirror, into: &result)
+    }
 
+    private func applyPINVerdict(
+        _ verdict: MergeVerdict<ParentalPINValues>,
+        mirror: SyncedParentalPIN?,
+        into result: inout CloudSyncReconcileResult
+    ) {
         switch verdict {
         case .noChange:
             break
@@ -57,12 +83,18 @@ extension CloudSyncEngine {
             if value != nil { result.parentalPushed += 1 }
             shadow.setParentalPINShadow(value)
         case let .pullToLocal(value):
-            applyPINToLocal(value)
+            guard applyPINToLocal(value) else {
+                result.parentalPending += 1
+                return
+            }
             if value != nil { result.parentalPulled += 1 }
             shadow.setParentalPINShadow(value)
         case let .writeBoth(value):
+            guard applyPINToLocal(value) else {
+                result.parentalPending += 1
+                return
+            }
             applyPINToCloud(value, mirror: mirror)
-            applyPINToLocal(value)
             result.parentalPushed += 1
             shadow.setParentalPINShadow(value)
         }
@@ -70,12 +102,14 @@ extension CloudSyncEngine {
 
     /// Writes the merged PIN into the keychain, which stays the local store of
     /// record. A nil value is the parent turning the PIN off on another device.
-    private func applyPINToLocal(_ value: ParentalPINValues?) {
-        if let value {
-            ParentalControlsStore.store(hash: value.hash)
-        } else {
-            ParentalControlsStore.clear()
-        }
+    ///
+    /// Returns false when the keychain refused the write, so the caller leaves the
+    /// shadow untouched. Baselining a value the keychain never took would make
+    /// the next pass read the missing hash as a local deletion and push it —
+    /// wiping the PIN on every device from one failed write.
+    private func applyPINToLocal(_ value: ParentalPINValues?) -> Bool {
+        guard let value else { return ParentalControlsStore.clear() }
+        return ParentalControlsStore.store(hash: value.hash)
     }
 
     private func applyPINToCloud(_ value: ParentalPINValues?, mirror: SyncedParentalPIN?) {
@@ -106,14 +140,25 @@ extension CloudSyncEngine {
         // is there to remember.
         var ids = localIDs.union(mirrorsByID.keys)
         ids.formUnion(shadow.categoryRestrictionShadowIDs())
+        guard !ids.isEmpty else { return }
+
+        // One chunked `IN` fetch for every id this pass touches, rather than a
+        // single-row fetch per id — the same batching the content pass was
+        // rewritten to use (`fetchCatalogModels`).
+        let categories = try fetchCatalogModels(byKind: [.category: Array(ids)])
 
         for id in ids {
+            let category = categories[id] as? Category
             // Garbage-collect restrictions whose owning playlist is gone on both
             // sides, exactly as the content pass does. Without this, a record for
             // a deleted category can never be applied (its `Category` is gone) and
             // so would be reported pending on every pass, forever.
             guard livePrefixes.contains(String(id.prefix(36))) else {
                 if let mirror = mirrorsByID[id] { cloudContext.delete(mirror) }
+                // Clear the orphan too, mirroring `resetLocalContent`: a category
+                // row that outlived its playlist would otherwise keep feeding
+                // `MainTabView`'s restricted set forever.
+                if let category, category.isRestricted { category.isRestricted = false }
                 shadow.setCategoryRestrictionShadow(id, nil)
                 continue
             }
@@ -126,16 +171,17 @@ extension CloudSyncEngine {
                 shadow: shadow.categoryRestrictionShadow(id),
                 mergeConflict: CategoryRestrictionValues.mergeConflict
             )
-            try applyRestrictionVerdict(verdict, id: id, mirror: mirrorsByID[id], into: &result)
+            applyRestrictionVerdict(verdict, id: id, category: category, mirror: mirrorsByID[id], into: &result)
         }
     }
 
     private func applyRestrictionVerdict(
         _ verdict: MergeVerdict<CategoryRestrictionValues>,
         id: String,
+        category: Category?,
         mirror: SyncedCategoryRestriction?,
         into result: inout CloudSyncReconcileResult
-    ) throws {
+    ) {
         switch verdict {
         case .noChange:
             break
@@ -144,14 +190,14 @@ extension CloudSyncEngine {
             if value != nil { result.parentalPushed += 1 }
             shadow.setCategoryRestrictionShadow(id, value)
         case let .pullToLocal(value):
-            guard try applyRestrictionToLocal(value, id: id) else {
+            guard applyRestrictionToLocal(value, category: category) else {
                 result.parentalPending += 1
                 return
             }
             if value != nil { result.parentalPulled += 1 }
             shadow.setCategoryRestrictionShadow(id, value)
         case let .writeBoth(value):
-            guard try applyRestrictionToLocal(value, id: id) else {
+            guard applyRestrictionToLocal(value, category: category) else {
                 result.parentalPending += 1
                 return
             }
@@ -164,8 +210,8 @@ extension CloudSyncEngine {
     /// Returns false — leaving the change pending, shadow untouched — when the
     /// category hasn't synced to this device yet, matching how content state
     /// waits for its catalog item.
-    private func applyRestrictionToLocal(_ value: CategoryRestrictionValues?, id: String) throws -> Bool {
-        guard let category = try fetchCategory(id) else {
+    private func applyRestrictionToLocal(_ value: CategoryRestrictionValues?, category: Category?) -> Bool {
+        guard let category else {
             // Applying a restriction has to wait for the catalog. *Lifting* one
             // has nothing to clear, so it is already satisfied — reporting it
             // pending would keep the id alive in the shadow forever.

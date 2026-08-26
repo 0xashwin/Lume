@@ -10,6 +10,12 @@
 //  talks to the process-wide keychain, and a PIN left set by one test would be
 //  picked up by another test's reconcile pass running concurrently.
 //
+//  `.serialized` alone isn't enough, though: the keychain outlives the *process*,
+//  so a PIN stranded by an interrupted run (or by manual testing on the same
+//  simulator) would still be there on the next one — and because `parentalPushed`
+//  counts the PIN and the restrictions together, it would add a phantom push to
+//  every count assertion below. Hence the per-test `init` that clears it.
+//
 
 import Foundation
 @testable import Lume
@@ -68,6 +74,13 @@ struct ParentalMergePolicyTests {
 @MainActor
 @Suite(.serialized)
 struct CloudSyncParentalEngineTests {
+    /// Runs before every test in the suite (Swift Testing instantiates the suite
+    /// per test): start from a keychain with no PIN, so the shared
+    /// `parentalPushed` counter reflects only what the test itself set up.
+    init() {
+        ParentalControlsStore.clear()
+    }
+
     private func freshShadow() -> CloudSyncShadow {
         let suite = UserDefaults(suiteName: "cloudsync.parental.test.\(UUID().uuidString)")!
         return CloudSyncShadow(defaults: suite)
