@@ -17,18 +17,27 @@ nonisolated enum DeepLink: Equatable {
     /// Reopens the player on the last played stream — the Live Activity's
     /// tap target (see `PlaybackLiveActivity` / `PlaybackResumeStore`).
     case resume
+    /// Opens the downloads list — the download Live Activity's tap target
+    /// (see `DownloadLiveActivity`).
+    case downloads
 
     /// The app's registered URL scheme (see `CFBundleURLTypes` in Info.plist).
     static let scheme = "lume"
 
-    /// Parses `lume://movie/{tmdbId}`, `lume://series/{tmdbId}` and
-    /// `lume://resume`. Returns nil for any other scheme, an unknown kind, or
-    /// a non-numeric id.
+    /// Parses `lume://movie/{tmdbId}`, `lume://series/{tmdbId}`,
+    /// `lume://resume` and `lume://downloads`. Returns nil for any other
+    /// scheme, an unknown kind, or a non-numeric id.
     init?(url: URL) {
         guard url.scheme?.lowercased() == Self.scheme else { return nil }
-        if url.host()?.lowercased() == "resume" {
+        switch url.host()?.lowercased() {
+        case "resume":
             self = .resume
             return
+        case "downloads":
+            self = .downloads
+            return
+        default:
+            break
         }
         // For `lume://movie/123` the kind is the host and the id is the first
         // path component; `pathComponents` includes the leading "/".

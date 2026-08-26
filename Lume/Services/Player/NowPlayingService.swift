@@ -16,6 +16,11 @@ import Foundation
 import MediaPlayer
 import OSLog
 import SwiftData
+#if os(macOS)
+    // `PlatformImage` is `NSImage` here, and `MediaPlayer` does not pull AppKit
+    // in the way it pulls UIKit on iOS.
+    import AppKit
+#endif
 
 final class NowPlayingService {
     static let shared = NowPlayingService()

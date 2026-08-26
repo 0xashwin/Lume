@@ -97,6 +97,7 @@
 		C6AA31102FDD00020000AB10 /* Exceptions for "LumeWidgets" folder in "Lume" target */ = {
 			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
 			membershipExceptions = (
+				DownloadActivityAttributes.swift,
 				PlaybackActivityAttributes.swift,
 			);
 			target = C67C02BF2F880F2200842DBA /* Lume */;

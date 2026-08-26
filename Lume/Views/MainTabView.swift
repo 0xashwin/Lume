@@ -30,6 +30,12 @@ struct MainTabView: View {
     /// reopen. Presented directly here, independent of any tab's own player
     /// cover.
     @State private var resumeMedia: PlayableMedia?
+
+    /// Whether a `lume://downloads` deep link (a download Live Activity tap)
+    /// asked for the downloads list. Presented as a sheet from here rather than
+    /// pushed into Settings, so the link doesn't disturb whatever the user had
+    /// open.
+    @State private var showsDownloads = false
     #if os(macOS)
         @Environment(\.openWindow) private var openWindow
     #endif
@@ -105,6 +111,7 @@ struct MainTabView: View {
                 }
             }
             .syncCover(item: $activeSyncPlaylist, onDismiss: promoteNextIfIdle)
+            .downloadsSheet(isPresented: $showsDownloads)
             .overlay {
                 if playlistSwitch?.isSwitching == true {
                     PlaylistSwitchOverlay(playlistName: playlistSwitch?.targetName ?? "")
@@ -250,6 +257,9 @@ struct MainTabView: View {
             #else
                 resumeMedia = media
             #endif
+        case .downloads:
+            // The download Live Activity was tapped.
+            showsDownloads = true
         }
     }
 
@@ -308,6 +318,37 @@ struct MainTabView: View {
     private func promoteNextIfIdle() {
         guard activeSyncPlaylist == nil, !syncQueue.isEmpty else { return }
         activeSyncPlaylist = syncQueue.removeFirst()
+    }
+}
+
+// MARK: - Downloads sheet presentation
+
+private extension View {
+    /// Presents the downloads list as a sheet, in the same navigation + dismiss
+    /// chrome Settings gives it. The download Live Activity's tap target, so it
+    /// is reachable without disturbing whatever tab the user had open.
+    @ViewBuilder
+    func downloadsSheet(isPresented: Binding<Bool>) -> some View {
+        #if os(tvOS)
+            // tvOS has no downloads feature to show.
+            self
+        #else
+            sheet(isPresented: isPresented) {
+                NavigationStack {
+                    DownloadsView()
+                        .toolbar {
+                            ToolbarItem(placement: .confirmationAction) {
+                                Button("Done") { isPresented.wrappedValue = false }
+                            }
+                        }
+                }
+                #if os(macOS)
+                // A `List` in a frameless macOS sheet collapses to zero
+                // height, leaving the sheet rendering as a bare toolbar.
+                .frame(minWidth: 480, minHeight: 440)
+                #endif
+            }
+        #endif
     }
 }
 
