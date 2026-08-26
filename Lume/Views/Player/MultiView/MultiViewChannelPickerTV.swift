@@ -252,8 +252,11 @@
                 predicate: #Predicate { $0.typeRaw == "live" && $0.isHidden == false }
             )
             let categories = sort.sort(
-                ((try? modelContext.fetch(descriptor)) ?? [])
-                    .filter { $0.id.hasPrefix(prefix) && !restriction.hides(categoryID: $0.id) }
+                LiveChannelQuery.visibleCategories(
+                    (try? modelContext.fetch(descriptor)) ?? [],
+                    playlistPrefix: prefix,
+                    restriction: restriction
+                )
             )
 
             var rail: [LiveTVSection] = []
@@ -285,8 +288,9 @@
             let sort = ContentSortOption(rawValue: contentSortRaw) ?? .playlist
             let descriptor = LiveChannelQuery.descriptor(for: scope, sort: sort)
             let fetched = (try? modelContext.fetch(descriptor)) ?? []
-            return LiveChannelQuery.scoped(fetched, scope: scope, playlistPrefix: prefix)
-                .excludingRestricted(restriction)
+            // `scoped` applies the restriction itself — categories by their id,
+            // the virtual collections per channel — so it must not be repeated.
+            return LiveChannelQuery.scoped(fetched, scope: scope, playlistPrefix: prefix, restriction: restriction)
         }
 
         private func pick(_ stream: LiveStream) {

@@ -72,6 +72,10 @@ struct AVPlayerEngineView: View {
         @AppStorage(SortStorageKey.liveContent)
         private var liveContentSortRaw: String = ContentSortOption.playlist.rawValue
         @Environment(\.modelContext) private var modelContext
+        /// Keeps channel surfing inside what this viewer may watch — a child
+        /// profile must not be able to rock up/down, or recall the last channel,
+        /// into a category a parent locked or the user hid.
+        @Environment(\.contentRestriction) private var restriction
     #endif
 
     @Environment(\.dismiss) private var dismiss
@@ -289,10 +293,12 @@ struct AVPlayerEngineView: View {
             case .up, .down:
                 let sort = ContentSortOption(rawValue: liveContentSortRaw) ?? .playlist
                 target = LiveChannelNavigator.adjacentMedia(
-                    for: media, offset: direction == .up ? 1 : -1, sort: sort, in: modelContext
+                    for: media, offset: direction == .up ? 1 : -1, sort: sort, restriction: restriction, in: modelContext
                 )
             case .right:
-                target = LiveChannelHistory.recallMedia(in: modelContext, scope: media.channelScope)
+                target = LiveChannelHistory.recallMedia(
+                    in: modelContext, scope: media.channelScope, restriction: restriction
+                )
             default:
                 return
             }

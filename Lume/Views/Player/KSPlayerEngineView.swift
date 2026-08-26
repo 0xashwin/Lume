@@ -126,6 +126,10 @@ struct KSPlayerEngineView: View {
         @AppStorage(SortStorageKey.liveContent)
         var liveContentSortRaw: String = ContentSortOption.playlist.rawValue
         @Environment(\.modelContext) var modelContext
+        /// Keeps channel surfing inside what this viewer may watch — a child
+        /// profile must not be able to rock up/down, or recall the last channel,
+        /// into a category a parent locked or the user hid.
+        @Environment(\.contentRestriction) var restriction
     #endif
 
     @Environment(\.dismiss) private var dismiss
