@@ -11,25 +11,14 @@
 
 import Foundation
 @testable import Lume
-import SwiftData
 import Testing
 
 @MainActor
 struct LiveChannelQueryTests {
-    /// An in-memory catalog so the models under test are real `LiveStream` /
-    /// `Category` instances rather than stand-ins — the helpers read `id`,
-    /// `categoryId` and `isHidden` off the models themselves.
-    private func makeContainer() throws -> ModelContainer {
-        let schema = Schema([
-            Playlist.self, Lume.Category.self, LiveStream.self, Movie.self,
-            Series.self, Episode.self, CastMember.self, EPGListing.self, EPGSource.self
-        ])
-        return try ModelContainer(
-            for: schema,
-            configurations: ModelConfiguration(schema: schema, isStoredInMemoryOnly: true, cloudKitDatabase: .none)
-        )
-    }
-
+    /// Real `LiveStream` / `Category` instances rather than stand-ins — the
+    /// helpers read `id`, `categoryId`, `type` and `isHidden` off the models
+    /// themselves. No `ModelContainer`: both helpers are pure functions over the
+    /// array they're handed, so inserting and saving would only add cost.
     private func stream(_ suffix: String, playlist: UUID, category: String?) -> LiveStream {
         LiveStream(id: "\(playlist.uuidString)-live-\(suffix)", streamId: 1, name: "Ch \(suffix)", categoryId: category)
     }
@@ -96,63 +85,54 @@ struct LiveChannelQueryTests {
     @Test func `category scope is not playlist-filtered but is still restriction-filtered`() {
         let pid = UUID()
         let locked = "\(pid.uuidString)-live-locked"
-        let streams = [stream("1", playlist: pid, category: locked)]
+        let streams = [
+            stream("1", playlist: pid, category: locked),
+            stream("2", playlist: pid, category: "\(pid.uuidString)-live-open")
+        ]
         let restriction = ContentRestriction(isActive: true, restrictedCategoryIDs: [locked])
 
-        // Category ids are already playlist-prefixed, so the scope skips the
-        // prefix filter — but a locked category must still never render.
+        // A prefix no stream matches: category ids are already playlist-prefixed,
+        // so the scope must skip the prefix filter entirely (an empty prefix
+        // would pass `hasPrefix` either way and prove nothing) — while a locked
+        // category still never renders.
         let kept = LiveChannelQuery.scoped(
-            streams, scope: .category(locked), playlistPrefix: "", restriction: restriction
+            streams, scope: .category(locked), playlistPrefix: "\(UUID().uuidString)-", restriction: restriction
         )
-        #expect(kept.isEmpty)
+        #expect(kept.map(\.name) == ["Ch 2"])
     }
 
     // MARK: - visibleCategories
 
-    @Test func `visible categories drop hidden, locked and other playlists`() throws {
-        let container = try makeContainer()
-        let ctx = container.mainContext
+    @Test func `visible categories drop hidden, locked, other playlists and other types`() {
         let playlist = Playlist(name: "Mine", serverURL: "http://x", username: "u", password: "p")
-        ctx.insert(playlist)
         let prefix = "\(playlist.id.uuidString)-"
 
         let open = Lume.Category(apiId: "1", name: "News", parentId: 0, type: .live, playlist: playlist)
         let hidden = Lume.Category(apiId: "2", name: "Shopping", parentId: 0, type: .live, playlist: playlist)
         hidden.isHidden = true
         let locked = Lume.Category(apiId: "3", name: "Adults", parentId: 0, type: .live, playlist: playlist)
-        locked.isRestricted = true
+        // A VOD category of the same playlist shares the prefix, so only the
+        // type check keeps it out of a *live* rail.
+        let movies = Lume.Category(apiId: "4", name: "Action", parentId: 0, type: .vod, playlist: playlist)
 
         let otherPlaylist = Playlist(name: "Theirs", serverURL: "http://y", username: "u", password: "p")
-        ctx.insert(otherPlaylist)
         let foreign = Lume.Category(apiId: "1", name: "News", parentId: 0, type: .live, playlist: otherPlaylist)
-        for category in [open, hidden, locked, foreign] {
-            ctx.insert(category)
-        }
-        try ctx.save()
 
         let restriction = ContentRestriction(isActive: true, restrictedCategoryIDs: [locked.id])
         let visible = LiveChannelQuery.visibleCategories(
-            [open, hidden, locked, foreign], playlistPrefix: prefix, restriction: restriction
+            [open, hidden, locked, movies, foreign], playlistPrefix: prefix, restriction: restriction
         )
 
         #expect(visible.map(\.id) == [open.id])
     }
 
-    @Test func `a parent profile still sees a locked category but never a hidden one`() throws {
-        let container = try makeContainer()
-        let ctx = container.mainContext
+    @Test func `a parent profile still sees a locked category but never a hidden one`() {
         let playlist = Playlist(name: "Mine", serverURL: "http://x", username: "u", password: "p")
-        ctx.insert(playlist)
         let prefix = "\(playlist.id.uuidString)-"
 
         let hidden = Lume.Category(apiId: "2", name: "Shopping", parentId: 0, type: .live, playlist: playlist)
         hidden.isHidden = true
         let locked = Lume.Category(apiId: "3", name: "Adults", parentId: 0, type: .live, playlist: playlist)
-        locked.isRestricted = true
-        for category in [hidden, locked] {
-            ctx.insert(category)
-        }
-        try ctx.save()
 
         // Hiding is a viewer-agnostic Content Management choice; locking only
         // applies to a child profile. The two must not be conflated.
@@ -160,5 +140,20 @@ struct LiveChannelQueryTests {
         let visible = LiveChannelQuery.visibleCategories([hidden, locked], playlistPrefix: prefix, restriction: restriction)
 
         #expect(visible.map(\.id) == [locked.id])
+    }
+
+    // MARK: - containsVisible
+
+    @Test func `rail gating agrees with what the list will render`() {
+        let pid = UUID()
+        let prefix = "\(pid.uuidString)-"
+        let locked = "\(pid.uuidString)-live-locked"
+        let streams = [stream("1", playlist: pid, category: locked)]
+        let restriction = ContentRestriction(isActive: true, restrictedCategoryIDs: [locked])
+
+        // The rail must not offer Favorites when every favorite would be
+        // filtered out of the list it opens.
+        #expect(LiveChannelQuery.containsVisible(streams, playlistPrefix: prefix, restriction: restriction) == false)
+        #expect(LiveChannelQuery.containsVisible(streams, playlistPrefix: prefix, restriction: ContentRestriction()))
     }
 }

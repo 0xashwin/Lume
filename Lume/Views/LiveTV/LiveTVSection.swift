@@ -158,13 +158,35 @@ enum LiveChannelQuery {
         playlistPrefix: String,
         restriction: ContentRestriction
     ) -> [LiveStream] {
-        let inPlaylist: [LiveStream] = switch scope {
+        switch scope {
         case .category:
-            streams
+            streams.excludingRestricted(restriction)
         case .favorites, .recentlyWatched:
-            streams.filter { $0.id.hasPrefix(playlistPrefix) }
+            streams.filter { isVisible($0, playlistPrefix: playlistPrefix, restriction: restriction) }
         }
-        return inPlaylist.excludingRestricted(restriction)
+    }
+
+    /// Whether any of `streams` survives the filtering `scoped` applies to the
+    /// virtual collections. Short-circuits, so the Live TV rail can decide
+    /// whether to offer Favorites / Recently Watched without materialising the
+    /// list — and shares `isVisible` with `scoped`, so the rail can never offer
+    /// a section whose list then renders empty.
+    static func containsVisible(
+        _ streams: some Sequence<LiveStream>,
+        playlistPrefix: String,
+        restriction: ContentRestriction
+    ) -> Bool {
+        streams.contains { isVisible($0, playlistPrefix: playlistPrefix, restriction: restriction) }
+    }
+
+    /// The per-channel test the virtual collections apply: in the active
+    /// playlist, and not in a category locked away from this viewer.
+    private static func isVisible(
+        _ stream: LiveStream,
+        playlistPrefix: String,
+        restriction: ContentRestriction
+    ) -> Bool {
+        stream.id.hasPrefix(playlistPrefix) && !restriction.hides(categoryID: stream.categoryId)
     }
 
     /// The live categories of the active playlist this viewer may see: scoped by
@@ -181,7 +203,8 @@ enum LiveChannelQuery {
         restriction: ContentRestriction
     ) -> [Category] {
         categories.filter {
-            $0.id.hasPrefix(playlistPrefix) && !$0.isHidden && !restriction.hides(categoryID: $0.id)
+            $0.type == .live && $0.id.hasPrefix(playlistPrefix)
+                && !$0.isHidden && !restriction.hides(categoryID: $0.id)
         }
     }
 }

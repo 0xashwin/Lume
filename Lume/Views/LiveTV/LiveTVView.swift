@@ -279,15 +279,15 @@ struct LiveTVView: View {
     /// Channels in restricted categories are excluded while a child profile is
     /// active, so those collections never surface restricted content.
     private var hasFavorites: Bool {
-        !playlistPrefix.isEmpty && favoriteStreams.contains {
-            $0.id.hasPrefix(playlistPrefix) && !restriction.hides(categoryID: $0.categoryId)
-        }
+        !playlistPrefix.isEmpty && LiveChannelQuery.containsVisible(
+            favoriteStreams, playlistPrefix: playlistPrefix, restriction: restriction
+        )
     }
 
     private var hasRecents: Bool {
-        !playlistPrefix.isEmpty && recentStreams.contains {
-            $0.id.hasPrefix(playlistPrefix) && !restriction.hides(categoryID: $0.categoryId)
-        }
+        !playlistPrefix.isEmpty && LiveChannelQuery.containsVisible(
+            recentStreams, playlistPrefix: playlistPrefix, restriction: restriction
+        )
     }
 
     /// The rail's entries: the virtual collections (when non-empty) pinned above
