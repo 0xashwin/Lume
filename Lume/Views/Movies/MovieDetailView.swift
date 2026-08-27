@@ -392,8 +392,7 @@ struct MovieDetailView: View {
     }
 
     private func toggleFavorite() {
-        movie.isFavorite.toggle()
-        movie.addedToWatchlistDate = movie.isFavorite ? Date() : nil
+        MediaFavorites.toggle(movie, in: modelContext)
     }
 
     private func toggleWatched() {

@@ -21,13 +21,19 @@ func makeTestContainer() throws -> ModelContainer {
     return try ModelContainer(for: schema, configurations: [config])
 }
 
-func exampleDataURL(_ filename: String, filePath: String = #filePath) -> URL {
+/// The repo root, walked up from a test file's own path: neither the JSON
+/// fixtures nor the string catalog are copied into the test bundle.
+func repoRootURL(filePath: String = #filePath) -> URL {
     var url = URL(fileURLWithPath: filePath)
-    while url.lastPathComponent != "LumeTests", url.lastPathComponent != "LumeUITests" {
+    while url.lastPathComponent != "LumeTests", url.lastPathComponent != "LumeUITests", url.pathComponents.count > 1 {
         url.deleteLastPathComponent()
     }
     url.deleteLastPathComponent()
-    return url.appendingPathComponent("ExampleData/\(filename)")
+    return url
+}
+
+func exampleDataURL(_ filename: String, filePath: String = #filePath) -> URL {
+    repoRootURL(filePath: filePath).appendingPathComponent("ExampleData/\(filename)")
 }
 
 func loadExampleJSON<T: Decodable>(_ filename: String, filePath: String = #filePath) throws -> T {
@@ -68,4 +74,34 @@ func makeProfileTestContainer() throws -> ModelContainer {
         for: Schema(catalogModels + cloudModels),
         configurations: localConfig, cloudConfig
     )
+}
+
+/// Minimal reader for `Lume/Localizable.xcstrings`. The catalog is asserted
+/// directly because runtime resolution can't tell a translated key from an
+/// English one that resolves to itself.
+struct StringCatalog {
+    let sourceLanguage: String
+    private let strings: [String: Any]
+
+    static func localizable(filePath: String = #filePath) throws -> Self {
+        let url = repoRootURL(filePath: filePath).appendingPathComponent("Lume/Localizable.xcstrings")
+        let root = try JSONSerialization.jsonObject(with: Data(contentsOf: url)) as? [String: Any]
+        return Self(
+            sourceLanguage: root?["sourceLanguage"] as? String ?? "en",
+            strings: root?["strings"] as? [String: Any] ?? [:]
+        )
+    }
+
+    /// Every non-source-language translation of `key`, or `nil` when the key is
+    /// absent from the catalog entirely.
+    func localizations(for key: String) -> [String: String]? {
+        guard let entry = strings[key] as? [String: Any] else { return nil }
+        let localizations = entry["localizations"] as? [String: Any] ?? [:]
+        var resolved: [String: String] = [:]
+        for (language, value) in localizations where language != sourceLanguage {
+            let unit = (value as? [String: Any])?["stringUnit"] as? [String: Any]
+            resolved[language] = unit?["value"] as? String ?? ""
+        }
+        return resolved
+    }
 }

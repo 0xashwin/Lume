@@ -23,12 +23,7 @@ extension View {
         onRemoveFromRecents: (() -> Void)? = nil
     ) -> some View {
         contextMenu {
-            Button(action: onToggleFavorite) {
-                Label(
-                    isFavorite ? "Remove from Favorites" : "Add to Favorites",
-                    systemImage: isFavorite ? "heart.slash" : "heart"
-                )
-            }
+            FavoriteMenuItems.favorite(isFavorite: isFavorite, action: onToggleFavorite)
 
             if let onStartMultiView {
                 Button(action: onStartMultiView) {
@@ -37,10 +32,29 @@ extension View {
             }
 
             if let onRemoveFromRecents {
-                Button(role: .destructive, action: onRemoveFromRecents) {
-                    Label("Remove from Recently Watched", systemImage: "clock.badge.xmark")
-                }
+                FavoriteMenuItems.removeFromRecents(onRemoveFromRecents)
             }
+        }
+    }
+}
+
+/// The items `liveChannelMenu` and `mediaFavoriteMenu` both offer. The two menus
+/// are twins by design, so their shared wording and glyphs live in one place —
+/// a rename that only lands in one of them would create a fresh untranslated key
+/// (see `MediaFavoriteMenuStringsTests`).
+enum FavoriteMenuItems {
+    static func favorite(isFavorite: Bool, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            Label(
+                isFavorite ? "Remove from Favorites" : "Add to Favorites",
+                systemImage: isFavorite ? "heart.slash" : "heart"
+            )
+        }
+    }
+
+    static func removeFromRecents(_ action: @escaping () -> Void) -> some View {
+        Button(role: .destructive, action: action) {
+            Label("Remove from Recently Watched", systemImage: "clock.badge.xmark")
         }
     }
 }
@@ -49,8 +63,10 @@ extension View {
 /// movies and series, which also stamp `addedToWatchlistDate` — mirroring
 /// `PlayerFavorites` and the detail screens.
 enum LiveChannelFavorites {
-    static func toggle(_ stream: LiveStream, in context: ModelContext) {
+    @discardableResult
+    static func toggle(_ stream: LiveStream, in context: ModelContext) -> Bool {
         stream.isFavorite.toggle()
         try? context.save()
+        return stream.isFavorite
     }
 }

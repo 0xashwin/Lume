@@ -121,11 +121,15 @@
                     if !similar.isEmpty {
                         TVRail(title: "You May Also Like", items: similar) { item in
                             posterLink(for: item)
+                                .mediaFavoriteMenu(item, in: modelContext)
                         }
                     }
 
                     if !otherSources.isEmpty {
                         TVRail(title: "Other Sources", items: otherSources) { source in
+                            // No favorite menu: an entry here is the same title on
+                            // a *different* playlist, so favoriting it would create a
+                            // favorite the playlist-scoped Favorites rail never shows.
                             posterLink(for: source.item, badge: source.playlistName)
                         }
                     }
@@ -479,8 +483,7 @@
         }
 
         func toggleFavorite() {
-            series.isFavorite.toggle()
-            series.addedToWatchlistDate = series.isFavorite ? Date() : nil
+            MediaFavorites.toggle(series, in: modelContext)
         }
 
         func toggleWatched(_ episode: Episode) {

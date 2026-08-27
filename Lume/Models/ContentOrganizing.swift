@@ -106,6 +106,16 @@ extension LiveStream: FavoriteOrderable {}
 extension Movie: FavoriteOrderable {}
 extension Series: FavoriteOrderable {}
 
+/// Favoritable content that also carries a watchlist stamp: movies and series.
+/// A `LiveStream` has no `addedToWatchlistDate`, which is the whole reason the
+/// VOD favorite semantic (`MediaFavorites`) is separate from the live one.
+protocol WatchlistFavoritable: FavoriteOrderable {
+    var addedToWatchlistDate: Date? { get set }
+}
+
+extension Movie: WatchlistFavoritable {}
+extension Series: WatchlistFavoritable {}
+
 extension ContentOrganizer {
     /// Applies a SwiftUI `.onMove` to an already-sorted favorites list and stamps
     /// a dense `favoriteOrder` so the arrangement persists. The list is
