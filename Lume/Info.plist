@@ -41,6 +41,10 @@
 		<string>vlc-x-callback</string>
 		<string>open-vidhub</string>
 	</array>
+	<key>NSSupportsLiveActivities</key>
+	<true/>
+	<key>NSSupportsLiveActivitiesFrequentUpdates</key>
+	<true/>
 	<key>NSAppTransportSecurity</key>
 	<dict>
 		<key>NSAllowsArbitraryLoads</key>

@@ -116,6 +116,13 @@ final class DownloadManager: NSObject {
             activeDownloads[info.id] = active
         }
         Logger.downloads.info("Adopted \(liveIDs.count) in-flight background download(s)")
+        // A leftover Live Activity has to be cleaned up when nothing is in
+        // flight any more — a force-quit cancels the session's tasks and would
+        // otherwise leave the banner up for hours. But if this launch happened
+        // *to deliver* background events, those completions are still on their
+        // way and belong in the closing summary, so leave ending it to
+        // `urlSessionDidFinishEvents` once they have all landed.
+        refreshLiveActivity(force: true, endsWhenIdle: backgroundCompletionHandler == nil)
 
         guard let container = modelContainer else { return }
         let capturedIDs = liveIDs
@@ -192,6 +199,7 @@ final class DownloadManager: NSObject {
         pendingIDs.remove(id)
         pendingQueue.removeAll { $0.id == id }
         scheduleModelUpdate(id: id, status: nil, localURL: nil)
+        refreshLiveActivity(force: true)
     }
 
     func deleteLocalFile(id: String) {
@@ -292,6 +300,9 @@ final class DownloadManager: NSObject {
             pendingIDs.remove(item.id)
             startTask(item)
         }
+        // The single choke point every start, finish and failure funnels
+        // through, so the Live Activity only needs one hook to see all three.
+        refreshLiveActivity(force: true)
     }
 
     private func startTask(_ item: PendingDownload) {
@@ -374,7 +385,9 @@ extension DownloadManager: URLSessionDownloadDelegate {
         let taskID = downloadTask.taskIdentifier
         let now = Date()
         let shouldPublish = progressPublishGate.withLock { lastPublish in
-            if let last = lastPublish[taskID], now.timeIntervalSince(last) < 0.25 { return false }
+            if let last = lastPublish[taskID], now.timeIntervalSince(last) < 0.25 {
+                return false
+            }
             lastPublish[taskID] = now
             return true
         }
@@ -390,6 +403,7 @@ extension DownloadManager: URLSessionDownloadDelegate {
                 download.samples.append((date: now, bytes: totalBytesWritten))
                 download.samples = download.samples.filter { $0.date >= now.addingTimeInterval(-5) }
             }
+            self.refreshLiveActivity()
         }
     }
 
@@ -507,6 +521,7 @@ extension DownloadManager: URLSessionDownloadDelegate {
         taskMap.removeValue(forKey: taskID)
         idToTask.removeValue(forKey: info.id)
         scheduleModelUpdate(id: info.id, status: .completed, localURL: destination.path)
+        noteLiveActivityCompleted()
         promoteIfNeeded()
     }
 
@@ -519,7 +534,9 @@ extension DownloadManager: URLSessionDownloadDelegate {
         // Cancellation is the user tapping the X: `cancelDownload` has already
         // cleared the item's state and status, so recording a failure here would
         // resurrect the row as a failed download.
-        if (error as? URLError)?.code == .cancelled { return }
+        if (error as? URLError)?.code == .cancelled {
+            return
+        }
         let taskID = task.taskIdentifier
         // As in `didFinishDownloadingTo`, the task may outlive the process that
         // started it, so `taskMap` is not guaranteed to know it.
@@ -537,6 +554,9 @@ extension DownloadManager: URLSessionDownloadDelegate {
     /// finished; failing to call it gets the app throttled out of future ones.
     nonisolated func urlSessionDidFinishEvents(forBackgroundURLSession _: URLSession) {
         Task { @MainActor in
+            // Every completion this relaunch carried is now counted, so the
+            // Live Activity can close with a summary that includes them.
+            self.refreshLiveActivity(force: true)
             let handler = self.backgroundCompletionHandler
             self.backgroundCompletionHandler = nil
             handler?()
@@ -550,5 +570,6 @@ extension DownloadManager: URLSessionDownloadDelegate {
         taskMap.removeValue(forKey: taskID)
         idToTask.removeValue(forKey: id)
         scheduleModelUpdate(id: id, status: .failed, localURL: nil)
+        noteLiveActivityFailed()
     }
 }

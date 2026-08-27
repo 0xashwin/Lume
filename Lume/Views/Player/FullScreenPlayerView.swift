@@ -224,6 +224,15 @@ struct FullScreenPlayerView: View {
             await resolveActiveMedia()
         }
         .task(id: activeMedia.id) {
+            // Publish the session system-wide: Now Playing metadata + remote
+            // commands (lock screen, Control Center, the iPhone's Apple TV
+            // remote) and the iOS Live Activity. Runs per active stream so a
+            // channel surf / next episode republishes; cancelled on swap.
+            await NowPlayingService.shared.runSession(
+                media: activeMedia, clock: clock, container: modelContext.container
+            )
+        }
+        .task(id: activeMedia.id) {
             // Resolve the next episode and the IntroDB segments for the active
             // stream. Runs on appear and whenever the stream swaps (manual pick
             // or auto-advance), so the queued episode always trails the one on
@@ -299,6 +308,7 @@ struct FullScreenPlayerView: View {
         .onDisappear {
             // Capture the clock synchronously, then flush off the main thread.
             persistProgressDetached(force: true)
+            NowPlayingService.shared.endSession()
             releaseAudioSession()
             ContentIndexingService.shared.isPlaybackActive = false
         }

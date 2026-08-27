@@ -170,12 +170,25 @@ struct LumeEngineEngineView: View {
             coordinator.startupTimeout = usesQuickStartupTimeout ? 15 : 40
             clock.reset()
             coordinator.configure(media: media)
+            NowPlayingService.shared.attachTransport(.init(
+                isPlaying: { [weak coordinator] in coordinator?.isPlaying ?? false },
+                play: { [weak coordinator] in
+                    guard let coordinator, !coordinator.isPlaying else { return }
+                    coordinator.togglePlay()
+                },
+                pause: { [weak coordinator] in
+                    guard let coordinator, coordinator.isPlaying else { return }
+                    coordinator.togglePlay()
+                },
+                seek: { [weak coordinator] in coordinator?.seek(to: $0) }
+            ), owner: coordinator)
             scheduleHide()
         }
         .onDisappear {
             hideTask?.cancel()
             hoverHideTask?.cancel()
             reconnector.cancel()
+            NowPlayingService.shared.detachTransport(owner: coordinator)
             coordinator.tearDown()
         }
         .onChange(of: coordinator.isPlaying) { _, _ in

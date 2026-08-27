@@ -46,6 +46,10 @@ enum KSPlayerOptionsFactory {
         KSOptions.firstPlayerType = settings.primaryEngine == .ffmpeg ? KSMEPlayer.self : KSAVPlayer.self
 
         let options = KSOptions()
+        // Now Playing metadata + remote commands are owned by
+        // `NowPlayingService` for all engines; KSPlayer's built-in
+        // registration would double-handle every command.
+        options.registerRemoteControll = false
         options.hardwareDecode = settings.hardwareDecode
         options.asynchronousDecompression = settings.asyncDecompression
         options.isSecondOpen = settings.secondOpen

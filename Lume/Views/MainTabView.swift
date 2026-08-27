@@ -28,6 +28,20 @@ struct MainTabView: View {
     /// `onOpenURL` deep link can switch tabs and push a detail screen.
     @State private var router = DeepLinkRouter()
 
+    /// The stream a `lume://resume` deep link (a Live Activity tap) asked to
+    /// reopen. Presented directly here, independent of any tab's own player
+    /// cover.
+    @State private var resumeMedia: PlayableMedia?
+
+    /// Whether a `lume://downloads` deep link (a download Live Activity tap)
+    /// asked for the downloads list. Presented as a sheet from here rather than
+    /// pushed into Settings, so the link doesn't disturb whatever the user had
+    /// open.
+    @State private var showsDownloads = false
+    #if os(macOS)
+        @Environment(\.openWindow) private var openWindow
+    #endif
+
     /// Playlists waiting to be auto-synced, and the one currently shown in the
     /// blocking progress cover. Auto-sync is presented (not silent) so the user
     /// sees progress and waits for it to finish — most importantly right after
@@ -85,6 +99,11 @@ struct MainTabView: View {
             .onOpenURL { url in
                 handleDeepLink(url)
             }
+        #if !os(macOS)
+            .fullScreenCover(item: $resumeMedia) { media in
+                FullScreenPlayerView(media: media)
+            }
+        #endif
             .task(id: playlists.count) {
                 // On launch (and whenever a playlist is added) sync any playlist that
                 // is due per the configured frequency.
@@ -106,6 +125,7 @@ struct MainTabView: View {
                 }
             }
             .syncCover(item: $activeSyncPlaylist, onDismiss: promoteNextIfIdle)
+            .downloadsSheet(isPresented: $showsDownloads)
             .switchProgressOverlay(playlist: playlistSwitch, profile: profileManager)
         #if os(tvOS)
             .overlay { tvOverlays }
@@ -279,6 +299,20 @@ struct MainTabView: View {
             router.selectedTab = .series
             router.seriesPath = NavigationPath()
             router.seriesPath.append(series)
+        case .resume:
+            // The Live Activity was tapped. When a player session is already
+            // up, foregrounding the app is all that's needed; otherwise reopen
+            // the last played stream where it left off.
+            guard NowPlayingService.shared.currentMedia == nil,
+                  let media = PlaybackResumeStore.load() else { return }
+            #if os(macOS)
+                openWindow(id: "player", value: media)
+            #else
+                resumeMedia = media
+            #endif
+        case .downloads:
+            // The download Live Activity was tapped.
+            showsDownloads = true
         }
     }
 
@@ -337,6 +371,37 @@ struct MainTabView: View {
     private func promoteNextIfIdle() {
         guard activeSyncPlaylist == nil, !syncQueue.isEmpty else { return }
         activeSyncPlaylist = syncQueue.removeFirst()
+    }
+}
+
+// MARK: - Downloads sheet presentation
+
+private extension View {
+    /// Presents the downloads list as a sheet, in the same navigation + dismiss
+    /// chrome Settings gives it. The download Live Activity's tap target, so it
+    /// is reachable without disturbing whatever tab the user had open.
+    @ViewBuilder
+    func downloadsSheet(isPresented: Binding<Bool>) -> some View {
+        #if os(tvOS)
+            // tvOS has no downloads feature to show.
+            self
+        #else
+            sheet(isPresented: isPresented) {
+                NavigationStack {
+                    DownloadsView()
+                        .toolbar {
+                            ToolbarItem(placement: .confirmationAction) {
+                                Button("Done") { isPresented.wrappedValue = false }
+                            }
+                        }
+                }
+                #if os(macOS)
+                // A `List` in a frameless macOS sheet collapses to zero
+                // height, leaving the sheet rendering as a bare toolbar.
+                .frame(minWidth: 480, minHeight: 440)
+                #endif
+            }
+        #endif
     }
 }
 
