@@ -64,7 +64,7 @@ private let recentlyAddedFetchLimit = 200
 /// A titled horizontal rail with a trailing "Show All" link into the full
 /// collection grid. Mirrors `CategoryPreviewRow`, but its header is a plain
 /// title plus a `LibraryCollection` destination rather than a `Category`.
-private struct CollectionPreviewRow<Item: Identifiable & Hashable, Card: View>: View {
+private struct CollectionPreviewRow<Item: Identifiable & Hashable & WatchlistFavoritable, Card: View>: View {
     let title: LocalizedStringKey
     let collection: LibraryCollection
     let items: [Item]
@@ -76,6 +76,7 @@ private struct CollectionPreviewRow<Item: Identifiable & Hashable, Card: View>: 
     /// context menu (a long-press on the focused card on tvOS). Nil for rows
     /// where removal doesn't apply, e.g. Favorites.
     var removeAction: ((Item) -> Void)?
+    @Environment(\.modelContext) private var modelContext
     @ViewBuilder let card: (Item) -> Card
 
     var body: some View {
@@ -105,7 +106,11 @@ private struct CollectionPreviewRow<Item: Identifiable & Hashable, Card: View>: 
                                 .matchedTransitionSourceIfAvailable(id: item.id, in: animationNamespace)
                         }
                         .posterCardButtonStyle()
-                        .recentlyWatchedRemoveMenu(removeAction.map { action in { action(item) } })
+                        .mediaFavoriteMenu(
+                            isFavorite: { item.isFavorite },
+                            onToggleFavorite: { MediaFavorites.toggle(item, in: modelContext) },
+                            onRemoveFromRecents: removeAction.map { action in { action(item) } }
+                        )
                     }
                 }
                 .padding(.horizontal)
@@ -329,27 +334,6 @@ private enum SeriesCollectionQuery {
         }
         if kind == .recentlyAdded { descriptor.fetchLimit = recentlyAddedFetchLimit }
         return descriptor
-    }
-}
-
-// MARK: - Remove-from-recents menu
-
-extension View {
-    /// Attaches a destructive "Remove from Recently Watched" context menu when an
-    /// action is provided, otherwise leaves the view untouched. Surfaced by a
-    /// long-press on the focused card on tvOS (and on iOS), or a right-click on
-    /// macOS — the standard cross-platform secondary-action gesture.
-    @ViewBuilder
-    func recentlyWatchedRemoveMenu(_ remove: (() -> Void)?) -> some View {
-        if let remove {
-            contextMenu {
-                Button(role: .destructive, action: remove) {
-                    Label("Remove from Recently Watched", systemImage: "clock.badge.xmark")
-                }
-            }
-        } else {
-            self
-        }
     }
 }
 

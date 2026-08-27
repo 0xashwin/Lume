@@ -69,11 +69,19 @@ struct SearchView: View {
                                         SearchResultRow(result: result)
                                             .matchedTransitionSourceIfAvailable(id: movie.id, in: animationNamespace)
                                     }
+                                    .mediaFavoriteMenu(
+                                        isFavorite: { movie.isFavorite },
+                                        onToggleFavorite: { MediaFavorites.toggle(movie, in: modelContext) }
+                                    )
                                 case let .series(series):
                                     NavigationLink(value: series) {
                                         SearchResultRow(result: result)
                                             .matchedTransitionSourceIfAvailable(id: series.id, in: animationNamespace)
                                     }
+                                    .mediaFavoriteMenu(
+                                        isFavorite: { series.isFavorite },
+                                        onToggleFavorite: { MediaFavorites.toggle(series, in: modelContext) }
+                                    )
                                 case let .liveStream(stream):
                                     Button {
                                         playChannel(stream)
@@ -81,6 +89,10 @@ struct SearchView: View {
                                         SearchResultRow(result: result)
                                     }
                                     .buttonStyle(.plain)
+                                    .liveChannelMenu(
+                                        isFavorite: stream.isFavorite,
+                                        onToggleFavorite: { LiveChannelFavorites.toggle(stream, in: modelContext) }
+                                    )
                                 }
                             }
                         } header: {

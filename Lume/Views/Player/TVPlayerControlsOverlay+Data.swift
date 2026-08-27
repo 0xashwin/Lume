@@ -292,15 +292,12 @@
 
         func toggleFavorite() {
             if isSeries, let series = episode?.series {
-                series.isFavorite.toggle()
-                series.addedToWatchlistDate = series.isFavorite ? Date() : nil
+                MediaFavorites.toggle(series, in: modelContext)
             } else if media.isLive, let liveStream {
-                liveStream.isFavorite.toggle()
+                LiveChannelFavorites.toggle(liveStream, in: modelContext)
             } else if let movie {
-                movie.isFavorite.toggle()
-                movie.addedToWatchlistDate = movie.isFavorite ? Date() : nil
+                MediaFavorites.toggle(movie, in: modelContext)
             }
-            try? modelContext.save()
             onResetHideTimer()
         }
 

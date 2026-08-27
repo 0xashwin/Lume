@@ -148,6 +148,7 @@ adapted per size class
 - Configurable sort options per category and content type
 - Hide and reorder categories to taste
 - Favorites and watched markers across every content type
+- **Long-press to favorite** — hold a movie or series card anywhere in the app (right-click on macOS, pinch-and-hold on visionOS) to add or remove a favorite without opening its detail screen
 - **Deep links** — open a title straight from a URL: `lume://movie/{tmdbId}` and `lume://series/{tmdbId}`
 
 #### ⏱️ Watch tracking

@@ -63,8 +63,6 @@ private struct HomeItemCell: View {
     var onVote: ((HomeMediaItem, RecommendationVote) -> Void)?
     var onStartMultiView: ((LiveStream) -> Void)?
     var animationNamespace: Namespace.ID?
-    /// For the channel menu's favourite toggle.
-    @Environment(\.modelContext) private var modelContext
 
     var body: some View {
         Group {
@@ -93,33 +91,44 @@ private struct HomeItemCell: View {
         .modifier(HomeItemMenu(
             item: item,
             onRemove: onRemove,
-            onStartMultiView: onStartMultiView,
-            onToggleFavorite: { stream in LiveChannelFavorites.toggle(stream, in: modelContext) }
+            onVote: onVote,
+            onStartMultiView: onStartMultiView
         ))
-        .recommendationVoteMenu(onVote.map { action in { vote in action(item, vote) } })
     }
 }
 
 /// The card's long-press menu. A channel gets the full channel menu — the same
-/// one its row in Live TV carries — while a movie or series keeps the remove
-/// action alone. One modifier rather than two stacked: only the outermost
-/// `contextMenu` on a view survives.
+/// one its row in Live TV carries, and the live favorite semantic (the flag
+/// alone, no watchlist date) — while a movie or series gets the VOD one. Every
+/// action a card offers is built here, in a single menu: only the outermost
+/// `contextMenu` on a view survives, so a stacked second modifier would silently
+/// replace the first.
 private struct HomeItemMenu: ViewModifier {
     let item: HomeMediaItem
     let onRemove: ((HomeMediaItem) -> Void)?
+    let onVote: ((HomeMediaItem, RecommendationVote) -> Void)?
     let onStartMultiView: ((LiveStream) -> Void)?
-    let onToggleFavorite: (LiveStream) -> Void
+    @Environment(\.modelContext) private var modelContext
 
     func body(content: Content) -> some View {
-        if case let .live(stream) = item {
+        let removeFromRecents = onRemove.map { action in { action(item) } }
+        let voteAction = onVote.map { action in { (vote: RecommendationVote) in action(item, vote) } }
+
+        switch item {
+        case let .live(stream):
             content.liveChannelMenu(
                 isFavorite: stream.isFavorite,
-                onToggleFavorite: { onToggleFavorite(stream) },
+                onToggleFavorite: { LiveChannelFavorites.toggle(stream, in: modelContext) },
                 onStartMultiView: onStartMultiView.map { action in { action(stream) } },
-                onRemoveFromRecents: onRemove.map { action in { action(item) } }
+                onRemoveFromRecents: removeFromRecents
             )
-        } else {
-            content.recentlyWatchedRemoveMenu(onRemove.map { action in { action(item) } })
+        default:
+            content.mediaFavoriteMenu(
+                item,
+                in: modelContext,
+                onRemoveFromRecents: removeFromRecents,
+                onVote: voteAction
+            )
         }
     }
 }
@@ -168,34 +177,6 @@ struct ForYouRow: View {
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding()
         .background(.quaternary, in: RoundedRectangle(cornerRadius: 12))
-    }
-}
-
-// MARK: - Recommendation vote menu
-
-extension View {
-    /// Attaches thumbs up / thumbs down actions for a "For You" recommendation
-    /// when an action is provided, otherwise leaves the view untouched. Surfaced
-    /// by the same secondary-action gesture as the remove menu (long-press on
-    /// iOS/tvOS, right-click on macOS).
-    @ViewBuilder
-    func recommendationVoteMenu(_ vote: ((RecommendationVote) -> Void)?) -> some View {
-        if let vote {
-            contextMenu {
-                Button {
-                    vote(.upvote)
-                } label: {
-                    Label("More Like This", systemImage: "hand.thumbsup")
-                }
-                Button(role: .destructive) {
-                    vote(.downvote)
-                } label: {
-                    Label("Not Interested", systemImage: "hand.thumbsdown")
-                }
-            }
-        } else {
-            self
-        }
     }
 }
 

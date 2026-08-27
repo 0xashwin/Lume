@@ -7,9 +7,8 @@
 //  and the iOS / macOS KSPlayer and VLCKit overlays) so the favorite control
 //  sitting beside the audio / subtitle track menus behaves identically on
 //  every engine. Series are favorited via their parent (episodes have no
-//  `isFavorite` of their own); movies and series also stamp
-//  `addedToWatchlistDate`, live streams toggle the flag alone — mirroring the
-//  detail screens.
+//  `isFavorite` of their own). Movies and series share the one VOD favorite
+//  semantic in `MediaFavorites`; live streams toggle the flag alone.
 //
 
 import Foundation
@@ -34,19 +33,15 @@ enum PlayerFavorites {
     static func toggle(for ref: PlayableMedia.ContentRef, in context: ModelContext) -> Bool {
         switch ref {
         case let .episode(id):
-            guard let series = episode(id, in: context)?.series else { return false }
-            series.isFavorite.toggle()
-            series.addedToWatchlistDate = series.isFavorite ? Date() : nil
+            guard let resolved = episode(id, in: context) else { return false }
+            return MediaFavorites.toggle(resolved, in: context)
         case let .movie(id):
-            guard let movie = movie(id, in: context) else { return false }
-            movie.isFavorite.toggle()
-            movie.addedToWatchlistDate = movie.isFavorite ? Date() : nil
+            guard let resolved = movie(id, in: context) else { return false }
+            return MediaFavorites.toggle(resolved, in: context)
         case let .live(id):
             guard let stream = liveStream(id, in: context) else { return false }
-            stream.isFavorite.toggle()
+            return LiveChannelFavorites.toggle(stream, in: context)
         }
-        try? context.save()
-        return isFavorite(for: ref, in: context)
     }
 
     // MARK: - Resolution

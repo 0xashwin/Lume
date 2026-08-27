@@ -538,8 +538,7 @@ private extension SeriesDetailView {
     }
 
     func toggleFavorite() {
-        series.isFavorite.toggle()
-        series.addedToWatchlistDate = series.isFavorite ? Date() : nil
+        MediaFavorites.toggle(series, in: modelContext)
     }
 
     func toggleWatched(_ episode: Episode) {
