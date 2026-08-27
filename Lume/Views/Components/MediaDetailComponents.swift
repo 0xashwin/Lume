@@ -9,6 +9,7 @@
 //  SeriesDetailView compose these so the two screens stay visually identical.
 //
 
+import SwiftData
 import SwiftUI
 
 extension View {
@@ -351,26 +352,31 @@ struct SimilarRow: View {
     let items: [HomeMediaItem]
     var animationNamespace: Namespace.ID?
 
+    @Environment(\.modelContext) private var modelContext
+
     var body: some View {
         ScrollView(.horizontal, showsIndicators: false) {
             HStack(spacing: 16) {
                 ForEach(items) { item in
-                    switch item {
-                    case let .movie(movie):
-                        NavigationLink(value: movie) {
-                            DetailPosterCard(title: item.title, imageURL: item.imageURL)
-                                .matchedTransitionSourceIfAvailable(id: movie.id, in: animationNamespace)
+                    Group {
+                        switch item {
+                        case let .movie(movie):
+                            NavigationLink(value: movie) {
+                                DetailPosterCard(title: item.title, imageURL: item.imageURL)
+                                    .matchedTransitionSourceIfAvailable(id: movie.id, in: animationNamespace)
+                            }
+                            .buttonStyle(.plain)
+                        case let .series(series):
+                            NavigationLink(value: series) {
+                                DetailPosterCard(title: item.title, imageURL: item.imageURL)
+                                    .matchedTransitionSourceIfAvailable(id: series.id, in: animationNamespace)
+                            }
+                            .buttonStyle(.plain)
+                        case .live:
+                            EmptyView()
                         }
-                        .buttonStyle(.plain)
-                    case let .series(series):
-                        NavigationLink(value: series) {
-                            DetailPosterCard(title: item.title, imageURL: item.imageURL)
-                                .matchedTransitionSourceIfAvailable(id: series.id, in: animationNamespace)
-                        }
-                        .buttonStyle(.plain)
-                    case .live:
-                        EmptyView()
                     }
+                    .mediaFavoriteMenu(item, in: modelContext)
                 }
             }
             .padding(.horizontal, DetailMetrics.contentPadding)
@@ -561,6 +567,7 @@ enum DetailFormat {
     let movie1 = Movie(id: "preview-sim-1", streamId: 1, name: "Similar Movie 1")
     let movie2 = Movie(id: "preview-sim-2", streamId: 2, name: "Similar Movie 2")
     SimilarRow(items: [.movie(movie1), .movie(movie2)])
+        .modelContainer(previewContainer())
 }
 
 #Preview("DetailPosterCard") {
