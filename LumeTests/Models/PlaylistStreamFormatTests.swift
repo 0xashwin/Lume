@@ -84,15 +84,33 @@ struct PlaylistStreamFormatTests {
 
     // MARK: - Xtream catch-up URLs
 
-    @Test func `catchup follows the playlist container`() throws {
+    @Test func `automatic catchup defaults to MPEGTS`() throws {
         let stream = LiveStream(id: "l-5", streamId: 777, name: "Catchup Channel")
         let url = try #require(makeClient().buildCatchupURL(
+            for: stream,
+            playlist: makePlaylist(),
+            start: Date(timeIntervalSince1970: 1_700_000_000),
+            durationMinutes: 90
+        ))
+        #expect(url.absoluteString.hasSuffix("/777.ts"))
+    }
+
+    @Test func `catchup follows the playlist container`() throws {
+        let stream = LiveStream(id: "l-6", streamId: 777, name: "Catchup Channel")
+        let tsURL = try #require(makeClient().buildCatchupURL(
             for: stream,
             playlist: makePlaylist(format: .mpegTS),
             start: Date(timeIntervalSince1970: 1_700_000_000),
             durationMinutes: 90
         ))
-        #expect(url.absoluteString.hasSuffix("/777.ts"))
+        let hlsURL = try #require(makeClient().buildCatchupURL(
+            for: stream,
+            playlist: makePlaylist(format: .hls),
+            start: Date(timeIntervalSince1970: 1_700_000_000),
+            durationMinutes: 90
+        ))
+        #expect(tsURL.absoluteString.hasSuffix("/777.ts"))
+        #expect(hlsURL.absoluteString.hasSuffix("/777.m3u8"))
     }
 
     // MARK: - m3u direct URL rewriting
