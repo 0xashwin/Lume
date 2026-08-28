@@ -1,6 +1,6 @@
 <div align="center">
 
-<img src=".github/assets/lume-banner.png" alt="Lume" width="640">
+<img src=".github/assets/readme/lume-banner.webp" alt="Lume" width="640">
 
 ### A modern, native IPTV player for Apple platforms
 
@@ -75,19 +75,19 @@ Metacritic, Trakt, Letterboxd), and your viewing activity can be scrobbled to **
 
 <div align="center">
 
-<img src="Assets/Screenshots/tvOS/1-home.jpeg" alt="Lume on Apple TV — immersive home screen with hero carousel and trending rail" width="880">
+<img src=".github/assets/readme/tvos-home.webp" alt="Lume on Apple TV — immersive home screen with hero carousel and trending rail" width="880">
 
 **Apple TV** — immersive full-screen home with a crossfading TMDB hero and fold-based scroll snapping
 
 <br>
 
-<img src="Assets/Screenshots/tvOS/4-movie-hero.jpeg" alt="Lume movie detail on Apple TV with logo artwork, ratings and cast" width="880">
+<img src=".github/assets/readme/tvos-movie-hero.webp" alt="Lume movie detail on Apple TV with logo artwork, ratings and cast" width="880">
 
 **Apple TV** — movie detail with TMDB backdrop, logo treatment, ratings, and metadata
 
 <br>
 
-<img src="Assets/Screenshots/macOS/01-home.png" alt="Lume on macOS showing the home dashboard in a window" width="880">
+<img src=".github/assets/readme/macos-home.webp" alt="Lume on macOS showing the home dashboard in a window" width="880">
 
 **Mac** — the same catalog in a resizable window, with profile switching in the toolbar
 
@@ -95,9 +95,9 @@ Metacritic, Trakt, Letterboxd), and your viewing activity can be scrobbled to **
 
 <table>
   <tr>
-    <td align="center" width="33%"><img src="Assets/Screenshots/iOS/1-home.jpeg" alt="Home dashboard on iPhone" width="250"></td>
-    <td align="center" width="33%"><img src="Assets/Screenshots/iOS/7-movies-overview.jpeg" alt="Movies browsing on iPhone" width="250"></td>
-    <td align="center" width="33%"><img src="Assets/Screenshots/iOS/4-live-epg.jpeg" alt="Live TV program guide on iPhone" width="250"></td>
+    <td align="center" width="33%"><img src=".github/assets/readme/ios-home.webp" alt="Home dashboard on iPhone" width="250"></td>
+    <td align="center" width="33%"><img src=".github/assets/readme/ios-movies.webp" alt="Movies browsing on iPhone" width="250"></td>
+    <td align="center" width="33%"><img src=".github/assets/readme/ios-live-epg.webp" alt="Live TV program guide on iPhone" width="250"></td>
   </tr>
   <tr>
     <td align="center"><sub>Home</sub></td>
