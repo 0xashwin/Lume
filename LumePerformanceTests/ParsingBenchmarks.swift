@@ -188,4 +188,41 @@ final class ParsingBenchmarks: XCTestCase {
             }
         }
     }
+
+    // MARK: - Fixture fidelity
+
+    /// Non-measuring guard on the three Xtream generators: bytes/row inside the
+    /// band the real provider occupies, and every generated row surviving the
+    /// DTOs.
+    ///
+    /// `XtreamList` drops an element it cannot decode and only rethrows when
+    /// *every* element fails, so a fixture whose shape the DTOs reject comes back
+    /// as a short array rather than an error — the decode benchmarks above would
+    /// quietly measure less work instead of failing.
+    func testXtreamFixturesMatchProviderRowShape() throws {
+        let rows = 5000
+        let decoder = JSONDecoder()
+
+        let vod = try PerfFixtures.xtreamVODStreamsJSON(count: rows)
+        assertBytesPerRow(vod, rows: rows, expected: 367)
+        let movies = try decoder.decode(XtreamList<XtreamVODStream>.self, from: vod).items
+        XCTAssertEqual(movies.count, rows)
+        XCTAssertTrue(movies.allSatisfy { $0.streamId != nil && $0.name?.isEmpty == false })
+        XCTAssertTrue(movies.contains { ($0.rating ?? 0) > 0 }, "the String `rating` path decoded nothing")
+        XCTAssertTrue(movies.contains { ($0.rating5Based ?? 0) > 0 }, "the numeric `rating_5based` path decoded nothing")
+
+        let series = try PerfFixtures.xtreamSeriesJSON(count: rows)
+        assertBytesPerRow(series, rows: rows, expected: 1033)
+        let shows = try decoder.decode(XtreamList<XtreamSeries>.self, from: series).items
+        XCTAssertEqual(shows.count, rows)
+        XCTAssertTrue(shows.allSatisfy { $0.seriesId != nil && $0.rating5Based?.isEmpty == false })
+        XCTAssertTrue(shows.allSatisfy { ($0.plot?.count ?? 0) > 200 }, "series rows carry ~1 KB of text")
+
+        let live = try PerfFixtures.xtreamLiveStreamsJSON(count: rows)
+        assertBytesPerRow(live, rows: rows, expected: 356)
+        let channels = try decoder.decode(XtreamList<XtreamLiveStream>.self, from: live).items
+        XCTAssertEqual(channels.count, rows)
+        XCTAssertTrue(channels.allSatisfy { $0.streamId != nil && $0.isAdult == 0 })
+        XCTAssertTrue(channels.contains { $0.tvArchive == 1 }, "the numeric `tv_archive` path decoded nothing")
+    }
 }

@@ -954,6 +954,35 @@
 			};
 			name = Sideload;
 		};
+		C6BE110000000000000000B5 /* Benchmark */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_ENTITLEMENTS = LumeWidgets/LumeWidgets.entitlements;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 19;
+				DEVELOPMENT_TEAM = CHG45F8MCL;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = LumeWidgets/Info.plist;
+				INFOPLIST_KEY_CFBundleDisplayName = Lume;
+				IPHONEOS_DEPLOYMENT_TARGET = 18.0;
+				LD_RUNPATH_SEARCH_PATHS = "@executable_path/Frameworks @executable_path/../../Frameworks";
+				MARKETING_VERSION = 1.8.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.bilipp.lume.LumeWidgets;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				REGISTER_APP_GROUPS = YES;
+				SDKROOT = iphoneos;
+				SKIP_INSTALL = YES;
+				STRING_CATALOG_GENERATE_SYMBOLS = NO;
+				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Benchmark;
+		};
 		C67C02F12F880F2400842DBA /* Sideload */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
@@ -1421,6 +1450,7 @@
 				C6AA31082FDD00020000AB08 /* Debug */,
 				C6AA31092FDD00020000AB09 /* Release */,
 				C6AA310A2FDD00020000AB0A /* Sideload */,
+				C6BE110000000000000000B5 /* Benchmark */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
