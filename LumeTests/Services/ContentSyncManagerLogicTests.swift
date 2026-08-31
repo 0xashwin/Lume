@@ -70,6 +70,48 @@ struct ContentSyncManagerLogicTests {
         #expect(result == "Pokémon")
     }
 
+    // MARK: - Inter-phase request spacing
+
+    @Test func `no previous request needs no spacing`() {
+        #expect(ContentSyncManager.outstandingPhaseSpacing(since: nil) == .zero)
+    }
+
+    @Test func `a phase that took longer than the spacing waits not at all`() {
+        let now = ContinuousClock.now
+        let remaining = ContentSyncManager.outstandingPhaseSpacing(
+            since: now - .seconds(45),
+            now: now
+        )
+        #expect(remaining == .zero)
+    }
+
+    @Test func `a fast phase waits only the outstanding remainder`() {
+        let now = ContinuousClock.now
+        let remaining = ContentSyncManager.outstandingPhaseSpacing(
+            since: now - .milliseconds(500),
+            now: now
+        )
+        #expect(remaining == .milliseconds(1500))
+    }
+
+    @Test func `spacing never exceeds the configured gap`() {
+        let now = ContinuousClock.now
+        let remaining = ContentSyncManager.outstandingPhaseSpacing(
+            since: now + .seconds(30),
+            now: now
+        )
+        #expect(remaining == ContentSyncManager.contentPhaseRequestSpacing)
+    }
+
+    @Test func `a phase exactly at the spacing boundary waits not at all`() {
+        let now = ContinuousClock.now
+        let remaining = ContentSyncManager.outstandingPhaseSpacing(
+            since: now - ContentSyncManager.contentPhaseRequestSpacing,
+            now: now
+        )
+        #expect(remaining == .zero)
+    }
+
     // MARK: - SyncStatus
 
     @Test func `playlist idle is default`() {

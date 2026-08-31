@@ -85,6 +85,10 @@ final class SignpostBenchmarks: XCTestCase {
     func testSignpostNamesAreUnique() {
         let all: [PerfSignpost] = [
             .playlistSync, .syncCategories, .syncMovies, .syncSeries, .syncLiveStreams,
+            .xtreamFetchMovies, .xtreamDecodeMovies, .upsertMovies, .pruneMovies,
+            .xtreamFetchSeries, .xtreamDecodeSeries, .upsertSeries, .pruneSeries,
+            .xtreamFetchLiveStreams, .xtreamDecodeLiveStreams, .upsertLiveStreams, .pruneLiveStreams,
+            .xtreamPhaseSpacing,
             .m3uDownload, .m3uImport,
             .epgSourceSync, .epgIngest, .channelEPGLoad, .guideWindowLoad,
             .homeTrendingLoad, .homeRecommendations,

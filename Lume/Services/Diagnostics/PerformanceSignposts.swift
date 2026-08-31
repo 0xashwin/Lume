@@ -49,6 +49,28 @@ nonisolated extension PerfSignpost {
     static let syncMovies = PerfSignpost("SyncMovies")
     static let syncSeries = PerfSignpost("SyncSeries")
     static let syncLiveStreams = PerfSignpost("SyncLiveStreams")
+
+    // Content sync sub-phases. Nested inside the SyncMovies/SyncSeries/
+    // SyncLiveStreams intervals above, which stay as the outer boundary so
+    // existing traces and benchmark baselines keep resolving.
+    static let xtreamFetchMovies = PerfSignpost("XtreamFetchMovies")
+    static let xtreamDecodeMovies = PerfSignpost("XtreamDecodeMovies")
+    static let upsertMovies = PerfSignpost("UpsertMovies")
+    static let pruneMovies = PerfSignpost("PruneMovies")
+    static let xtreamFetchSeries = PerfSignpost("XtreamFetchSeries")
+    static let xtreamDecodeSeries = PerfSignpost("XtreamDecodeSeries")
+    static let upsertSeries = PerfSignpost("UpsertSeries")
+    static let pruneSeries = PerfSignpost("PruneSeries")
+    static let xtreamFetchLiveStreams = PerfSignpost("XtreamFetchLiveStreams")
+    static let xtreamDecodeLiveStreams = PerfSignpost("XtreamDecodeLiveStreams")
+    static let upsertLiveStreams = PerfSignpost("UpsertLiveStreams")
+    static let pruneLiveStreams = PerfSignpost("PruneLiveStreams")
+
+    /// Only emitted when the sync actually has to wait between content phases
+    /// to respect a provider's one-connection cap — its absence in a trace is
+    /// the signal that the spacing cost nothing.
+    static let xtreamPhaseSpacing = PerfSignpost("XtreamPhaseSpacing")
+
     static let m3uDownload = PerfSignpost("M3UDownload")
     static let m3uImport = PerfSignpost("M3UImport")
 

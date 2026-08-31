@@ -60,6 +60,12 @@ Scripts/run-performance-tests.sh ParsingBenchmarks  # one suite
   what the Benchmark configuration exists for.
 - Store benchmarks use **on-disk** containers (`PerfStore`); in-memory skips
   SQLite, the very cost being measured.
+- **`context.save()` is ~90% of catalog import cost.** Optimise how much
+  SwiftData is asked to write, or how often; nothing else moves the number.
+- **Four knobs were measured at full scale and are each under 6%** — `batchSize`
+  (500/2k/10k/50k all within noise), the 11 `#Index` groups on `Movie`,
+  `@Attribute(.unique)`, and the per-batch existing-row lookup. Don't re-derive
+  them; `LumePerformanceTests/README.md` carries the numbers.
 - Fixtures are generated per run from a fixed seed (`PerfFixtures`), never
   committed.
 - App-defined phases are named once in `Services/Diagnostics/PerformanceSignposts.swift`
