@@ -190,12 +190,10 @@ struct EPGGridScroller: View {
         }
     }
 
-    /// Scroll offset that places `date` just inside the leading edge of the
-    /// grid. The lead-in only has to clear the marker's own cap; anything wider
-    /// puts the red line on top of the airing programme's title, which pins to
-    /// the leading edge one block inset in (`EPGStickyText`).
+    /// Scroll offset that parks `date` `metrics.nowLeadInMinutes` inside the
+    /// grid's leading edge.
     private func scrollTarget(forNow date: Date) -> CGFloat {
-        max(0, timeline.x(for: date) - 6)
+        timeline.x(for: date.addingTimeInterval(-Double(metrics.nowLeadInMinutes) * 60))
     }
 
     /// The initial target, handed to the grid. Bound to the view's captured
