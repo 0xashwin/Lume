@@ -190,9 +190,20 @@ struct EPGGridScroller: View {
         }
     }
 
-    /// Scroll offset that places "now" just inside the leading edge of the grid.
+    /// Scroll offset that places `date` just inside the leading edge of the
+    /// grid. The lead-in only has to clear the marker's own cap; anything wider
+    /// puts the red line on top of the airing programme's title, which pins to
+    /// the leading edge one block inset in (`EPGStickyText`).
+    private func scrollTarget(forNow date: Date) -> CGFloat {
+        max(0, timeline.x(for: date) - 6)
+    }
+
+    /// The initial target, handed to the grid. Bound to the view's captured
+    /// `now` on purpose: the grid's `Equatable` gate compares it, so a value
+    /// that moved with the wall clock would re-render the whole subtree on
+    /// every parent update. Explicit jumps read the clock instead.
     private var nowScrollTarget: CGFloat {
-        max(0, timeline.x(for: now) - 12)
+        scrollTarget(forNow: now)
     }
 
     /// Asks the grid to scroll. On tvOS the frozen panes' mirror is updated in
@@ -226,7 +237,7 @@ struct EPGGridScroller: View {
             Color.clear
         #else
             Button {
-                requestScroll(to: CGPoint(x: nowScrollTarget, y: sync.offset.y), animated: true)
+                requestScroll(to: CGPoint(x: scrollTarget(forNow: Date()), y: sync.offset.y), animated: true)
             } label: {
                 Label("Now", systemImage: "smallcircle.filled.circle")
                     .font(.subheadline.weight(.semibold))
@@ -340,7 +351,7 @@ struct EPGGridScroller: View {
         /// visible channel, reading as "now" on a channel.
         private func landOnChannel() {
             guard !rows.isEmpty else { return }
-            requestScroll(to: CGPoint(x: nowScrollTarget, y: sync.offset.y), animated: false)
+            requestScroll(to: CGPoint(x: scrollTarget(forNow: Date()), y: sync.offset.y), animated: false)
             preferredX = nil
             virtualFocus = .channel(rowIndex: topVisibleRowIndex)
         }
@@ -502,7 +513,7 @@ struct EPGGridScroller: View {
         /// back to now.
         private func handleExitCommand() {
             guard case let .cell(rowIndex, _) = virtualFocus else { return }
-            requestScroll(to: CGPoint(x: nowScrollTarget, y: sync.offset.y), animated: false)
+            requestScroll(to: CGPoint(x: scrollTarget(forNow: Date()), y: sync.offset.y), animated: false)
             preferredX = nil
             virtualFocus = .channel(rowIndex: rowIndex)
         }

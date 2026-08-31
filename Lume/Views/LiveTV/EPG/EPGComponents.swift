@@ -278,6 +278,21 @@ struct EPGProgramBlockView: View {
             .padding(.horizontal, metrics.blockInset)
             .padding(.vertical, metrics.blockInset * 0.55)
             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+            // Keeps the text of a partially scrolled block readable instead of
+            // letting it ride off the leading edge with the block's own origin.
+            // Driven by `visualEffect` rather than the shared scroll offset: the
+            // closure re-runs on geometry change without invalidating the
+            // block's body, where observing the guide's per-frame offset would
+            // re-render every realized cell — the cost the grid is built around.
+            .visualEffect { [inset = metrics.blockInset] content, proxy in
+                content.offset(
+                    x: EPGStickyText.shift(
+                        blockMinX: proxy.frame(in: .scrollView).minX,
+                        blockWidth: proxy.size.width,
+                        inset: inset
+                    )
+                )
+            }
 
             if isLive {
                 liveProgressBar

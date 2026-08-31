@@ -78,6 +78,25 @@ nonisolated struct EPGTimeline: Equatable {
     }
 }
 
+// MARK: - Sticky text
+
+/// How far a programme block's text has to shift to stay inside the viewport.
+///
+/// Blocks sit at their absolute timeline offset and draw their text at their
+/// own leading edge, so a programme that started before the viewport's leading
+/// edge — the in-progress one the guide opens on — would render its title
+/// off-screen. Shifting by the hidden amount pins the text to the visible part
+/// of the block; the cap stops it from sliding out of the block's own trailing
+/// edge as the block scrolls away.
+///
+/// `nonisolated`: called from the `visualEffect` closure, which is `@Sendable`.
+nonisolated enum EPGStickyText {
+    static func shift(blockMinX: CGFloat, blockWidth: CGFloat, inset: CGFloat) -> CGFloat {
+        guard blockMinX < 0 else { return 0 }
+        return min(-blockMinX, max(0, blockWidth - inset * 2))
+    }
+}
+
 // MARK: - Grid model
 
 /// One cell in a channel row: either a real programme or a gap filler that keeps
