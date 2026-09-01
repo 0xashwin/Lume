@@ -204,9 +204,15 @@ struct VLCPlayerControlsOverlay: View {
         let hasRate = !media.isLive
 
         return HStack(spacing: 4) {
-            if hasText { subtitleMenu }
-            if hasAudio { audioTrackMenu }
-            if hasRate { playbackRateMenu }
+            if hasText {
+                subtitleMenu
+            }
+            if hasAudio {
+                audioTrackMenu
+            }
+            if hasRate {
+                playbackRateMenu
+            }
             favoriteButton
         }
         .padding(.horizontal, 4)
@@ -233,14 +239,14 @@ struct VLCPlayerControlsOverlay: View {
                 coordinator.selectTextTrack(nil)
                 onResetHideTimer()
             } label: {
-                checkmarkLabel("Off", checked: !hasSelection)
+                playerCheckmarkLabel("Off", checked: !hasSelection)
             }
             ForEach(Array(tracks.enumerated()), id: \.offset) { _, track in
                 Button {
                     coordinator.selectTextTrack(track)
                     onResetHideTimer()
                 } label: {
-                    checkmarkLabel(track.trackName, checked: track.isSelectedExclusively)
+                    playerCheckmarkLabel(verbatim: track.trackName, checked: track.isSelectedExclusively)
                 }
             }
             if let onSearchSubtitles {
@@ -256,6 +262,7 @@ struct VLCPlayerControlsOverlay: View {
             pillGlyph("captions.bubble.fill", dimmed: !hasSelection)
         }
         .menuIndicator(.hidden)
+        .trackMenuAccessibility("Subtitles", selected: tracks.first(where: \.isSelectedExclusively)?.trackName, fallback: "Off")
     }
 
     @ViewBuilder
@@ -267,13 +274,14 @@ struct VLCPlayerControlsOverlay: View {
                     coordinator.selectAudioTrack(track)
                     onResetHideTimer()
                 } label: {
-                    checkmarkLabel(track.trackName, checked: track.isSelectedExclusively)
+                    playerCheckmarkLabel(verbatim: track.trackName, checked: track.isSelectedExclusively)
                 }
             }
         } label: {
             pillGlyph("waveform")
         }
         .menuIndicator(.hidden)
+        .trackMenuAccessibility("Audio Track", selected: tracks.first(where: \.isSelectedExclusively)?.trackName, fallback: "Default")
     }
 
     private var playbackRateMenu: some View {
@@ -283,7 +291,7 @@ struct VLCPlayerControlsOverlay: View {
                     coordinator.playbackRate = rate
                     onResetHideTimer()
                 } label: {
-                    checkmarkLabel(rateString(rate), checked: abs(coordinator.playbackRate - rate) < 0.01)
+                    playerCheckmarkLabel(verbatim: rateString(rate), checked: abs(coordinator.playbackRate - rate) < 0.01)
                 }
             }
         } label: {
@@ -381,15 +389,6 @@ struct VLCPlayerControlsOverlay: View {
     /// Compact rate label, e.g. `1×`, `1.25×`. `%g` drops trailing zeros.
     private func rateString(_ rate: Float) -> String {
         String(format: "%g×", rate)
-    }
-
-    @ViewBuilder
-    private func checkmarkLabel(_ title: String, checked: Bool) -> some View {
-        if checked {
-            Label(title, systemImage: "checkmark")
-        } else {
-            Text(title)
-        }
     }
 
     private func timeString(from time: TimeInterval) -> String {
