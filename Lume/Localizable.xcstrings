@@ -2306,6 +2306,58 @@
         }
       }
     },
+    "A sentence or two helps a lot. It's added to the top of the report." : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ein, zwei Sätze helfen sehr. Sie werden oben im Bericht eingefügt."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Una o dos frases ayudan mucho. Se añaden al principio del informe."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Une ou deux phrases aident beaucoup. Elles sont ajoutées en haut du rapport."
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Una o due frasi aiutano molto. Vengono aggiunte all'inizio del rapporto."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "一言、二言でも大いに役立ちます。レポートの先頭に追加されます。"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "한두 문장만 적어 주셔도 큰 도움이 됩니다. 보고서 맨 위에 추가됩니다."
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Uma ou duas frases ajudam muito. Elas são adicionadas ao início do relatório."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "一两句话就很有帮助。它会添加到报告的开头。"
+          }
+        }
+      }
+    },
     "Abandoned" : {
       "localizations" : {
         "de" : {
@@ -8480,6 +8532,58 @@
         }
       }
     },
+    "Clear Diagnostic Data" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Diagnosedaten löschen"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Borrar datos de diagnóstico"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Effacer les données de diagnostic"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Cancella dati di diagnostica"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "診断データを消去"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "진단 데이터 지우기"
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Limpar dados de diagnóstico"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "清除诊断数据"
+          }
+        }
+      }
+    },
     "Clear Image Cache" : {
       "localizations" : {
         "de" : {
@@ -8685,6 +8789,58 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "清除最近观看"
+          }
+        }
+      }
+    },
+    "Clear the diagnostic log?" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Diagnoseprotokoll löschen?"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "¿Borrar el registro de diagnóstico?"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Effacer le journal de diagnostic ?"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Cancellare il registro di diagnostica?"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "診断ログを消去しますか？"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "진단 로그를 지울까요?"
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Limpar o registro de diagnóstico?"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "要清除诊断日志吗？"
           }
         }
       }
@@ -10162,106 +10318,54 @@
         }
       }
     },
-    "Couldn't Prepare Logs" : {
+    "Couldn't Prepare the Report" : {
       "localizations" : {
         "de" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Protokolle konnten nicht vorbereitet werden"
+            "value" : "Bericht konnte nicht erstellt werden"
           }
         },
         "es" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "No se pudieron preparar los registros"
+            "value" : "No se pudo preparar el informe"
           }
         },
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Impossible de préparer les journaux"
+            "value" : "Impossible de préparer le rapport"
           }
         },
         "it" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Impossibile preparare i registri"
+            "value" : "Impossibile preparare il rapporto"
           }
         },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "ログを準備できませんでした"
+            "value" : "レポートを準備できませんでした"
           }
         },
         "ko" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "로그를 준비할 수 없습니다"
+            "value" : "보고서를 준비할 수 없음"
           }
         },
         "pt" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Não foi possível preparar os registros"
+            "value" : "Não foi possível preparar o relatório"
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "无法准备日志"
-          }
-        }
-      }
-    },
-    "Couldn't read the logs." : {
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Protokolle konnten nicht gelesen werden."
-          }
-        },
-        "es" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "No se pudieron leer los registros."
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Impossible de lire les journaux."
-          }
-        },
-        "it" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Impossibile leggere i registri."
-          }
-        },
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "ログを読み取れませんでした。"
-          }
-        },
-        "ko" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "로그를 읽을 수 없습니다."
-          }
-        },
-        "pt" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Não foi possível ler os registros."
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "无法读取日志。"
+            "value" : "无法准备报告"
           }
         }
       }
@@ -10680,58 +10784,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "深色"
-          }
-        }
-      }
-    },
-    "Debug Logging" : {
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Debug-Protokollierung"
-          }
-        },
-        "es" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Registro de depuración"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Journalisation de débogage"
-          }
-        },
-        "it" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Registro di debug"
-          }
-        },
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "デバッグログ"
-          }
-        },
-        "ko" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "디버그 로깅"
-          }
-        },
-        "pt" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Registro de depuração"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "调试日志"
           }
         }
       }
@@ -11679,54 +11731,106 @@
         }
       }
     },
-    "Describe the problem here. The diagnostic log is attached.\n\n" : {
+    "Describe the problem here." : {
       "localizations" : {
         "de" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Beschreibe das Problem hier. Das Diagnoseprotokoll ist angehängt.\n\n"
+            "value" : "Beschreibe das Problem hier."
           }
         },
         "es" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Describe el problema aquí. El registro de diagnóstico está adjunto.\n\n"
+            "value" : "Describe el problema aquí."
           }
         },
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Décrivez le problème ici. Le journal de diagnostic est joint.\n\n"
+            "value" : "Décrivez le problème ici."
           }
         },
         "it" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Descrivi il problema qui. Il registro diagnostico è allegato.\n\n"
+            "value" : "Descrivi il problema qui."
           }
         },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "ここで問題を説明してください。診断ログを添付しています。\n\n"
+            "value" : "ここに問題を記入してください。"
           }
         },
         "ko" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "여기에 문제를 설명하세요. 진단 로그가 첨부되어 있습니다.\n\n"
+            "value" : "여기에 문제를 설명해 주세요."
           }
         },
         "pt" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Descreva o problema aqui. O registro de diagnóstico está anexado.\n\n"
+            "value" : "Descreva o problema aqui."
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "请在此处描述问题。诊断日志已附上。\n\n"
+            "value" : "请在此描述问题。"
+          }
+        }
+      }
+    },
+    "Description (optional)" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Beschreibung (optional)"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Descripción (opcional)"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Description (facultatif)"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Descrizione (facoltativa)"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "説明（任意）"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "설명(선택 사항)"
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Descrição (opcional)"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "描述（可选）"
           }
         }
       }
@@ -11832,6 +11936,58 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "详细程度"
+          }
+        }
+      }
+    },
+    "Detailed Logging" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ausführliche Protokollierung"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Registro detallado"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Journalisation détaillée"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Registrazione dettagliata"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "詳細ログ"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "상세 로깅"
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Registro detalhado"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "详细日志"
           }
         }
       }
@@ -11989,6 +12145,110 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "诊断"
+          }
+        }
+      }
+    },
+    "Diagnostics are always recorded on this device and never leave it unless you send them. Detailed logging adds verbose entries — turn it on only when asked to." : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Diagnosedaten werden immer auf diesem Gerät aufgezeichnet und verlassen es nur, wenn du sie sendest. Die ausführliche Protokollierung fügt detaillierte Einträge hinzu – aktiviere sie nur, wenn du darum gebeten wirst."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Los diagnósticos se registran siempre en este dispositivo y nunca salen de él a menos que los envíes. El registro detallado añade entradas más completas; actívalo solo cuando se te pida."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Les diagnostics sont toujours enregistrés sur cet appareil et ne le quittent que si vous les envoyez. La journalisation détaillée ajoute des entrées supplémentaires — ne l'activez que si on vous le demande."
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "La diagnostica viene sempre registrata su questo dispositivo e non lo lascia mai, a meno che tu non la invii. La registrazione dettagliata aggiunge voci più approfondite: attivala solo se ti viene richiesto."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "診断情報は常にこのデバイスに記録され、送信しない限りデバイスの外に出ることはありません。詳細ログは詳しい記録を追加します。依頼されたときだけオンにしてください。"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "진단 정보는 항상 이 기기에 기록되며, 직접 보내지 않는 한 기기 밖으로 나가지 않습니다. 상세 로깅은 더 자세한 항목을 추가합니다. 요청받았을 때만 켜 주세요."
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Os diagnósticos são sempre registrados neste dispositivo e nunca saem dele, a menos que você os envie. O registro detalhado adiciona entradas mais completas — ative-o somente quando solicitado."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "诊断信息始终记录在此设备上，除非你发送，否则不会离开设备。详细日志会添加更详尽的条目——仅在被要求时才开启。"
+          }
+        }
+      }
+    },
+    "Diagnostics are always recorded on this device. Detailed logging adds verbose entries — turn it on only when asked to, reproduce the problem, then send the report." : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Diagnosedaten werden immer auf diesem Gerät aufgezeichnet. Die ausführliche Protokollierung fügt detaillierte Einträge hinzu – aktiviere sie nur, wenn du darum gebeten wirst, reproduziere das Problem und sende dann den Bericht."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Los diagnósticos se registran siempre en este dispositivo. El registro detallado añade entradas más completas: actívalo solo cuando se te pida, reproduce el problema y envía el informe."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Les diagnostics sont toujours enregistrés sur cet appareil. La journalisation détaillée ajoute des entrées supplémentaires — activez-la seulement si on vous le demande, reproduisez le problème, puis envoyez le rapport."
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "La diagnostica viene sempre registrata su questo dispositivo. La registrazione dettagliata aggiunge voci più approfondite: attivala solo se ti viene richiesto, riproduci il problema e poi invia il rapporto."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "診断情報は常にこのデバイスに記録されます。詳細ログは詳しい記録を追加します。依頼されたときだけオンにし、問題を再現してからレポートを送信してください。"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "진단 정보는 항상 이 기기에 기록됩니다. 상세 로깅은 더 자세한 항목을 추가합니다. 요청받았을 때만 켜고, 문제를 재현한 다음 보고서를 보내 주세요."
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Os diagnósticos são sempre registrados neste dispositivo. O registro detalhado adiciona entradas mais completas — ative-o somente quando solicitado, reproduza o problema e envie o relatório."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "诊断信息始终记录在此设备上。详细日志会添加更详尽的条目——仅在被要求时开启，重现问题后再发送报告。"
           }
         }
       }
@@ -14113,54 +14373,54 @@
         }
       }
     },
-    "Email Logs to Developer" : {
+    "Email Report to Developer" : {
       "localizations" : {
         "de" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Protokolle an Entwickler senden"
+            "value" : "Bericht per E-Mail an Entwickler senden"
           }
         },
         "es" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Enviar registros al desarrollador"
+            "value" : "Enviar informe al desarrollador"
           }
         },
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Envoyer les journaux au développeur"
+            "value" : "Envoyer le rapport au développeur"
           }
         },
         "it" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Invia i registri allo sviluppatore"
+            "value" : "Invia rapporto allo sviluppatore"
           }
         },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "開発者にログをメール送信"
+            "value" : "レポートを開発者にメール"
           }
         },
         "ko" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "개발자에게 로그 이메일 보내기"
+            "value" : "개발자에게 보고서 이메일 보내기"
           }
         },
         "pt" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Enviar registros ao desenvolvedor"
+            "value" : "Enviar relatório ao desenvolvedor"
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "将日志发送给开发者"
+            "value" : "通过邮件将报告发送给开发者"
           }
         }
       }
@@ -24627,110 +24887,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "锁定某个类别可将其对儿童个人资料隐藏。拖动以重新排列。"
-          }
-        }
-      }
-    },
-    "Logs" : {
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Protokolle"
-          }
-        },
-        "es" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Registros"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Journaux"
-          }
-        },
-        "it" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Registri"
-          }
-        },
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "ログ"
-          }
-        },
-        "ko" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "로그"
-          }
-        },
-        "pt" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Registros"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "日志"
-          }
-        }
-      }
-    },
-    "Logs are sent to %@." : {
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Protokolle werden an %@ gesendet."
-          }
-        },
-        "es" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Los registros se envían a %@."
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Les journaux sont envoyés à %@."
-          }
-        },
-        "it" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "I registri vengono inviati a %@."
-          }
-        },
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "ログは %@ に送信されます。"
-          }
-        },
-        "ko" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "로그는 %@(으)로 전송됩니다."
-          }
-        },
-        "pt" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Os registros são enviados para %@."
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "日志将发送至 %@。"
           }
         }
       }
@@ -35788,54 +35944,106 @@
         }
       }
     },
-    "Prepare Logs" : {
+    "Prepare Report" : {
       "localizations" : {
         "de" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Protokolle vorbereiten"
+            "value" : "Bericht erstellen"
           }
         },
         "es" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Preparar registros"
+            "value" : "Preparar informe"
           }
         },
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Préparer les journaux"
+            "value" : "Préparer le rapport"
           }
         },
         "it" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Prepara i registri"
+            "value" : "Prepara rapporto"
           }
         },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "ログを準備"
+            "value" : "レポートを準備"
           }
         },
         "ko" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "로그 준비"
+            "value" : "보고서 준비"
           }
         },
         "pt" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Preparar registros"
+            "value" : "Preparar relatório"
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "准备日志"
+            "value" : "准备报告"
+          }
+        }
+      }
+    },
+    "Prepare the report, then share it or attach it to an email to %@." : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Erstelle den Bericht und teile ihn dann oder hänge ihn an eine E-Mail an %@ an."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Prepara el informe y luego compártelo o adjúntalo a un correo para %@."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Préparez le rapport, puis partagez-le ou joignez-le à un e-mail adressé à %@."
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Prepara il rapporto, poi condividilo o allegalo a un'e-mail a %@."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "レポートを準備してから、共有するか %@ 宛てのメールに添付してください。"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "보고서를 준비한 다음 공유하거나 %@(으)로 보내는 이메일에 첨부하세요."
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Prepare o relatório e depois compartilhe-o ou anexe-o a um e-mail para %@."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "准备报告后，分享它或将其附加到发送至 %@ 的邮件中。"
           }
         }
       }
@@ -36256,6 +36464,58 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "探测大小"
+          }
+        }
+      }
+    },
+    "Problem" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Problem"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Problema"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Problème"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Problema"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "問題"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "문제"
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Problema"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "问题"
           }
         }
       }
@@ -37357,58 +37617,6 @@
         }
       }
     },
-    "Records diagnostic logs as you use the app. Reproduce the problem, then send the logs below. They stay on your device until you send them, and personal details are hidden." : {
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Zeichnet Diagnoseprotokolle auf, während du die App verwendest. Reproduziere das Problem und sende dann unten die Protokolle. Sie verbleiben auf deinem Gerät, bis du sie sendest, und persönliche Daten werden ausgeblendet."
-          }
-        },
-        "es" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Registra los datos de diagnóstico mientras usas la app. Reproduce el problema y luego envía los registros de abajo. Permanecen en tu dispositivo hasta que los envíes y los datos personales quedan ocultos."
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Enregistre des journaux de diagnostic pendant que vous utilisez l'app. Reproduisez le problème, puis envoyez les journaux ci-dessous. Ils restent sur votre appareil jusqu'à leur envoi et les données personnelles sont masquées."
-          }
-        },
-        "it" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Registra i log diagnostici mentre usi l'app. Riproduci il problema, quindi invia i registri qui sotto. Rimangono sul tuo dispositivo finché non li invii e i dati personali vengono nascosti."
-          }
-        },
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "アプリの使用中に診断ログを記録します。問題を再現してから、下のログを送信してください。ログは送信するまでデバイスに保存され、個人情報は非表示になります。"
-          }
-        },
-        "ko" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "앱을 사용하는 동안 진단 로그를 기록합니다. 문제를 재현한 다음 아래에서 로그를 보내세요. 로그는 보낼 때까지 기기에 남아 있으며 개인 정보는 숨겨집니다."
-          }
-        },
-        "pt" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Registra logs de diagnóstico enquanto você usa o app. Reproduza o problema e envie os registros abaixo. Eles permanecem no seu dispositivo até você enviá-los e os dados pessoais ficam ocultos."
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "在你使用应用时记录诊断日志。重现问题后，发送下方的日志。日志会保留在你的设备上，直到你发送它们，个人信息将被隐藏。"
-          }
-        }
-      }
-    },
     "Red card" : {
       "localizations" : {
         "de" : {
@@ -37669,58 +37877,6 @@
         }
       }
     },
-    "Refresh Logs" : {
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Protokolle aktualisieren"
-          }
-        },
-        "es" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Actualizar registros"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Actualiser les journaux"
-          }
-        },
-        "it" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Aggiorna i registri"
-          }
-        },
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "ログを更新"
-          }
-        },
-        "ko" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "로그 새로 고침"
-          }
-        },
-        "pt" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Atualizar registros"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "刷新日志"
-          }
-        }
-      }
-    },
     "Refresh Now" : {
       "localizations" : {
         "de" : {
@@ -37769,6 +37925,58 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "立即刷新"
+          }
+        }
+      }
+    },
+    "Refresh Report" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Bericht aktualisieren"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Actualizar informe"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Actualiser le rapport"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Aggiorna rapporto"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "レポートを更新"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "보고서 새로 고침"
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Atualizar relatório"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "刷新报告"
           }
         }
       }
@@ -38560,6 +38768,110 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "重新排列“收藏”类别中的频道。"
+          }
+        }
+      }
+    },
+    "Report" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Bericht"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Informe"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Rapport"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Rapporto"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "レポート"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "보고서"
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Relatório"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "报告"
+          }
+        }
+      }
+    },
+    "Reports go to %@." : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Berichte gehen an %@."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Los informes se envían a %@."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Les rapports sont envoyés à %@."
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "I rapporti vengono inviati a %@."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "レポートは %@ に送信されます。"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "보고서는 %@(으)로 전송됩니다."
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Os relatórios são enviados para %@."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "报告将发送至 %@。"
           }
         }
       }
@@ -39560,58 +39872,6 @@
         }
       }
     },
-    "Review exactly what will be sent before you share it." : {
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Prüfe genau, was gesendet wird, bevor du es teilst."
-          }
-        },
-        "es" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Revisa exactamente lo que se enviará antes de compartirlo."
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Vérifiez exactement ce qui sera envoyé avant de le partager."
-          }
-        },
-        "it" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Controlla esattamente ciò che verrà inviato prima di condividerlo."
-          }
-        },
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "共有する前に、送信される内容を正確に確認できます。"
-          }
-        },
-        "ko" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "공유하기 전에 전송될 내용을 정확히 확인하세요."
-          }
-        },
-        "pt" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Revise exatamente o que será enviado antes de compartilhar."
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "在共享之前，请准确查看将要发送的内容。"
-          }
-        }
-      }
-    },
     "RK" : {
       "comment" : "Standings table column header: rank (keep very short).",
       "localizations" : {
@@ -40240,6 +40500,58 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "扑救"
+          }
+        }
+      }
+    },
+    "Scan the code with your phone to email a diagnostic summary to %@. Add a sentence about what went wrong before you send it." : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Scanne den Code mit deinem Telefon, um eine Diagnosezusammenfassung per E-Mail an %@ zu senden. Beschreibe vor dem Senden kurz, was schiefgelaufen ist."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Escanea el código con tu teléfono para enviar un resumen de diagnóstico por correo a %@. Añade una frase sobre lo que falló antes de enviarlo."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Scannez le code avec votre téléphone pour envoyer un résumé de diagnostic par e-mail à %@. Ajoutez une phrase sur ce qui n'a pas fonctionné avant l'envoi."
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Scansiona il codice con il telefono per inviare un riepilogo di diagnostica via e-mail a %@. Aggiungi una frase su cosa è andato storto prima di inviarlo."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "スマートフォンでコードをスキャンすると、診断の概要を %@ にメールで送信できます。送信する前に、何が起きたかを一言添えてください。"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "휴대폰으로 코드를 스캔하면 진단 요약을 %@(으)로 이메일로 보낼 수 있습니다. 보내기 전에 무엇이 잘못되었는지 한 문장 덧붙여 주세요."
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Escaneie o código com seu telefone para enviar um resumo de diagnóstico por e-mail para %@. Adicione uma frase sobre o que deu errado antes de enviar."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "用手机扫描此代码，即可通过邮件将诊断摘要发送至 %@。发送前请补充一句说明出了什么问题。"
           }
         }
       }
@@ -41599,6 +41911,58 @@
         }
       }
     },
+    "See exactly what will be sent. The report lists your device, app settings, playlist types and sync state, and recent app activity — never playlist names, server addresses, usernames or passwords." : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sieh genau, was gesendet wird. Der Bericht enthält dein Gerät, die App-Einstellungen, Playlist-Typen und Synchronisierungsstatus sowie die letzten App-Aktivitäten – niemals Playlist-Namen, Serveradressen, Benutzernamen oder Passwörter."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Consulta exactamente lo que se enviará. El informe incluye tu dispositivo, los ajustes de la app, los tipos de lista y su estado de sincronización, y la actividad reciente de la app; nunca nombres de listas, direcciones de servidor, usuarios ni contraseñas."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Voyez exactement ce qui sera envoyé. Le rapport indique votre appareil, les réglages de l'app, les types de playlist et leur état de synchronisation, ainsi que l'activité récente de l'app — jamais de noms de playlist, d'adresses de serveur, de noms d'utilisateur ni de mots de passe."
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Guarda esattamente cosa verrà inviato. Il rapporto elenca il dispositivo, le impostazioni dell'app, i tipi di playlist e lo stato di sincronizzazione, oltre all'attività recente dell'app: mai nomi di playlist, indirizzi dei server, nomi utente o password."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "送信される内容をそのまま確認できます。レポートにはデバイス、アプリの設定、プレイリストの種類と同期状態、最近のアプリの動作が含まれます。プレイリスト名、サーバアドレス、ユーザ名、パスワードは含まれません。"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "전송될 내용을 그대로 확인하세요. 보고서에는 기기, 앱 설정, 재생목록 유형과 동기화 상태, 최근 앱 활동이 포함되며, 재생목록 이름, 서버 주소, 사용자 이름, 비밀번호는 절대 포함되지 않습니다."
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Veja exatamente o que será enviado. O relatório lista seu dispositivo, os ajustes do app, os tipos de playlist e o estado de sincronização, além da atividade recente do app — nunca nomes de playlists, endereços de servidor, nomes de usuário ou senhas."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "查看将要发送的确切内容。报告包含你的设备、App 设置、播放列表类型和同步状态以及最近的 App 活动——绝不包含播放列表名称、服务器地址、用户名或密码。"
+          }
+        }
+      }
+    },
     "Select a Category" : {
       "localizations" : {
         "de" : {
@@ -41699,6 +42063,162 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "选择一行将其拿起，上下移动后再次选择即可放置 — 靠前的几项会显示在主页栏目的最前面。"
+          }
+        }
+      }
+    },
+    "Send" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Senden"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Enviar"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Envoyer"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Invia"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "送信"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "보내기"
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Enviar"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "发送"
+          }
+        }
+      }
+    },
+    "Send Diagnostics" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Diagnose senden"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Enviar diagnóstico"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Envoyer le diagnostic"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Invia diagnostica"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "診断情報を送信"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "진단 정보 보내기"
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Enviar diagnóstico"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "发送诊断信息"
+          }
+        }
+      }
+    },
+    "Send Diagnostics…" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Diagnose senden …"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Enviar diagnóstico…"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Envoyer le diagnostic…"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Invia diagnostica…"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "診断情報を送信…"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "진단 정보 보내기…"
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Enviar diagnóstico…"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "发送诊断信息…"
           }
         }
       }
@@ -42275,54 +42795,54 @@
         }
       }
     },
-    "Share Logs…" : {
+    "Share Report…" : {
       "localizations" : {
         "de" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Protokolle teilen …"
+            "value" : "Bericht teilen …"
           }
         },
         "es" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Compartir registros…"
+            "value" : "Compartir informe…"
           }
         },
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Partager les journaux…"
+            "value" : "Partager le rapport…"
           }
         },
         "it" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Condividi i registri…"
+            "value" : "Condividi rapporto…"
           }
         },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "ログを共有…"
+            "value" : "レポートを共有…"
           }
         },
         "ko" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "로그 공유…"
+            "value" : "보고서 공유…"
           }
         },
         "pt" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Compartilhar registros…"
+            "value" : "Compartilhar relatório…"
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "共享日志…"
+            "value" : "分享报告…"
           }
         }
       }
@@ -44522,6 +45042,110 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "平滑隔行扫描频道（通常为1080i）。关闭后将原样显示帧，运动画面可能出现梳状伪影。"
+          }
+        }
+      }
+    },
+    "Something not working? Send a diagnostic report to the developer." : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Funktioniert etwas nicht? Sende einen Diagnosebericht an den Entwickler."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "¿Algo no funciona? Envía un informe de diagnóstico al desarrollador."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Quelque chose ne fonctionne pas ? Envoyez un rapport de diagnostic au développeur."
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Qualcosa non funziona? Invia un rapporto di diagnostica allo sviluppatore."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "うまく動作しない場合は、診断レポートを開発者に送信してください。"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "제대로 작동하지 않나요? 개발자에게 진단 보고서를 보내 주세요."
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Algo não está funcionando? Envie um relatório de diagnóstico ao desenvolvedor."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "遇到问题？请向开发者发送诊断报告。"
+          }
+        }
+      }
+    },
+    "Something not working? Send a diagnostic summary to the developer." : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Funktioniert etwas nicht? Sende eine Diagnosezusammenfassung an den Entwickler."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "¿Algo no funciona? Envía un resumen de diagnóstico al desarrollador."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Quelque chose ne fonctionne pas ? Envoyez un résumé de diagnostic au développeur."
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Qualcosa non funziona? Invia un riepilogo di diagnostica allo sviluppatore."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "うまく動作しない場合は、診断の概要を開発者に送信してください。"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "제대로 작동하지 않나요? 개발자에게 진단 요약을 보내 주세요."
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Algo não está funcionando? Envie um resumo de diagnóstico ao desenvolvedor."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "遇到问题？请向开发者发送诊断摘要。"
           }
         }
       }
@@ -49149,6 +49773,110 @@
         }
       }
     },
+    "The diagnostic log stays on your device until you send it, and removes its oldest entries on its own." : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Das Diagnoseprotokoll bleibt auf deinem Gerät, bis du es sendest, und entfernt seine ältesten Einträge selbstständig."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "El registro de diagnóstico permanece en tu dispositivo hasta que lo envíes y elimina por sí solo sus entradas más antiguas."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Le journal de diagnostic reste sur votre appareil jusqu'à ce que vous l'envoyiez et supprime lui-même ses entrées les plus anciennes."
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Il registro di diagnostica rimane sul dispositivo finché non lo invii e rimuove da solo le voci più vecchie."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "診断ログは送信するまでデバイスに保存され、古い記録は自動的に削除されます。"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "진단 로그는 보내기 전까지 기기에 남아 있으며, 가장 오래된 항목은 자동으로 삭제됩니다."
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "O registro de diagnóstico fica no seu dispositivo até você enviá-lo e remove sozinho as entradas mais antigas."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "诊断日志会保留在你的设备上，直到你发送为止，并会自动删除最旧的条目。"
+          }
+        }
+      }
+    },
+    "The diagnostic report is attached." : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Der Diagnosebericht ist angehängt."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Se adjunta el informe de diagnóstico."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Le rapport de diagnostic est joint."
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Il rapporto di diagnostica è allegato."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "診断レポートを添付しています。"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "진단 보고서가 첨부되어 있습니다."
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "O relatório de diagnóstico está anexado."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "已附上诊断报告。"
+          }
+        }
+      }
+    },
     "The downloaded file will be removed. You can re-download it later." : {
       "localizations" : {
         "de" : {
@@ -52287,58 +53015,6 @@
         }
       }
     },
-    "Turn on debug logging to help diagnose a problem, then send the logs to the developer." : {
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Aktiviere die Debug-Protokollierung, um ein Problem zu diagnostizieren, und sende die Protokolle dann an den Entwickler."
-          }
-        },
-        "es" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Activa el registro de depuración para ayudar a diagnosticar un problema y luego envía los registros al desarrollador."
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Activez la journalisation de débogage pour aider à diagnostiquer un problème, puis envoyez les journaux au développeur."
-          }
-        },
-        "it" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Attiva il registro di debug per aiutare a diagnosticare un problema, quindi invia i registri allo sviluppatore."
-          }
-        },
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "問題の診断に役立てるためにデバッグログを有効にし、ログを開発者に送信します。"
-          }
-        },
-        "ko" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "문제 진단에 도움이 되도록 디버그 로깅을 켠 다음 로그를 개발자에게 보내세요."
-          }
-        },
-        "pt" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Ative o registro de depuração para ajudar a diagnosticar um problema e envie os registros ao desenvolvedor."
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "打开调试日志以帮助诊断问题，然后将日志发送给开发者。"
-          }
-        }
-      }
-    },
     "Turn sections on or off and reorder them. Each appears on Home only when it has something to show. \"For You\" is built on-device from your library and what you watch." : {
       "localizations" : {
         "de" : {
@@ -53909,54 +54585,54 @@
         }
       }
     },
-    "View Logs" : {
+    "View Report" : {
       "localizations" : {
         "de" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Protokolle anzeigen"
+            "value" : "Bericht ansehen"
           }
         },
         "es" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Ver registros"
+            "value" : "Ver informe"
           }
         },
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Afficher les journaux"
+            "value" : "Voir le rapport"
           }
         },
         "it" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Visualizza i registri"
+            "value" : "Visualizza rapporto"
           }
         },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "ログを表示"
+            "value" : "レポートを表示"
           }
         },
         "ko" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "로그 보기"
+            "value" : "보고서 보기"
           }
         },
         "pt" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Ver registros"
+            "value" : "Ver relatório"
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "查看日志"
+            "value" : "查看报告"
           }
         }
       }
@@ -55273,6 +55949,58 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "网站"
+          }
+        }
+      }
+    },
+    "What were you doing when it went wrong?" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Was hast du gemacht, als der Fehler auftrat?"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "¿Qué estabas haciendo cuando falló?"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Que faisiez-vous lorsque le problème est survenu ?"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Cosa stavi facendo quando si è verificato il problema?"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "問題が起きたとき、何をしていましたか？"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "문제가 발생했을 때 무엇을 하고 있었나요?"
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "O que você estava fazendo quando deu errado?"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "出问题时你正在做什么？"
           }
         }
       }

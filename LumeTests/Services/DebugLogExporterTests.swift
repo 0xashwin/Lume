@@ -19,7 +19,7 @@ struct DebugLogExporterTests {
         let exporter = DebugLogExporter(metadata: sampleMetadata())
         let text = exporter.header(now: Date(timeIntervalSince1970: 0)).joined(separator: "\n")
 
-        #expect(text.contains("Lume Diagnostic Log"))
+        #expect(text.contains("Lume Diagnostic Report"))
         #expect(text.contains("App: Lume 1.2.3 (build 42)"))
         #expect(text.contains("Platform: iOS Version 26.4 (Build 23A340)"))
         #expect(text.contains("Device: iPhone17,1"))

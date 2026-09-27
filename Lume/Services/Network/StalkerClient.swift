@@ -123,7 +123,7 @@ class StalkerClient {
         trying endpoints: [URL],
         lastError: inout Error
     ) async throws -> StalkerSessionStore.Session? {
-        for endpoint in endpoints {
+        for (index, endpoint) in endpoints.enumerated() {
             // Bail immediately if a caller deadline (e.g. the add-playlist
             // connection-test timeout) cancelled us, rather than racing through
             // the remaining endpoints.
@@ -147,11 +147,20 @@ class StalkerClient {
                 return session
             } catch {
                 lastError = error
+                // What each miss returned tells a wrong path from a blocked device.
+                let shape = NetworkDiagnostics.shape(of: endpoint.absoluteString)
+                let returned = lastResponseFingerprint ?? "no response"
+                Logger.network.info(
+                    "Stalker handshake candidate \(index + 1)/\(endpoints.count) [\(shape)] failed — \(error) — \(returned)"
+                )
                 continue
             }
         }
         return nil
     }
+
+    /// What the most recent failed `perform` got back, for the failure logs.
+    private var lastResponseFingerprint: String?
 
     // MARK: - Request plumbing
 
@@ -193,14 +202,15 @@ class StalkerClient {
                 guard error.isRetriable, attempt < Self.maxAttempts else {
                     // Only here, not in `perform`: the handshake's endpoint
                     // probing decodes HTML from the wrong candidates by design.
+                    let returned = lastResponseFingerprint ?? "no response"
                     Logger.network.error(
-                        "Stalker: \(type, privacy: .public) \(action, privacy: .public) failed — \(error.logDescription, privacy: .public)"
+                        "Stalker: \(type, privacy: .public) \(action, privacy: .public) failed — \(error) — \(returned)"
                     )
                     throw error
                 }
                 let delay = pow(2.0, Double(attempt))
                 Logger.network.warning(
-                    "Stalker request failed (\(error.localizedDescription)); retry \(attempt)/\(Self.maxAttempts - 1) in \(delay)s"
+                    "Stalker request failed (\(error)); retry \(attempt)/\(Self.maxAttempts - 1) in \(delay)s"
                 )
                 try await Task.sleep(nanoseconds: UInt64(delay * 1_000_000_000))
             }
@@ -225,31 +235,20 @@ class StalkerClient {
 
         let data: Data
         let response: URLResponse
+        lastResponseFingerprint = nil
         do {
             (data, response) = try await session.data(for: urlRequest)
         } catch {
             throw StalkerError.networkError(error)
         }
-
-        guard let httpResponse = response as? HTTPURLResponse else {
-            throw StalkerError.invalidResponse
-        }
-        if httpResponse.statusCode == 401 || httpResponse.statusCode == 403 {
-            throw StalkerError.authenticationFailed
-        }
-        guard (200 ... 299).contains(httpResponse.statusCode) else {
-            throw StalkerError.serverError(httpResponse.statusCode)
-        }
-
         do {
-            return try JSONDecoder().decode(T.self, from: data)
+            return try Self.decodeValidated(T.self, response: response, data: data)
         } catch {
-            // Ministra answers a call from an unauthorized device with HTTP 200
-            // and a plain-text `Authorization failed.` — not a 401, not JSON.
-            if Self.isAuthorizationFailure(data) {
-                throw StalkerError.authenticationFailed
-            }
-            throw StalkerError.decodingError(error)
+            // Failure path only: fingerprinting parses the body.
+            lastResponseFingerprint = NetworkDiagnostics.fingerprint(
+                response: response, data: data.count <= 1_048_576 ? data : nil
+            )
+            throw error
         }
     }
 

@@ -1,3 +1,4 @@
+import OSLog
 import SwiftData
 import SwiftUI
 #if !os(tvOS)
@@ -47,7 +48,7 @@ struct LoginView: View {
     @Environment(\.dismiss) private var dismiss
     @Environment(\.modelContext) private var modelContext
 
-    @State private var sourceType: LoginSourceType = .xtream
+    @State var sourceType: LoginSourceType = .xtream
 
     @State private var name = ""
     @State private var serverURL = ""
@@ -74,6 +75,9 @@ struct LoginView: View {
 
     @State var isLoading = false
     @State var errorMessage: String?
+    /// The slim diagnostics screen — the only way to send a report before a
+    /// playlist exists, since Settings isn't reachable until then.
+    @State var showDiagnostics = false
 
     private var isFormValid: Bool {
         switch sourceType {
@@ -145,6 +149,11 @@ struct LoginView: View {
                             Label(errorMessage, systemImage: "exclamationmark.circle.fill")
                                 .foregroundStyle(.red)
                                 .font(.callout)
+                            Button {
+                                showDiagnostics = true
+                            } label: {
+                                Label("Send Diagnostics…", systemImage: "stethoscope")
+                            }
                         }
                     }
 
@@ -178,7 +187,18 @@ struct LoginView: View {
                             Button("Cancel") { dismiss() }
                                 .disabled(isLoading)
                         }
+                    } else {
+                        ToolbarItem(placement: .primaryAction) {
+                            Button {
+                                showDiagnostics = true
+                            } label: {
+                                Label("Send Diagnostics", systemImage: "stethoscope")
+                            }
+                        }
                     }
+                }
+                .sheet(isPresented: $showDiagnostics) {
+                    DiagnosticsSheet(origin: diagnosticsOrigin, visibleProblem: errorMessage)
                 }
                 .interactiveDismissDisabled(isLoading)
                 .fileImporter(
@@ -280,6 +300,16 @@ struct LoginView: View {
                                 .buttonStyle(TVSettingsActionButtonStyle())
                                 .disabled(isLoading)
                         }
+
+                        if errorMessage != nil || !isModal {
+                            Button {
+                                showDiagnostics = true
+                            } label: {
+                                Label("Send Diagnostics", systemImage: "stethoscope")
+                            }
+                            .buttonStyle(TVSettingsActionButtonStyle())
+                            .disabled(isLoading)
+                        }
                     }
                     .padding(.top, 8)
                     .padding(.horizontal, TVSettingsMetrics.rowHPadding)
@@ -290,6 +320,9 @@ struct LoginView: View {
                 .padding(.vertical, 72)
             }
             .tvSettingsBackground()
+            .fullScreenCover(isPresented: $showDiagnostics) {
+                TVDiagnosticsView(origin: diagnosticsOrigin, visibleProblem: errorMessage)
+            }
         }
     #endif
 
@@ -328,6 +361,7 @@ struct LoginView: View {
     private func loginXtream(serverURL: String, username: String, password: String) {
         isLoading = true
         errorMessage = nil
+        noteAddAttempt("xtream", address: serverURL)
 
         let playlistName = trimmedName.isEmpty ? "My Playlist" : trimmedName
 
@@ -352,6 +386,7 @@ struct LoginView: View {
                 }
             } catch {
                 errorMessage = error.localizedDescription
+                noteAddFailure(error)
                 isLoading = false
             }
         }
@@ -366,6 +401,7 @@ struct LoginView: View {
         // front so the stored URL is the one that actually parses.
         let urlString = M3UClient.normalizedPlaylistURL(m3uURL.trimmingCharacters(in: .whitespacesAndNewlines))
         let epgURLString = epgURL.trimmingCharacters(in: .whitespacesAndNewlines)
+        noteAddAttempt("m3u", address: urlString)
 
         Task {
             do {
@@ -379,6 +415,7 @@ struct LoginView: View {
                 }
             } catch {
                 errorMessage = error.localizedDescription
+                noteAddFailure(error)
                 isLoading = false
             }
         }
@@ -391,6 +428,7 @@ struct LoginView: View {
         let playlistName = trimmedName.isEmpty ? "My Playlist" : trimmedName
         let portal = portalURL.trimmingCharacters(in: .whitespacesAndNewlines)
         let mac = macAddress.trimmingCharacters(in: .whitespacesAndNewlines).uppercased()
+        noteAddAttempt("stalker", address: portal)
 
         Task {
             let playlist = Playlist(
@@ -412,6 +450,7 @@ struct LoginView: View {
                 }
             } catch {
                 errorMessage = error.localizedDescription
+                noteAddFailure(error)
                 isLoading = false
             }
         }
@@ -430,6 +469,7 @@ struct LoginView: View {
         // the autosave is deferred and the sync's fresh context
         // fetches nil, silently completing without syncing.
         try? modelContext.save()
+        noteAddSuccess(playlist)
         isLoading = false
         // Only dismiss when presented modally (e.g. the Settings
         // sheet). On first launch LoginView is the window's root
@@ -484,9 +524,11 @@ struct LoginView: View {
                     errorMessage = nil
                 } catch {
                     errorMessage = error.localizedDescription
+                    Logger.app.error("Add playlist: couldn't copy the picked m3u file — \(error)")
                 }
             case let .failure(error):
                 errorMessage = error.localizedDescription
+                Logger.app.error("Add playlist: file picker failed — \(error)")
             }
         }
     }

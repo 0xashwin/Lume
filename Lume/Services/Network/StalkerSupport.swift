@@ -138,7 +138,7 @@ nonisolated enum StalkerLink {
 
 // MARK: - Errors
 
-enum StalkerError: LocalizedError {
+nonisolated enum StalkerError: LocalizedError {
     case invalidURL
     case handshakeFailed
     case authenticationFailed
@@ -257,5 +257,33 @@ actor StalkerSessionStore {
 
     func clear(_ key: String) {
         sessions[key] = nil
+    }
+}
+
+// MARK: - Response validation
+
+extension StalkerClient {
+    /// Maps a portal response onto `StalkerError`, or decodes it. Split out of
+    /// `perform` so its one catch can fingerprint every failure path.
+    nonisolated static func decodeValidated<T: Decodable>(_: T.Type, response: URLResponse, data: Data) throws -> T {
+        guard let httpResponse = response as? HTTPURLResponse else {
+            throw StalkerError.invalidResponse
+        }
+        if httpResponse.statusCode == 401 || httpResponse.statusCode == 403 {
+            throw StalkerError.authenticationFailed
+        }
+        guard (200 ... 299).contains(httpResponse.statusCode) else {
+            throw StalkerError.serverError(httpResponse.statusCode)
+        }
+        do {
+            return try JSONDecoder().decode(T.self, from: data)
+        } catch {
+            // Ministra answers a call from an unauthorized device with HTTP 200
+            // and a plain-text `Authorization failed.` — not a 401, not JSON.
+            if isAuthorizationFailure(data) {
+                throw StalkerError.authenticationFailed
+            }
+            throw StalkerError.decodingError(error)
+        }
     }
 }
