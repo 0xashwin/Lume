@@ -196,11 +196,12 @@ class XtreamClient: APIClient {
             throw XtreamError.invalidResponse
         }
 
-        if httpResponse.statusCode == 401 || httpResponse.statusCode == 403 {
-            throw XtreamError.authenticationFailed
-        }
-
         guard (200 ... 299).contains(httpResponse.statusCode) else {
+            let fingerprint = NetworkDiagnostics.fingerprint(response: response, data: data)
+            Logger.network.error("Xtream \(action) rejected: \(fingerprint)")
+            if httpResponse.statusCode == 401 || httpResponse.statusCode == 403 {
+                throw XtreamError.authenticationFailed
+            }
             throw XtreamError.serverError(httpResponse.statusCode)
         }
 
@@ -210,6 +211,12 @@ class XtreamClient: APIClient {
             let decoder = JSONDecoder()
             return try decoder.decode(T.self, from: data)
         } catch {
+            // Only fingerprint small bodies: a multi-hundred-MB catalog that
+            // fails to decode would otherwise be re-parsed just for the log.
+            let fingerprint = byteCount <= 1_048_576
+                ? NetworkDiagnostics.fingerprint(response: response, data: data)
+                : NetworkDiagnostics.fingerprint(response: response, data: nil)
+            Logger.network.error("Xtream \(action) undecodable: \(fingerprint)")
             throw XtreamError.decodingError(error)
         }
     }

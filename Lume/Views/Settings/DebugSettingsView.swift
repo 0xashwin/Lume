@@ -2,22 +2,60 @@
 //  DebugSettingsView.swift
 //  Lume
 //
-//  End-user diagnostics. A toggle starts a "Debug Logging" session; once on, the
-//  user can reproduce a problem and then email the captured logs to support or
-//  share them. The actual capture is the OS unified log (Lume already logs via
-//  `Logger`); `DebugLogExporter` reads it back, scoped to the session, redacts
-//  private values, and writes a text file.
+//  End-user diagnostics: describe the problem, then email or share a report
+//  built by `DebugLogExporter` from the always-on `DiagnosticJournal`. Nothing
+//  has to be switched on beforehand — the journal already holds the history —
+//  so the screen works right after a failure, including from the add-playlist
+//  form on first launch, where Settings isn't reachable yet (`DiagnosticsSheet`).
+//
+//  "Detailed Logging" only adds the verbose debug-level lines; the report is
+//  useful without it.
 //
 //  iOS gets a native Mail composer (falling back to the share sheet when Mail
-//  isn't set up); macOS uses ShareLink plus a mailto link. tvOS has no
-//  diagnostics UI — it can neither attach a file nor compose mail, and the
-//  captured logs add little value there.
+//  isn't set up); macOS uses ShareLink plus a mailto link. Apple TV can neither
+//  attach a file nor compose mail — it has its own screen, `TVDiagnosticsView`.
 //
 
+import OSLog
+import SwiftData
 import SwiftUI
 #if os(iOS)
     import MessageUI
 #endif
+
+// MARK: - Report assembly
+
+/// Builds the exporter with everything the report needs from the environment.
+/// Shared by every diagnostics surface so they all send the same report.
+@MainActor
+enum DiagnosticsReport {
+    static func exporter(
+        container: ModelContainer?,
+        cloudSync: CloudSyncCoordinator?,
+        origin: String?,
+        visibleProblem: String?,
+        userNote: String? = nil
+    ) -> DebugLogExporter {
+        let metadata = DebugLogExporter.currentMetadata(
+            cloudSync: cloudSync,
+            origin: origin,
+            visibleProblem: visibleProblem,
+            userNote: userNote
+        )
+        return DebugLogExporter(metadata: metadata, container: container)
+    }
+
+    /// The `mailto:` a phone opens from the Apple TV QR code: support address,
+    /// subject, and the compact summary as the body.
+    nonisolated static func mailtoLink(summary: String, appVersion: String) -> String {
+        var allowed = CharacterSet.urlQueryAllowed
+        allowed.remove(charactersIn: "&=+?#")
+        let subject = "Lume Diagnostics — \(appVersion)"
+        let encodedSubject = subject.addingPercentEncoding(withAllowedCharacters: allowed) ?? ""
+        let encodedBody = summary.addingPercentEncoding(withAllowedCharacters: allowed) ?? ""
+        return "mailto:\(SupportInfo.email)?subject=\(encodedSubject)&body=\(encodedBody)"
+    }
+}
 
 // MARK: - Settings entry points
 
@@ -34,7 +72,7 @@ extension SettingsView {
             } header: {
                 Text("Troubleshooting")
             } footer: {
-                Text("Turn on debug logging to help diagnose a problem, then send the logs to the developer.")
+                Text("Something not working? Send a diagnostic report to the developer.")
             }
         }
     #endif
@@ -42,13 +80,44 @@ extension SettingsView {
 
 #if !os(tvOS)
 
+    // MARK: - Standalone sheet
+
+    /// The diagnostics screen on its own, for places that can't reach Settings —
+    /// the add-playlist form before any playlist exists.
+    struct DiagnosticsSheet: View {
+        var origin: String?
+        var visibleProblem: String?
+        @Environment(\.dismiss) private var dismiss
+
+        var body: some View {
+            NavigationStack {
+                DebugSettingsView(origin: origin, visibleProblem: visibleProblem)
+                    .toolbar {
+                        ToolbarItem(placement: .confirmationAction) {
+                            Button("Done") { dismiss() }
+                        }
+                    }
+            }
+            #if os(macOS)
+            .frame(minWidth: 460, idealWidth: 520, minHeight: 520, idealHeight: 620)
+            #endif
+        }
+    }
+
     // MARK: - iOS / macOS screen
 
     struct DebugSettingsView: View {
-        @AppStorage(DebugLogSettings.enabledKey) private var loggingEnabled = false
+        var origin: String?
+        var visibleProblem: String?
+
+        @Environment(\.modelContext) private var modelContext
+        @Environment(CloudSyncCoordinator.self) private var cloudSync: CloudSyncCoordinator?
+        @AppStorage(DebugLogSettings.enabledKey) private var detailedLogging = false
+        @State private var note = ""
         @State private var isPreparing = false
         @State private var errorMessage: String?
         @State private var shareItem: ExportedLog?
+        @State private var confirmClear = false
         #if os(iOS)
             @State private var mailItem: ExportedLog?
         #elseif os(macOS)
@@ -57,40 +126,73 @@ extension SettingsView {
 
         var body: some View {
             List {
+                if let visibleProblem, !visibleProblem.isEmpty {
+                    Section("Problem") {
+                        Label(visibleProblem, systemImage: "exclamationmark.circle.fill")
+                            .foregroundStyle(.red)
+                            .font(.callout)
+                    }
+                }
+
                 Section {
-                    Toggle("Debug Logging", isOn: $loggingEnabled)
-                        .onChange(of: loggingEnabled) { _, isOn in
+                    TextField("What were you doing when it went wrong?", text: $note, axis: .vertical)
+                        .lineLimit(3 ... 6)
+                } header: {
+                    Text("Description (optional)")
+                } footer: {
+                    Text("A sentence or two helps a lot. It's added to the top of the report.")
+                }
+
+                submitSection
+
+                Section {
+                    NavigationLink {
+                        DebugLogViewerView(makeExporter: makeExporter)
+                    } label: {
+                        Label("View Report", systemImage: "doc.text.magnifyingglass")
+                    }
+                } footer: {
+                    // swiftlint:disable:next line_length
+                    Text("See exactly what will be sent. The report lists your device, app settings, playlist types and sync state, and recent app activity — never playlist names, server addresses, usernames or passwords.")
+                }
+
+                Section {
+                    Toggle("Detailed Logging", isOn: $detailedLogging)
+                        .onChange(of: detailedLogging) { _, isOn in
                             if isOn { DebugLogSettings.markEnabled(at: Date()) }
                         }
                 } footer: {
-                    Text("Records diagnostic logs as you use the app. Reproduce the problem, then send the logs below. They stay on your device until you send them, and personal details are hidden.")
+                    Text("Diagnostics are always recorded on this device. Detailed logging adds verbose entries — turn it on only when asked to, reproduce the problem, then send the report.")
                 }
 
-                if loggingEnabled {
-                    submitSection
-                    Section {
-                        NavigationLink {
-                            DebugLogViewerView()
-                        } label: {
-                            Label("View Logs", systemImage: "doc.text.magnifyingglass")
-                        }
-                    } footer: {
-                        Text("Review exactly what will be sent before you share it.")
+                Section {
+                    Button("Clear Diagnostic Data", role: .destructive) {
+                        confirmClear = true
                     }
+                } footer: {
+                    Text("The diagnostic log stays on your device until you send it, and removes its oldest entries on its own.")
                 }
             }
             .platformNavigationTitle("Diagnostics")
-            .alert("Couldn't Prepare Logs", isPresented: errorAlertBinding) {
+            .alert("Couldn't Prepare the Report", isPresented: errorAlertBinding) {
                 Button("OK", role: .cancel) {}
             } message: {
                 Text(errorMessage ?? "")
+            }
+            .confirmationDialog("Clear the diagnostic log?", isPresented: $confirmClear, titleVisibility: .visible) {
+                Button("Clear", role: .destructive) {
+                    DiagnosticJournal.shared.clear()
+                    #if os(macOS)
+                        preparedURL = nil
+                    #endif
+                }
             }
             #if os(iOS)
             .sheet(item: $mailItem) { item in
                 MailComposeView(
                     recipient: SupportInfo.email,
                     subject: String(localized: "Lume Diagnostics — \(SupportInfo.appVersion)"),
-                    body: String(localized: "Describe the problem here. The diagnostic log is attached.\n\n"),
+                    body: mailBody,
                     attachmentURL: item.url
                 )
                 .ignoresSafeArea()
@@ -101,32 +203,38 @@ extension SettingsView {
             }
         }
 
+        private var mailBody: String {
+            let trimmed = note.trimmingCharacters(in: .whitespacesAndNewlines)
+            let intro = trimmed.isEmpty ? String(localized: "Describe the problem here.") : trimmed
+            return intro + "\n\n" + String(localized: "The diagnostic report is attached.") + "\n"
+        }
+
         private var submitSection: some View {
             Section {
                 #if os(iOS)
                     Button {
                         Task { await prepareThenEmail() }
                     } label: {
-                        actionLabel("Email Logs to Developer", systemImage: "envelope")
+                        actionLabel("Email Report to Developer", systemImage: "envelope")
                     }
                     .disabled(isPreparing)
 
                     Button {
                         Task { await prepare { shareItem = $0 } }
                     } label: {
-                        actionLabel("Share Logs…", systemImage: "square.and.arrow.up")
+                        actionLabel("Share Report…", systemImage: "square.and.arrow.up")
                     }
                     .disabled(isPreparing)
                 #elseif os(macOS)
                     if let preparedURL {
                         ShareLink(item: preparedURL) {
-                            Label("Share Logs…", systemImage: "square.and.arrow.up")
+                            Label("Share Report…", systemImage: "square.and.arrow.up")
                         }
                     }
                     Button {
                         Task { await prepare { preparedURL = $0.url } }
                     } label: {
-                        actionLabel(preparedURL == nil ? "Prepare Logs" : "Refresh Logs", systemImage: "arrow.clockwise")
+                        actionLabel(preparedURL == nil ? "Prepare Report" : "Refresh Report", systemImage: "arrow.clockwise")
                     }
                     .disabled(isPreparing)
 
@@ -136,8 +244,14 @@ extension SettingsView {
                         }
                     }
                 #endif
+            } header: {
+                Text("Send")
             } footer: {
-                Text("Logs are sent to \(SupportInfo.email).")
+                #if os(macOS)
+                    Text("Prepare the report, then share it or attach it to an email to \(SupportInfo.email).")
+                #else
+                    Text("Reports go to \(SupportInfo.email).")
+                #endif
             }
         }
 
@@ -157,13 +271,24 @@ extension SettingsView {
 
         // MARK: Preparation
 
+        private func makeExporter() -> DebugLogExporter {
+            DiagnosticsReport.exporter(
+                container: modelContext.container,
+                cloudSync: cloudSync,
+                origin: origin,
+                visibleProblem: visibleProblem,
+                userNote: note
+            )
+        }
+
         /// Writes the report off the main actor, then hands the URL to `assign`.
         private func prepare(_ assign: (ExportedLog) -> Void) async {
             isPreparing = true
             defer { isPreparing = false }
-            let metadata = DebugLogExporter.currentMetadata()
+            let exporter = makeExporter()
+            Logger.app.notice("Diagnostic report prepared (from \(origin ?? "Settings"))")
             do {
-                let url = try await DebugLogExporter(metadata: metadata).writeReport()
+                let url = try await exporter.writeReport()
                 assign(ExportedLog(url: url))
             } catch {
                 errorMessage = error.localizedDescription
@@ -191,11 +316,12 @@ extension SettingsView {
         }
     }
 
-    // MARK: - Log viewer
+    // MARK: - Report viewer
 
     /// A read-only, monospaced preview of the report the user is about to send,
     /// so they can see exactly what leaves the device.
     struct DebugLogViewerView: View {
+        let makeExporter: () -> DebugLogExporter
         @State private var text = ""
         @State private var isLoading = true
 
@@ -213,11 +339,10 @@ extension SettingsView {
                         .padding()
                 }
             }
-            .platformNavigationTitle("Logs")
+            .platformNavigationTitle("Report")
             .task {
-                let metadata = DebugLogExporter.currentMetadata()
-                text = await (try? DebugLogExporter(metadata: metadata).makeReport())
-                    ?? String(localized: "Couldn't read the logs.")
+                let exporter = makeExporter()
+                text = await exporter.makeReport()
                 isLoading = false
             }
         }
@@ -236,7 +361,7 @@ extension SettingsView {
 #if os(iOS)
 
     /// Presents the system Mail composer pre-filled with the support address and
-    /// the diagnostic log attached.
+    /// the diagnostic report attached.
     struct MailComposeView: UIViewControllerRepresentable {
         let recipient: String
         let subject: String

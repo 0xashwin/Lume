@@ -62,8 +62,10 @@ actor ContentSyncManager {
             // An aborted sync isn't a failure: restore the playlist to idle so it
             // can be retried cleanly, rather than wedging it in the error state.
             if Task.isCancelled {
+                Logger.database.info("Sync cancelled for playlist \(playlistId)")
                 markPlaylistIdle(playlistId: playlistId)
             } else {
+                Logger.database.error("Sync failed for playlist \(playlistId) — \(error)")
                 markPlaylistError(playlistId: playlistId)
             }
             throw error

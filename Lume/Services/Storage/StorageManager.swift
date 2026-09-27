@@ -30,7 +30,7 @@ struct StorageStats {
 
 @MainActor
 enum StorageManager {
-    private static let logger = Logger(subsystem: "com.lume", category: "Storage")
+    private nonisolated static let logger = Logger.storage
 
     // MARK: - Stats
 

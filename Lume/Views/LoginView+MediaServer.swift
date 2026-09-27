@@ -84,6 +84,7 @@ extension LoginView {
         let playlistName = trimmedName.isEmpty ? "My Playlist" : trimmedName
         let user = username.trimmingCharacters(in: .whitespacesAndNewlines)
         let input = MediaServerAddCheck.Input(url: mediaServerURL, username: user, password: password)
+        noteAddAttempt("media server", address: mediaServerURL)
 
         Task {
             do {
@@ -124,6 +125,7 @@ extension LoginView {
                 }
             } catch {
                 errorMessage = MediaServerAddCheck.message(for: error, input: input, timedOut: error is ConnectionTimeoutError)
+                noteAddFailure(error)
                 isLoading = false
             }
         }

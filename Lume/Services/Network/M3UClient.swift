@@ -231,10 +231,13 @@ nonisolated class M3UClient {
             throw M3UError.invalidURL
         }
 
+        var response: URLResponse?
         let head = url.isFileURL
             ? try localFileHead(url)
-            : try await remoteHead(url)
+            : try await remoteHead(url, response: &response)
         guard Self.looksLikePlaylist(head) else {
+            let fingerprint = NetworkDiagnostics.fingerprint(response: response, data: head)
+            Logger.network.error("m3u validation: not a playlist (\(fingerprint))")
             // A rewritten `type` didn't take (server ignored it) or the user
             // pasted a raw bouquet URL we can't fix — give a specific hint
             // instead of the generic "not a playlist" error.
@@ -250,18 +253,22 @@ nonisolated class M3UClient {
         return (try? handle.read(upToCount: 64 * 1024)) ?? Data()
     }
 
-    private func remoteHead(_ url: URL) async throws -> Data {
+    private func remoteHead(_ url: URL, response responseOut: inout URLResponse?) async throws -> Data {
         let bytes: URLSession.AsyncBytes
         let response: URLResponse
         do {
             (bytes, response) = try await session.bytes(from: url)
         } catch {
+            Logger.network.error("m3u validation: request failed — \(error)")
             throw M3UError.networkError(error)
         }
+        responseOut = response
 
         if let httpResponse = response as? HTTPURLResponse,
            !(200 ... 299).contains(httpResponse.statusCode)
         {
+            let fingerprint = NetworkDiagnostics.fingerprint(response: response, data: nil)
+            Logger.network.error("m3u validation: server refused (\(fingerprint))")
             throw M3UError.serverError(httpResponse.statusCode)
         }
 

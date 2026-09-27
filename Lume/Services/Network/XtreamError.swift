@@ -8,7 +8,7 @@
 
 import Foundation
 
-enum XtreamError: LocalizedError {
+nonisolated enum XtreamError: LocalizedError {
     case invalidURL
     case authenticationFailed
     case networkError(Error)
