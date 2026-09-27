@@ -74,8 +74,25 @@ final class VLCPlayerCoordinator: NSObject, ObservableObject {
     private var didConfigure = false
 
     /// Snapshot of the user's VLCKit options, refreshed from `UserDefaults` each
-    /// time a stream is configured or reloaded.
-    private var options = VLCPlayerOptions.load()
+    /// time a stream is configured or reloaded. Internal so `installMedia()`
+    /// can live in the +Media file, which exists to keep this one under the
+    /// project's 600-line cap.
+    var options = VLCPlayerOptions.load()
+
+    /// Snapshot of the viewer's preferred track languages, refreshed each time
+    /// a stream is configured or reloaded — never mid-session, so a change in
+    /// Settings applies the next time playback starts.
+    var languageOptions = PlayerLanguageOptions(preferredAudioLanguages: [])
+
+    /// Holds the preferred-language pass to once per opened stream; it is
+    /// driven from the state change, which fires on every transition. Reset
+    /// wherever the media is rebuilt, which hands libvlc fresh tracks.
+    var didApplyPreferredLanguages = false
+
+    /// A manual audio / subtitle pick outranks the preference for the rest of
+    /// this stream. Kept across a same-URL rebuild (reconnect, Try Again) and
+    /// cleared when the URL changes, so it cannot leak into the next channel.
+    var hasManualTrackSelection = false
 
     private var needsResume = false
     private var didSeekResume = false
@@ -95,7 +112,11 @@ final class VLCPlayerCoordinator: NSObject, ObservableObject {
     /// `handleRetry`).
     private let retry = PlaybackRetryController()
     /// Current stream URL, kept so a reconnect can rebuild the `VLCMedia`.
+    /// Always credential-free — `installMedia` adds userinfo transiently.
     private var mediaURL: URL?
+    /// Auth headers for the current stream (WebDAV only). VLCKit has no header
+    /// API, so `installMedia` folds these into a userinfo MRL at handoff.
+    var httpHeaders: [String: String]?
     /// Last playback position reported to the UI — a reconnect resumes VOD here
     /// rather than restarting from the top.
     private var lastKnownTime: TimeInterval = 0
@@ -138,7 +159,9 @@ final class VLCPlayerCoordinator: NSObject, ObservableObject {
         startTime = media.startTime
         needsResume = !media.isLive && media.startTime > 1
         options = VLCPlayerOptions.load()
+        languageOptions = PlayerLanguageOptions.load()
         mediaURL = media.url
+        httpHeaders = media.httpHeaders
         retry.reset()
         hasStartedPlayback = false
         didReportFailure = false
@@ -146,9 +169,7 @@ final class VLCPlayerCoordinator: NSObject, ObservableObject {
         startStartupWatchdog()
         mediaPlayer.delegate = self
 
-        let vlcMedia = VLCMedia(url: media.url)
-        applyMediaOptions(to: vlcMedia, isLive: media.isLive)
-        mediaPlayer.media = vlcMedia
+        installMedia(media.url, isLive: media.isLive)
         let deinterlaceOn = options.deinterlace
         // swiftlint:disable:next line_length
         Logger.player.log("configure: live=\(media.isLive, privacy: .public) startTime=\(media.startTime, format: .fixed(precision: 1), privacy: .public)s deinterlace=\(deinterlaceOn, privacy: .public) url=\(media.url.absoluteString, privacy: .private(mask: .hash))")
@@ -156,28 +177,6 @@ final class VLCPlayerCoordinator: NSObject, ObservableObject {
         applyDeinterlace()
         isPlaying = true
         startStatsLogging()
-    }
-
-    private func applyMediaOptions(to media: VLCMedia?, isLive: Bool) {
-        guard let media else { return }
-
-        media.addOption(options.hardwareDecode ? ":avcodec-hw=videotoolbox" : ":avcodec-hw=none")
-        media.addOption(":avcodec-threads=\(options.decodeThreads)")
-        media.addOption(options.skipFrames ? ":skip-frames=1" : ":skip-frames=0")
-        media.addOption(options.dropLateFrames ? ":drop-late-frames=1" : ":drop-late-frames=0")
-        if options.httpReconnect { media.addOption(":http-reconnect=1") }
-
-        media.addOption(options.deinterlace ? ":deinterlace=1" : ":deinterlace=0")
-        if options.deinterlace { media.addOption(":deinterlace-mode=\(options.deinterlaceMode)") }
-
-        // The original code set network-caching alongside the live/file caching
-        // to the same value; the live and on-demand buffers keep that pairing.
-        let buffer = isLive ? options.liveBuffer : options.vodBuffer
-        media.addOption(":network-caching=\(buffer)")
-        media.addOption(isLive ? ":live-caching=\(buffer)" : ":file-caching=\(buffer)")
-
-        if let jitter = options.clockJitter { media.addOption(":clock-jitter=\(jitter)") }
-        if let synchro = options.clockSynchro { media.addOption(":clock-synchro=\(synchro)") }
     }
 
     /// Internal so `logStateChange()` (in +Diagnostics) can re-assert it.
@@ -200,7 +199,10 @@ final class VLCPlayerCoordinator: NSObject, ObservableObject {
         resumeLanded = false
         videoInfo = nil
         options = VLCPlayerOptions.load()
+        languageOptions = PlayerLanguageOptions.load()
+        if media.url != mediaURL { hasManualTrackSelection = false }
         mediaURL = media.url
+        httpHeaders = media.httpHeaders
         lastKnownTime = 0
         retry.reset()
         hasStartedPlayback = false
@@ -208,9 +210,7 @@ final class VLCPlayerCoordinator: NSObject, ObservableObject {
         PlaybackQoE.shared.beginStartup(engine: .vlcKit, isLive: media.isLive)
         startStartupWatchdog()
 
-        let vlcMedia = VLCMedia(url: media.url)
-        applyMediaOptions(to: vlcMedia, isLive: media.isLive)
-        mediaPlayer.media = vlcMedia
+        installMedia(media.url, isLive: media.isLive)
         let deinterlaceOn = options.deinterlace
         // swiftlint:disable:next line_length
         Logger.player.log("reload: live=\(media.isLive, privacy: .public) startTime=\(media.startTime, format: .fixed(precision: 1), privacy: .public)s deinterlace=\(deinterlaceOn, privacy: .public) url=\(media.url.absoluteString, privacy: .private(mask: .hash))")
@@ -299,9 +299,7 @@ final class VLCPlayerCoordinator: NSObject, ObservableObject {
         retry.reset()
         startStartupWatchdog()
 
-        let vlcMedia = VLCMedia(url: mediaURL)
-        applyMediaOptions(to: vlcMedia, isLive: isLive)
-        mediaPlayer.media = vlcMedia
+        installMedia(mediaURL, isLive: isLive)
         mediaPlayer.play()
         applyDeinterlace()
         isPlaying = true
@@ -322,9 +320,7 @@ final class VLCPlayerCoordinator: NSObject, ObservableObject {
             resumeLanded = false
         }
 
-        let vlcMedia = VLCMedia(url: mediaURL)
-        applyMediaOptions(to: vlcMedia, isLive: isLive)
-        mediaPlayer.media = vlcMedia
+        installMedia(mediaURL, isLive: isLive)
         mediaPlayer.play()
         applyDeinterlace()
         isPlaying = true
@@ -437,29 +433,7 @@ final class VLCPlayerCoordinator: NSObject, ObservableObject {
         }
     }
 
-    // MARK: - Tracks
-
-    var audioTracks: [VLCMediaPlayer.Track] {
-        mediaPlayer.audioTracks
-    }
-
-    var textTracks: [VLCMediaPlayer.Track] {
-        mediaPlayer.textTracks
-    }
-
-    func selectAudioTrack(_ track: VLCMediaPlayer.Track) {
-        track.isSelectedExclusively = true
-        objectWillChange.send()
-    }
-
-    func selectTextTrack(_ track: VLCMediaPlayer.Track?) {
-        if let track {
-            track.isSelectedExclusively = true
-        } else {
-            mediaPlayer.deselectAllTextTracks()
-        }
-        objectWillChange.send()
-    }
+    // Track listing and selection live in VLCPlayerCoordinator+Languages.
 }
 
 // MARK: - VLCMediaPlayerDelegate
@@ -478,6 +452,7 @@ extension VLCPlayerCoordinator: VLCMediaPlayerDelegate {
             isPipSupported = pipController != nil
             pipController?.invalidatePlaybackState()
             refreshVideoInfo()
+            applyPreferredLanguagesIfNeeded()
         }
     }
 

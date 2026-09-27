@@ -31,11 +31,23 @@ import SwiftUI
         @Binding var hideTask: Task<Void, Never>?
         var onClose: () -> Void
         var onTogglePlay: () -> Void
+        var onTogglePip: () -> Void
         var onResetHideTimer: () -> Void
         var onScheduleHide: () -> Void
         /// Raises the OpenSubtitles browser. `nil` when the search isn't
         /// available for this stream, which also drops the menu entry.
         var onSearchSubtitles: (() -> Void)?
+        /// Video-track snapshot for the Advanced stream-info caption. `nil`
+        /// until the first frame reports usable dimensions.
+        var videoInfo: PlayerVideoInfo?
+        /// Previous/next stream for the transport pair, resolved once per stream
+        /// by the player host. Never derived here — this body must not read the
+        /// clock, and neither may the buttons.
+        var itemNeighbours = PlayerItemNavigation.Neighbours.none
+        /// Plays the neighbour on that side. Routed back through the host's
+        /// swapper so two presses can't stack a second decoder teardown on the
+        /// first.
+        var onStepItem: ((PlayerMediaSwapper.Step) -> Void)?
 
         @Environment(\.modelContext) private var modelContext
         /// Mirrors the backing model's favorite flag; refreshed when the media
@@ -111,7 +123,7 @@ import SwiftUI
 
         private var pipButton: some View {
             Button {
-                coordinator.playerLayer?.isPipActive.toggle()
+                onTogglePip()
                 onResetHideTimer()
             } label: {
                 circleGlyph(isPipActive ? "pip.exit" : "pip.enter", size: 16, diameter: 44)
@@ -122,8 +134,27 @@ import SwiftUI
 
         // MARK: - Center Transport
 
+        /// The episode pair turns this into a five-circle row, which is wider
+        /// than a phone in portrait at the spacing the three-button row used.
+        /// Close the gaps rather than let the outer buttons clip off-screen.
         private var centerTransport: some View {
-            HStack(spacing: 32) {
+            ViewThatFits(in: .horizontal) {
+                transportRow(spacing: 32)
+                transportRow(spacing: 12)
+            }
+        }
+
+        private func transportRow(spacing: CGFloat) -> some View {
+            HStack(spacing: spacing) {
+                if itemNeighbours.axis != nil {
+                    PlayerItemNavButton(
+                        step: .previous,
+                        neighbours: itemNeighbours,
+                        onStep: { onStepItem?($0) },
+                        onResetHideTimer: onResetHideTimer
+                    )
+                }
+
                 if !media.isLive {
                     Button {
                         coordinator.skip(interval: -15)
@@ -155,6 +186,15 @@ import SwiftUI
                     .buttonStyle(.plain)
                     .accessibilityLabel("Skip forward 15 seconds")
                 }
+
+                if itemNeighbours.axis != nil {
+                    PlayerItemNavButton(
+                        step: .next,
+                        neighbours: itemNeighbours,
+                        onStep: { onStepItem?($0) },
+                        onResetHideTimer: onResetHideTimer
+                    )
+                }
             }
         }
 
@@ -185,6 +225,11 @@ import SwiftUI
 
         private var titleBlock: some View {
             VStack(alignment: .leading, spacing: 2) {
+                StreamInfoCaption(
+                    media: media,
+                    videoInfo: videoInfo,
+                    engine: .ksPlayer
+                )
                 if let subtitle = media.subtitle, !subtitle.isEmpty {
                     Text(subtitle)
                         .font(.subheadline)
@@ -216,9 +261,15 @@ import SwiftUI
 
         private var secondaryControls: some View {
             HStack(spacing: 4) {
-                if !subtitleTracks.isEmpty || onSearchSubtitles != nil { subtitleMenu }
-                if audioTracks.count > 1 { audioTrackMenu }
-                if !media.isLive { playbackRateMenu }
+                if !subtitleTracks.isEmpty || onSearchSubtitles != nil {
+                    subtitleMenu
+                }
+                if audioTracks.count > 1 {
+                    audioTrackMenu
+                }
+                if !media.isLive {
+                    playbackRateMenu
+                }
                 contentModeButton
                 favoriteButton
             }
@@ -245,14 +296,14 @@ import SwiftUI
                     coordinator.subtitleModel.selectedSubtitleInfo = nil
                     onResetHideTimer()
                 } label: {
-                    checkmarkLabel("Off", checked: !hasSelection)
+                    playerCheckmarkLabel("Off", checked: !hasSelection)
                 }
                 ForEach(subtitleTracks, id: \.subtitleID) { track in
                     Button {
                         coordinator.subtitleModel.selectedSubtitleInfo = track
                         onResetHideTimer()
                     } label: {
-                        checkmarkLabel(track.name, checked: selectedSubtitle?.subtitleID == track.subtitleID)
+                        playerCheckmarkLabel(verbatim: track.name, checked: selectedSubtitle?.subtitleID == track.subtitleID)
                     }
                 }
                 if let onSearchSubtitles {
@@ -268,6 +319,7 @@ import SwiftUI
                 pillGlyph("captions.bubble.fill", dimmed: !hasSelection)
             }
             .menuIndicator(.hidden)
+            .trackMenuAccessibility("Subtitles", selected: selectedSubtitle?.name, fallback: "Off")
         }
 
         /// KSPlayer exposes the demuxed audio streams on the player itself —
@@ -285,17 +337,18 @@ import SwiftUI
             Menu {
                 ForEach(Array(tracks.enumerated()), id: \.offset) { _, track in
                     Button {
-                        coordinator.playerLayer?.player.select(track: track)
+                        coordinator.selectAudioTrack(track)
                         coordinator.objectWillChange.send()
                         onResetHideTimer()
                     } label: {
-                        checkmarkLabel(track.name, checked: track.isEnabled)
+                        playerCheckmarkLabel(verbatim: track.name, checked: track.isEnabled)
                     }
                 }
             } label: {
                 pillGlyph("waveform")
             }
             .menuIndicator(.hidden)
+            .trackMenuAccessibility("Audio Track", selected: tracks.first(where: \.isEnabled)?.name, fallback: "Default")
         }
 
         private var playbackRateMenu: some View {
@@ -305,7 +358,7 @@ import SwiftUI
                         coordinator.playbackRate = rate
                         onResetHideTimer()
                     } label: {
-                        checkmarkLabel(rateString(rate), checked: abs(coordinator.playbackRate - rate) < 0.01)
+                        playerCheckmarkLabel(verbatim: rateString(rate), checked: abs(coordinator.playbackRate - rate) < 0.01)
                     }
                 }
             } label: {
@@ -380,15 +433,6 @@ import SwiftUI
         /// Compact rate label, e.g. `1×`, `1.25×`. `%g` drops trailing zeros.
         private func rateString(_ rate: Float) -> String {
             String(format: "%g×", rate)
-        }
-
-        @ViewBuilder
-        private func checkmarkLabel(_ title: String, checked: Bool) -> some View {
-            if checked {
-                Label(title, systemImage: "checkmark")
-            } else {
-                Text(title)
-            }
         }
     }
 

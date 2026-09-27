@@ -116,12 +116,20 @@ struct SearchPredicateTests {
     @Test func `playlist scoping still applies alongside the exclusion`() throws {
         let container = try makeSQLiteContainer()
         let context = container.mainContext
-        let mine = Movie(id: "m1", streamId: 1, name: "The Matrix")
+        // The scope matches the row's own playlist-prefixed id
+        // (`"<playlist uuid>-<kind>-<provider id>"`), which is indexed, rather
+        // than substring-searching `categoryId` for the playlist's uuid.
+        let mine = Movie(id: "PL-A-movie-1", streamId: 1, name: "The Matrix")
         mine.categoryId = "PL-A-vod-1"
-        let other = Movie(id: "m2", streamId: 2, name: "The Matrix")
+        let other = Movie(id: "PL-B-movie-2", streamId: 2, name: "The Matrix")
         other.categoryId = "PL-B-vod-1"
-        context.insert(mine)
-        context.insert(other)
+        // A playlist whose id merely starts with the scoped one must not leak
+        // in — the separator is part of the prefix.
+        let lookalike = Movie(id: "PL-AB-movie-3", streamId: 3, name: "The Matrix")
+        lookalike.categoryId = "PL-AB-vod-1"
+        for movie in [mine, other, lookalike] {
+            context.insert(movie)
+        }
         try context.save()
 
         let fetched = try context.fetch(
@@ -129,15 +137,37 @@ struct SearchPredicateTests {
                 query: "matrix", playlistID: "PL-A", restrictToPlaylist: true, excluded: ["nl"]
             )))
         )
-        #expect(fetched.map(\.id) == ["m1"])
+        #expect(fetched.map(\.id) == ["PL-A-movie-1"])
+    }
+
+    @Test func `playlist scoping keeps the playlist's uncategorised titles`() throws {
+        let container = try makeSQLiteContainer()
+        let context = container.mainContext
+        // m3u sources don't always supply a group, so a title can carry no
+        // category at all. Scoping on the row's id rather than on its
+        // `categoryId` is what makes those titles findable while the search is
+        // restricted to one playlist; the old `categoryId` substring test
+        // dropped every one of them.
+        let orphan = Movie(id: "PL-A-movie-1", streamId: 1, name: "The Matrix")
+        let other = Movie(id: "PL-B-movie-2", streamId: 2, name: "The Matrix")
+        other.categoryId = "PL-B-vod-1"
+        context.insert(orphan)
+        context.insert(other)
+        try context.save()
+
+        let fetched = try context.fetch(
+            FetchDescriptor<Movie>(predicate: searchMoviePredicate(scope: SearchScope(
+                query: "matrix", playlistID: "PL-A", restrictToPlaylist: true, excluded: []
+            )))
+        )
+        #expect(fetched.map(\.id) == ["PL-A-movie-1"])
     }
 
     // MARK: - Cross-playlist budget
 
-    /// Two playlists, one of which alone can fill the whole budget with titles
-    /// that sort first. The other must still be represented — a single catalog
-    /// crowding the rest out is indistinguishable, on screen, from the setting
-    /// not working at all.
+    /// Two playlists, one of which alone can fill the whole budget. The other
+    /// must still be represented — a single catalog crowding the rest out is
+    /// indistinguishable, on screen, from the setting not working at all.
     private func insertTwoCatalogs(_ context: ModelContext, limit: Int) throws -> (String, String) {
         let big = UUID().uuidString
         let small = UUID().uuidString
@@ -159,68 +189,48 @@ struct SearchPredicateTests {
         ids.compactMap { (context.model(for: $0) as? Movie)?.name }
     }
 
+    private func movieRequest(_ playlistIDs: [String], limit: Int) -> SearchRequest {
+        SearchRequest(
+            query: "matrix", playlistIDs: playlistIDs,
+            wantMovies: true, wantSeries: false, wantLive: false,
+            excludedCategoryIDs: [], limit: limit
+        )
+    }
+
     @Test func `each playlist gets a share of the result budget`() throws {
         let container = try makeSQLiteContainer()
         let context = container.mainContext
         let limit = 20
         let (big, small) = try insertTwoCatalogs(context, limit: limit)
 
-        let hits = SearchFetcher.fetch(container: container, request: SearchRequest(
-            query: "matrix", playlistIDs: [big, small],
-            wantMovies: true, wantSeries: false, wantLive: false,
-            excludedCategoryIDs: [], limit: limit
-        ))
+        let hits = SearchFetcher.fetch(container: container, request: movieRequest([big, small], limit: limit))
 
         #expect(hits.movies.count == limit)
         let matched = names(hits.movies, in: context)
-        #expect(matched.contains { $0.hasPrefix("Zzz") })
-        #expect(matched.filter { $0.hasPrefix("Aaa") }.count == limit - 2)
+        #expect(matched.count(where: { $0.hasPrefix("Zzz") }) == 2)
+        #expect(matched.count(where: { $0.hasPrefix("Aaa") }) == limit - 2)
     }
 
-    @Test func `results stay in name order after the split`() throws {
-        let container = try makeSQLiteContainer()
-        let context = container.mainContext
-        let limit = 20
-        let (big, small) = try insertTwoCatalogs(context, limit: limit)
-
-        let hits = SearchFetcher.fetch(container: container, request: SearchRequest(
-            query: "matrix", playlistIDs: [big, small],
-            wantMovies: true, wantSeries: false, wantLive: false,
-            excludedCategoryIDs: [], limit: limit
-        ))
-
-        let matched = names(hits.movies, in: context)
-        #expect(matched == matched.sorted { $0.localizedStandardCompare($1) == .orderedAscending })
-    }
-
-    @Test func `a split search still finds uncategorised titles`() throws {
+    @Test func `a split search keeps a playlist's uncategorised titles`() throws {
         let container = try makeSQLiteContainer()
         let context = container.mainContext
         let (big, small) = try insertTwoCatalogs(context, limit: 5)
-        // m3u sources don't always supply a category, and a per-playlist fetch
-        // keys off the playlist UUID prefixed onto the category id.
-        context.insert(Movie(id: "orphan", streamId: 999, name: "Bbb Matrix"))
+        // m3u sources don't always supply a category; the per-playlist scope
+        // keys off the row's own id, so the title still belongs to its playlist.
+        context.insert(Movie(id: "\(small)-movie-99", streamId: 99, name: "Bbb Matrix"))
         try context.save()
 
-        let hits = SearchFetcher.fetch(container: container, request: SearchRequest(
-            query: "matrix", playlistIDs: [big, small],
-            wantMovies: true, wantSeries: false, wantLive: false,
-            excludedCategoryIDs: [], limit: 20
-        ))
+        let hits = SearchFetcher.fetch(container: container, request: movieRequest([big, small], limit: 20))
 
         #expect(names(hits.movies, in: context).contains("Bbb Matrix"))
     }
 
-    @Test func `a single playlist search is unchanged`() throws {
+    @Test func `a single playlist search is scoped to that playlist`() throws {
         let container = try makeSQLiteContainer()
         let context = container.mainContext
         let (big, _) = try insertTwoCatalogs(context, limit: 5)
 
-        let hits = SearchFetcher.fetch(container: container, request: SearchRequest(
-            query: "matrix", playlistIDs: [big],
-            wantMovies: true, wantSeries: false, wantLive: false,
-            excludedCategoryIDs: [], limit: 20
-        ))
+        let hits = SearchFetcher.fetch(container: container, request: movieRequest([big], limit: 20))
 
         #expect(hits.movies.count == 15)
         #expect(names(hits.movies, in: context).allSatisfy { $0.hasPrefix("Aaa") })

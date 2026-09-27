@@ -145,7 +145,7 @@ import OSLog
 
         /// Where archived payloads live. Excluded from backup — they are
         /// re-derivable diagnostics, not user data.
-        static var archiveDirectory: URL? {
+        nonisolated static var archiveDirectory: URL? {
             guard let support = FileManager.default.urls(
                 for: .applicationSupportDirectory, in: .userDomainMask
             ).first else { return nil }

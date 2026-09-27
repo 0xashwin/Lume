@@ -2,17 +2,17 @@
 //  DebugLogSettings.swift
 //  Lume
 //
-//  Persisted state for the end-user diagnostics feature. Enabling "Debug
-//  Logging" doesn't change what the system records — Lume already writes to the
-//  unified log via `Logger` — it starts a *session*: it stamps the moment
-//  logging was turned on so an export only includes entries from the reproduction
-//  the user is about to perform, and reveals the submit/share actions in Settings.
+//  Persisted state for the "Detailed Logging" switch on the Diagnostics
+//  screen. Diagnostics are recorded regardless (see `DiagnosticJournal`); the
+//  switch only admits the verbose `.debug` entries, which would otherwise
+//  crowd the bounded journal. The key names predate that split and are kept so
+//  an existing opt-in carries over.
 //
 
 import Foundation
 
 nonisolated enum DebugLogSettings {
-    /// Whether the user has turned on diagnostic logging. Gates the export UI.
+    /// Whether Detailed Logging is on.
     static let enabledKey = "debug.logging.enabled"
     /// `Date.timeIntervalSinceReferenceDate` of the moment logging was enabled,
     /// used to scope an export to the current debugging session.

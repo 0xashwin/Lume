@@ -2,23 +2,26 @@
 //  DebugLogExporter.swift
 //  Lume
 //
-//  Builds a shareable diagnostic report from the app's own unified-log output.
-//  Everything Lume logs through `Logger` (see Utils/Logger.swift) is already
-//  captured by the OS; this reads it back for the current process, scoped to the
-//  debugging session, prepends a device/app header, and writes it to a temp file
-//  the user can email to support or share.
+//  Builds the shareable diagnostic report: a context header (app, device,
+//  network, playlists, settings, iCloud), a digest of recent problems and
+//  sessions, the performance counters, and the full `DiagnosticJournal` — the
+//  persistent log that survives relaunches and crashes, so a report can be
+//  sent *after* something went wrong without having turned anything on first.
 //
-//  Interpolated values stay `<private>`-redacted (the default) — the report
-//  carries the log messages and app/device context needed to triage a problem
-//  without leaking playlist URLs, credentials, or other personal data.
+//  Nothing personal leaves the device: playlist names, hosts, usernames,
+//  passwords and MACs are never written; addresses appear only as their shape
+//  (`NetworkDiagnostics.shape`); every log line was redacted when it was
+//  recorded. The user can read the whole report before sending it.
 //
-//  Metadata is gathered on the main actor (it reads MainActor-isolated player
-//  settings); the OSLogStore read is `async nonisolated`, so it runs off the
-//  main actor and never stalls the UI.
+//  Metadata is gathered on the main actor (it reads MainActor-isolated
+//  settings and services); everything else — the catalog counts, the network
+//  path, the journal read — runs off it, so preparing a report never stalls
+//  the UI, even over a 600k-row catalog.
 //
 
 import Foundation
 import OSLog
+import SwiftData
 
 nonisolated struct DebugLogExporter {
     /// App / device context, gathered once on the main actor via `currentMetadata()`.
@@ -34,29 +37,71 @@ nonisolated struct DebugLogExporter {
         var playbackQoE: [String] = []
         /// The newest MetricKit payload summary, when one has been delivered.
         var fieldMetrics: [String] = []
+        var installSource = ""
+        var locale = ""
+        var sessionStartedAt: Date?
+        var launchCount = 0
+        var lastUnexpectedEnd: Date?
+        var isPremium: Bool?
+        var cloudSync: [String] = []
+        var settings: [String] = []
+        /// Where the user opened diagnostics from ("Add Playlist") and the
+        /// error that screen was showing, so the report leads with it.
+        var origin: String?
+        var visibleProblem: String?
+        var userNote: String?
     }
 
-    /// Oldest entries to include when the session start is unknown or very old.
-    private static let maxLookback: TimeInterval = 24 * 60 * 60
-
     let metadata: Metadata
+    /// The catalog container, for the playlist / content summary. `nil` skips it.
+    var container: ModelContainer?
+    var journal: DiagnosticJournal = .shared
+
+    /// How far back "Recent problems" looks.
+    static let problemWindow: TimeInterval = 7 * 24 * 60 * 60
+    private static let maxProblems = 40
+    private static let maxSignposts = 400
+    /// The newest MetricKit diagnostic payload (crash / hang call stacks) rides
+    /// along in full when it's this small — symbolicated later against the dSYM.
+    private static let maxDiagnosticPayloadBytes = 256 * 1024
 
     enum ExportError: Error {
         case storeUnavailable
     }
 
-    /// The report as plain text: a metadata header followed by the log entries.
-    /// Reads the unified log off the main actor.
-    func makeReport(now: Date = Date()) async throws -> String {
+    // MARK: - Report
+
+    /// The report as plain text. Runs off the main actor.
+    func makeReport(now: Date = Date()) async -> String {
+        let journalText = journal.contents()
+        let networkPath = await DeviceDiagnostics.networkPathDescription()
+
         var lines = header(now: now)
-        lines.append(contentsOf: performanceSection())
-        let entries = try collectEntries(now: now)
+        lines += section("Device", deviceLines(networkPath: networkPath))
+        if let container {
+            lines += section("Playlists", Self.catalogLines(container: container, now: now))
+        }
+        lines += section("iCloud sync", metadata.cloudSync)
+        lines += section("Settings", metadata.settings)
+        lines += section("Recent problems (last 7 days, newest first)", Self.problemDigest(journalText, now: now))
+        lines += section("Sessions (newest first)", Self.sessionDigest(journalText))
+        lines += performanceSection()
+        lines += section("Latest MetricKit diagnostics", Self.diagnosticPayloadLines())
+
+        let journalLines = journalText.split(separator: "\n", omittingEmptySubsequences: true)
         lines.append("")
-        lines.append("--- Log entries (\(entries.count)) ---")
-        if entries.isEmpty {
-            lines.append("No log entries were captured for this session. Reproduce the problem while Debug Logging is on, then export again.")
+        lines.append("--- Log (\(journalLines.count) entries, oldest first) ---")
+        if journalLines.isEmpty {
+            lines.append("The log is empty — it starts recording from the first launch of this version.")
         } else {
-            lines.append(contentsOf: entries)
+            lines.append(contentsOf: journalLines.map(String.init))
+        }
+
+        let signposts = collectSignposts(now: now)
+        if !signposts.isEmpty {
+            lines.append("")
+            lines.append("--- Performance signposts (this launch, last \(signposts.count)) ---")
+            lines.append(contentsOf: signposts)
         }
         return lines.joined(separator: "\n")
     }
@@ -65,79 +110,145 @@ nonisolated struct DebugLogExporter {
     /// sharing / mail attachment. The filename carries the date so a support
     /// inbox can tell submissions apart.
     func writeReport(now: Date = Date()) async throws -> URL {
-        let report = try await makeReport(now: now)
-        let name = "Lume-Diagnostics-\(Self.fileStamp.string(from: now)).txt"
+        let report = await makeReport(now: now)
+        let name = "Lume-Diagnostics-\(DiagnosticDateFormat.file.string(from: now)).txt"
         let url = FileManager.default.temporaryDirectory.appendingPathComponent(name)
         try report.write(to: url, atomically: true, encoding: .utf8)
         return url
     }
 
-    // MARK: - Log collection
-
-    private func collectEntries(now: Date) throws -> [String] {
-        guard let store = try? OSLogStore(scope: .currentProcessIdentifier) else {
-            throw ExportError.storeUnavailable
+    /// A few hundred characters that fit a `mailto:` QR code — for Apple TV,
+    /// which can neither attach a file nor compose mail.
+    func compactSummary(now: Date = Date(), maxLength: Int = 900) -> String {
+        let journalText = journal.contents()
+        var lines = [
+            "Lume \(metadata.appVersion) (\(metadata.buildNumber)) \(metadata.installSource)",
+            "\(metadata.platform) \(metadata.osVersion) · \(metadata.deviceModel)"
+        ]
+        if let origin = metadata.origin { lines.append("From: \(origin)") }
+        if let problem = metadata.visibleProblem { lines.append("Shown: \(LogRedaction.scrubURLs(in: problem))") }
+        if let container {
+            lines += Self.catalogLines(container: container, now: now, compact: true)
         }
-        let start = startDate(now: now)
-        let position = store.position(date: start)
-        let predicate = Bundle.main.bundleIdentifier.map {
-            NSPredicate(format: "subsystem == %@", $0)
+        lines.append("Recent problems:")
+        let problems = Self.problemDigest(journalText, now: now, compact: true)
+        lines += problems.isEmpty ? ["none"] : problems
+
+        var summary = ""
+        for line in lines {
+            let candidate = summary.isEmpty ? line : summary + "\n" + line
+            guard candidate.count <= maxLength else { break }
+            summary = candidate
         }
-
-        let entries = try store.getEntries(at: position, matching: predicate)
-        return entries
-            .compactMap { $0 as? OSLogEntryLog }
-            .map { entry in
-                let time = Self.entryStamp.string(from: entry.date)
-                // Last line of defense: even if a future call site accidentally
-                // interpolates a URL with `privacy: .public`, it must not reach
-                // a shared report — stream URLs carry playlist credentials.
-                let message = LogRedaction.scrubURLs(in: entry.composedMessage)
-                return "\(time)  [\(entry.category)] \(Self.label(for: entry.level))  \(message)"
-            }
-    }
-
-    /// The debugging session start, floored to `maxLookback` so an ancient
-    /// session (logging left on for days) doesn't drag in an unbounded history.
-    private func startDate(now: Date) -> Date {
-        let floor = now.addingTimeInterval(-Self.maxLookback)
-        guard let since = DebugLogSettings.enabledSince else { return floor }
-        return max(since, floor)
+        return summary
     }
 
     // MARK: - Header
 
     func header(now: Date) -> [String] {
-        [
-            "Lume Diagnostic Log",
-            "===================",
-            "App: Lume \(metadata.appVersion) (build \(metadata.buildNumber))",
+        var lines = [
+            "Lume Diagnostic Report",
+            "======================"
+        ]
+        if let origin = metadata.origin {
+            lines.append("Reported from: \(origin)")
+        }
+        if let problem = metadata.visibleProblem, !problem.isEmpty {
+            lines.append("Error on screen: \(LogRedaction.scrubURLs(in: problem))")
+        }
+        if let note = metadata.userNote?.trimmingCharacters(in: .whitespacesAndNewlines), !note.isEmpty {
+            lines.append("User's description: \(LogRedaction.scrubURLs(in: note))")
+        }
+        lines += [
+            "App: Lume \(metadata.appVersion) (build \(metadata.buildNumber))\(metadata.installSource.isEmpty ? "" : " · \(metadata.installSource)")",
             "Platform: \(metadata.platform) \(metadata.osVersion)",
             "Device: \(metadata.deviceModel)",
-            "Player engines: \(metadata.engineSummary)",
-            "Generated: \(Self.entryStamp.string(from: now))",
-            "Session started: \(DebugLogSettings.enabledSince.map { Self.entryStamp.string(from: $0) } ?? "unknown")"
+            "Player engines: \(metadata.engineSummary)"
         ]
+        if let isPremium = metadata.isPremium {
+            lines.append("Lume Pro: \(isPremium ? "yes" : "no")")
+        }
+        if !metadata.locale.isEmpty {
+            lines.append("Locale: \(metadata.locale)")
+        }
+        lines.append("Generated: \(DiagnosticDateFormat.entry.string(from: now))")
+        if let started = metadata.sessionStartedAt {
+            lines.append("This session: launch #\(metadata.launchCount), up \(DeviceDiagnostics.uptimeDescription(since: started, now: now))")
+        }
+        if let crash = metadata.lastUnexpectedEnd {
+            lines.append("Last unexpected end: \(DiagnosticDateFormat.entry.string(from: crash))")
+        }
+        return lines
+    }
+
+    private func deviceLines(networkPath: String) -> [String] {
+        [
+            "Network: \(networkPath)",
+            "Storage: \(DeviceDiagnostics.freeDiskDescription)",
+            "Memory: \(DeviceDiagnostics.memoryDescription)",
+            "Power: \(DeviceDiagnostics.powerDescription)"
+        ]
+    }
+
+    private func section(_ title: String, _ body: [String]) -> [String] {
+        guard !body.isEmpty else { return [] }
+        return ["", "--- \(title) ---"] + body
+    }
+
+    // MARK: - Digests
+
+    /// Warnings and worse from the last week, deduplicated (numbers collapsed
+    /// so "retry 1/2" and "retry 2/2" count as one) with a count and last-seen.
+    static func problemDigest(_ journal: String, now: Date, compact: Bool = false) -> [String] {
+        struct Problem {
+            var sample: String
+            var count: Int
+            var last: Date
+        }
+        var problems: [String: Problem] = [:]
+        let cutoff = now.addingTimeInterval(-problemWindow)
+        for line in journal.split(separator: "\n") {
+            guard let entry = DiagnosticJournal.parse(line), entry.level.isProblem, entry.date >= cutoff else { continue }
+            let text = "[\(entry.category)] \(entry.level.rawValue): \(entry.message)"
+            let key = text.replacing(/\d+(\.\d+)?/, with: "#")
+            if var existing = problems[key] {
+                existing.count += 1
+                existing.last = max(existing.last, entry.date)
+                existing.sample = text
+                problems[key] = existing
+            } else {
+                problems[key] = Problem(sample: text, count: 1, last: entry.date)
+            }
+        }
+        let limit = compact ? 6 : maxProblems
+        return problems.values.sorted { $0.last > $1.last }.prefix(limit).map { problem in
+            let count = problem.count > 1 ? " ×\(problem.count)" : ""
+            if compact {
+                return "• \(String(problem.sample.prefix(140)))\(count)"
+            }
+            return "\(DiagnosticDateFormat.entry.string(from: problem.last))\(count)  \(problem.sample)"
+        }
+    }
+
+    /// Session starts and unexpected ends, so the timeline is readable at a glance.
+    static func sessionDigest(_ journal: String) -> [String] {
+        let markers = journal.split(separator: "\n").compactMap { line -> String? in
+            guard let entry = DiagnosticJournal.parse(line), entry.category == "App" else { return nil }
+            guard entry.message.hasPrefix("Session started") || entry.message.hasPrefix("Previous session ended") else {
+                return nil
+            }
+            return "\(DiagnosticDateFormat.entry.string(from: entry.date))  \(entry.message)"
+        }
+        return Array(markers.suffix(12).reversed())
     }
 
     // MARK: - Performance section
 
     /// Playback QoE and field metrics, when there is anything to report. These
-    /// numbers turn "streams are slow to start" into an actual measurement, so
-    /// they belong in the report a user sends rather than in a localized screen.
+    /// numbers turn "streams are slow to start" into an actual measurement.
     func performanceSection() -> [String] {
-        var lines: [String] = []
-        if !metadata.playbackQoE.isEmpty {
-            lines.append("")
-            lines.append("--- Playback quality of experience ---")
-            lines.append(contentsOf: metadata.playbackQoE)
-        }
-        if !metadata.fieldMetrics.isEmpty {
-            lines.append("")
-            lines.append("--- Latest MetricKit payload ---")
-            lines.append(contentsOf: metadata.fieldMetrics)
-        }
-        return lines
+        section("Playback quality of experience", metadata.playbackQoE)
+            + section("Latest MetricKit payload", metadata.fieldMetrics)
     }
 
     /// Renders one line per engine that has seen a playback attempt.
@@ -170,12 +281,66 @@ nonisolated struct DebugLogExporter {
         return lines
     }
 
+    /// The newest archived MetricKit diagnostic payload (crashes, hangs, disk
+    /// write exceptions), verbatim when small enough. Its call stacks are raw
+    /// addresses, so it carries no user data — and it's the only crash record
+    /// a user can hand over without a Mac.
+    static func diagnosticPayloadLines() -> [String] {
+        #if canImport(MetricKit) && !os(tvOS)
+            guard let directory = AppPerformanceMetrics.archiveDirectory,
+                  let files = try? FileManager.default.contentsOfDirectory(
+                      at: directory, includingPropertiesForKeys: [.contentModificationDateKey]
+                  )
+            else { return [] }
+            let newest = files
+                .filter { $0.lastPathComponent.hasPrefix("diagnostics-") }
+                .max { lhs, rhs in
+                    let left = (try? lhs.resourceValues(forKeys: [.contentModificationDateKey]).contentModificationDate) ?? .distantPast
+                    let right = (try? rhs.resourceValues(forKeys: [.contentModificationDateKey]).contentModificationDate) ?? .distantPast
+                    return left < right
+                }
+            guard let newest, let data = FileManager.default.contents(atPath: newest.path),
+                  let json = String(bytes: data, encoding: .utf8)
+            else { return [] }
+            guard data.count <= maxDiagnosticPayloadBytes else {
+                return ["\(newest.lastPathComponent): \(DeviceDiagnostics.byteString(Int64(data.count))) — too large to include"]
+            }
+            return ["\(newest.lastPathComponent):", json]
+        #else
+            return []
+        #endif
+    }
+
+    // MARK: - Signposts
+
+    /// `Perf` intervals from this launch, read back from the unified log. On
+    /// Apple TV (no MetricKit) they are the only phase timing a report carries.
+    private func collectSignposts(now: Date) -> [String] {
+        guard let store = try? OSLogStore(scope: .currentProcessIdentifier) else { return [] }
+        let position = store.position(date: now.addingTimeInterval(-24 * 60 * 60))
+        let predicate = NSPredicate(format: "subsystem == %@ AND category == %@", Perf.subsystem, Perf.category)
+        guard let entries = try? store.getEntries(at: position, matching: predicate) else { return [] }
+        var lines: [String] = []
+        for case let signpost as OSLogEntrySignpost in entries {
+            let time = DiagnosticDateFormat.entry.string(from: signpost.date)
+            let message = LogRedaction.scrubURLs(in: signpost.composedMessage)
+            let head = "\(time)  \(Self.signpostLabel(for: signpost.signpostType))  \(signpost.signpostName) #\(signpost.signpostIdentifier)"
+            lines.append(message.isEmpty ? head : "\(head)  \(message)")
+        }
+        return Array(lines.suffix(Self.maxSignposts))
+    }
+
     // MARK: - Metadata
 
-    /// Gather app / device context. Runs on the main actor because it reads the
-    /// MainActor-isolated player-engine settings.
+    /// Gather app / device context. Runs on the main actor because it reads
+    /// MainActor-isolated settings and services.
     @MainActor
-    static func currentMetadata() -> Metadata {
+    static func currentMetadata(
+        cloudSync: CloudSyncCoordinator? = nil,
+        origin: String? = nil,
+        visibleProblem: String? = nil,
+        userNote: String? = nil
+    ) -> Metadata {
         let defaults = UserDefaults.standard
         let priorityRaw = defaults.string(forKey: PlayerSettings.enginePriorityKey) ?? ""
         let legacyRaw = defaults.string(forKey: PlayerSettings.engineKey) ?? PlayerEngineKind.defaultValue.rawValue
@@ -197,8 +362,58 @@ nonisolated struct DebugLogExporter {
             deviceModel: deviceModel,
             engineSummary: engineSummary,
             playbackQoE: qoeLines(PlaybackQoE.shared.summary),
-            fieldMetrics: fieldMetrics
+            fieldMetrics: fieldMetrics,
+            installSource: DeviceDiagnostics.installSource,
+            locale: DeviceDiagnostics.localeSummary,
+            sessionStartedAt: DiagnosticSession.startedAt,
+            launchCount: DiagnosticSession.launchCount,
+            lastUnexpectedEnd: DiagnosticSession.lastUnexpectedEnd,
+            isPremium: PremiumManager.shared.isPremium,
+            cloudSync: cloudSync.map { cloudSyncLines($0.status) } ?? [],
+            settings: settingsLines(defaults),
+            origin: origin,
+            visibleProblem: visibleProblem,
+            userNote: userNote
         )
+    }
+
+    @MainActor
+    static func cloudSyncLines(_ status: CloudSyncStatus) -> [String] {
+        var lines = ["Account: \(status.account) · syncing: \(status.isSyncing ? "yes" : "no") · initial sync done: \(status.hasCompletedInitialSync ? "yes" : "no")"]
+        if let last = status.lastReconcile {
+            lines.append("Last reconcile: \(DiagnosticDateFormat.entry.string(from: last))")
+        }
+        if let error = status.lastError {
+            lines.append("Last error: \(LogRedaction.scrubURLs(in: error))")
+        }
+        return lines
+    }
+
+    /// Every scalar preference (flags, numbers) plus the player's short string
+    /// settings. Scalars can't carry personal data; strings are held to the
+    /// `player.` keys, which are engine names and modes.
+    static func settingsLines(_ defaults: UserDefaults) -> [String] {
+        // Lume's keys are lowercase and dotted ("player.ks.hardwareDecode");
+        // the system and SDK domains mixed into `standard` are capitalized.
+        let excludedPrefixes = ["com.", "diagnostics.", "debug.logging.enabledSince"]
+        var lines: [String] = []
+        for (key, value) in defaults.dictionaryRepresentation() {
+            guard key.count < 80, key.first?.isLowercase == true, key.contains("."),
+                  !excludedPrefixes.contains(where: { key.hasPrefix($0) })
+            else { continue }
+            // Keys carrying an id ("progress.<uuid>") are per-item state, not settings.
+            guard key.firstMatch(of: /[0-9A-Fa-f]{8}-[0-9A-Fa-f]{4}/) == nil else { continue }
+            switch value {
+            case let number as NSNumber:
+                let rendered = CFGetTypeID(number) == CFBooleanGetTypeID() ? (number.boolValue ? "on" : "off") : number.stringValue
+                lines.append("\(key) = \(rendered)")
+            case let string as String where key.hasPrefix("player.") && string.count <= 40 && !string.contains("://"):
+                lines.append("\(key) = \(string)")
+            default:
+                continue
+            }
+        }
+        return lines.sorted().prefix(250).map(\.self)
     }
 
     static var platformName: String {
@@ -216,6 +431,9 @@ nonisolated struct DebugLogExporter {
     /// The hardware model identifier (e.g. "iPhone17,1"), read from `utsname`.
     /// Assembled scalar-by-scalar to avoid `String(decoding:)`, which lint bans.
     static var deviceModel: String {
+        if let simulated = ProcessInfo.processInfo.environment["SIMULATOR_MODEL_IDENTIFIER"] {
+            return "\(simulated) (Simulator)"
+        }
         var systemInfo = utsname()
         uname(&systemInfo)
         let identifier = Mirror(reflecting: systemInfo.machine).children.reduce(into: "") { result, element in
@@ -223,6 +441,16 @@ nonisolated struct DebugLogExporter {
             result.append(Character(UnicodeScalar(UInt8(value))))
         }
         return identifier.isEmpty ? "unknown" : identifier
+    }
+
+    static func signpostLabel(for type: OSLogEntrySignpost.SignpostType) -> String {
+        switch type {
+        case .intervalBegin: "signpost-begin"
+        case .intervalEnd: "signpost-end"
+        case .event: "signpost-event"
+        case .undefined: "signpost"
+        @unknown default: "signpost"
+        }
     }
 
     static func label(for level: OSLogEntryLog.Level) -> String {
@@ -236,20 +464,4 @@ nonisolated struct DebugLogExporter {
         @unknown default: "—"
         }
     }
-
-    // MARK: - Formatters
-
-    private static let entryStamp: DateFormatter = {
-        let formatter = DateFormatter()
-        formatter.locale = Locale(identifier: "en_US_POSIX")
-        formatter.dateFormat = "yyyy-MM-dd HH:mm:ss.SSS"
-        return formatter
-    }()
-
-    private static let fileStamp: DateFormatter = {
-        let formatter = DateFormatter()
-        formatter.locale = Locale(identifier: "en_US_POSIX")
-        formatter.dateFormat = "yyyy-MM-dd-HHmmss"
-        return formatter
-    }()
 }

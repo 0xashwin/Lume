@@ -12,6 +12,7 @@ struct SettingsView: View {
     /// Not `private`: read by the SettingsView+Playlists extension (separate file).
     @State var showingAddPlaylist = false
     @State private var trakt = TraktService.shared
+    @State private var simkl = SimklService.shared
     @State private var openSubtitles = OpenSubtitlesService.shared
     /// Premium entitlement + paywall presentation. Not `private`: read by the
     /// SettingsView+Playlists / +TVComponents extensions (separate files).
@@ -32,12 +33,33 @@ struct SettingsView: View {
     @AppStorage(PlayerSettings.externalPlayerKey) var externalPlayerRaw: String = ""
     @AppStorage(PlayerSettings.externalPlayerScopeKey)
     var externalPlayerScopeRaw: String = ExternalPlayerScope.default.rawValue
+    @AppStorage(PlayerSettings.liveSurfModeKey)
+    var liveSurfModeRaw: String = LiveSurfMode.default.rawValue
+    #if os(tvOS)
+        @AppStorage(PlayerSettings.tvRemoteSwipesKey)
+        var tvRemoteSwipes = PlayerSettings.tvRemoteSwipesDefault
+    #endif
     @AppStorage(PlayerSettings.Playback.autoPlayNextKey)
     var autoPlayNext = PlayerSettings.Playback.autoPlayNextDefault
-    @AppStorage(PlayerSettings.Playback.showNextEpisodeButtonKey)
-    var showNextEpisodeButton = PlayerSettings.Playback.showNextEpisodeButtonDefault
+    #if os(tvOS)
+        /// tvOS only: off tvOS the transport row carries an always-available
+        /// Next Episode button, so `PlayerNextUpOverlay`'s outro-armed one —
+        /// and with it this switch — has nothing left to control.
+        @AppStorage(PlayerSettings.Playback.showNextEpisodeButtonKey)
+        var showNextEpisodeButton = PlayerSettings.Playback.showNextEpisodeButtonDefault
+    #endif
     @AppStorage(PlayerSettings.Playback.showSkipIntroButtonKey)
     var showSkipIntroButton = PlayerSettings.Playback.showSkipIntroButtonDefault
+    /// Comma-separated preferred languages, empty meaning no preference (see `PreferredLanguageList`). Not `private`: read by the SettingsView+Language extension (separate file).
+    @AppStorage(PlayerSettings.Language.preferredAudioLanguagesKey) var preferredAudioLanguagesRaw = PlayerSettings.Language.preferredAudioLanguagesDefault
+
+    // Stream-information caption preferences (SettingsView+StreamInfo, separate file).
+    #if !os(tvOS)
+        @AppStorage(PlayerSettings.StreamInfo.enabledKey)
+        var streamInfoEnabled = PlayerSettings.StreamInfo.enabledDefault
+    #endif
+    @AppStorage(PlayerSettings.StreamInfo.detailLevelKey)
+    var streamInfoDetailLevelRaw = PlayerSettings.StreamInfo.detailLevelDefault.rawValue
     @AppStorage(SearchSettings.searchAllPlaylistsKey)
     private var searchAllPlaylists = SearchSettings.searchAllPlaylistsDefault
     #if !os(tvOS)
@@ -54,13 +76,13 @@ struct SettingsView: View {
         @AppStorage(DownloadManager.autoDeleteKey) private var autoDeleteAfterWatching = false
     #endif
 
+    /// The globally-selected playlist, shared with the content tabs; the rows'
+    /// sync state reads it. On tvOS (no toolbar switcher) this pane is also where
+    /// it is chosen, the Play/Pause quick-switch overlay the fast path. Not
+    /// `private`: read by the SettingsView+Playlists extension (separate file).
+    @AppStorage(PlaylistSelectionStore.key) var selectedPlaylistID: String = ""
+
     #if os(tvOS)
-        /// The globally-selected playlist, shared with the content tabs. tvOS has
-        /// no toolbar switcher: this pane is the management surface where the
-        /// active playlist is chosen, and the Play/Pause quick-switch overlay the
-        /// fast path that writes the same key. Not `private`: read by the
-        /// SettingsView+Playlists extension (separate file).
-        @AppStorage(PlaylistSelectionStore.key) var selectedPlaylistID: String = ""
         /// Routes the switch through the blocking overlay (see PlaylistSwitchModel).
         /// Not `private`: read by the SettingsView+Playlists extension.
         @Environment(PlaylistSwitchModel.self) var playlistSwitch: PlaylistSwitchModel?
@@ -79,6 +101,17 @@ struct SettingsView: View {
         /// replacing the player detail in place (same reasoning as `selectedPlaylist`).
         /// Not `private`: read by the SettingsView+TVPlayer extension (separate file).
         @State var selectedEngineOptions: PlayerEngineKind?
+        /// Which preferred-language pane is drilled into within the Player
+        /// category — the ordered list, or its add picker one level deeper —
+        /// replacing the player detail in place (same reasoning as
+        /// `selectedEngineOptions`). Not `private`: read by the
+        /// SettingsView+TVPlayer extension (separate file).
+        @State var preferredLanguagePane: PreferredLanguagePane?
+
+        enum PreferredLanguagePane {
+            case list, add
+        }
+
         /// Home layout preferences, shown in the Home category. Not `private`: read
         /// by the SettingsView+TVHome extension (separate file). The iOS/macOS build
         /// has its own `HomeLayoutSettingsView`, so these live in the tvOS block.
@@ -117,13 +150,15 @@ struct SettingsView: View {
                     searchSection
                     autoSyncSection
                     epgSection
+                    sportsSection
                     CloudSyncSection()
-                    if trakt.isConfigured {
+                    if trakt.isConfigured || simkl.isConfigured {
                         integrationsSection
                     }
                     playbackSection
                     downloadsSection
                     playerSection
+                    streamInfoSection
                     externalPlayerSection
                     storageSection
                     supportSection
@@ -182,12 +217,17 @@ struct SettingsView: View {
 
                                 VStack(alignment: .leading, spacing: 1) {
                                     Text(playlist.name)
-                                    Text(playlist.serverURL)
+                                    Text(playlist.displayURL)
                                         .font(.caption)
                                         .foregroundStyle(.secondary)
                                         .lineLimit(1)
                                         .truncationMode(.middle)
                                 }
+
+                                Spacer(minLength: 0)
+                                PlaylistSyncAccessory(state: playlist.syncState(
+                                    isActive: playlist.id.uuidString == playlists.activeID(for: selectedPlaylistID)
+                                ))
                             }
                             .padding(.vertical, 1)
                         }
@@ -273,16 +313,34 @@ struct SettingsView: View {
 
         private var integrationsSection: some View {
             Section {
-                NavigationLink {
-                    TraktIntegrationView()
-                } label: {
-                    HStack {
-                        Label("Trakt", systemImage: "rectangle.stack.badge.play")
-                        Spacer()
-                        if trakt.isConnected {
-                            Text(trakt.username.map { "@\($0)" } ?? "Connected")
-                                .font(.caption)
-                                .foregroundStyle(.secondary)
+                if trakt.isConfigured {
+                    NavigationLink {
+                        TraktIntegrationView()
+                    } label: {
+                        HStack {
+                            Label("Trakt", systemImage: "arrow.trianglehead.2.clockwise.rotate.90.circle")
+                            Spacer()
+                            if trakt.isConnected {
+                                Text(trakt.username.map { "@\($0)" } ?? "Connected")
+                                    .font(.caption)
+                                    .foregroundStyle(.secondary)
+                            }
+                        }
+                    }
+                }
+
+                if simkl.isConfigured {
+                    NavigationLink {
+                        SimklIntegrationView()
+                    } label: {
+                        HStack {
+                            Label("Simkl", systemImage: "arrow.trianglehead.2.clockwise.rotate.90.circle")
+                            Spacer()
+                            if simkl.isConnected {
+                                Text(simkl.username.map { "@\($0)" } ?? "Connected")
+                                    .font(.caption)
+                                    .foregroundStyle(.secondary)
+                            }
                         }
                     }
                 }
@@ -305,15 +363,13 @@ struct SettingsView: View {
             } header: {
                 Text("Integrations")
             } footer: {
-                Text("Sync watched movies and episodes, show your Trakt watchlist on Home, and download subtitles for anything that ships without them.")
+                Text("Sync watched movies and episodes, show your Trakt or Simkl watchlist on Home, and download subtitles for anything that ships without them.")
             }
         }
 
         private var playbackSection: some View {
             Section {
                 Toggle("Autoplay Next Episode", isOn: $autoPlayNext)
-                    .disabled(!premium.isPremium)
-                Toggle("Show Next Episode Button", isOn: $showNextEpisodeButton)
                     .disabled(!premium.isPremium)
                 Toggle("Show Skip Intro Button", isOn: $showSkipIntroButton)
                     .disabled(!premium.isPremium)
@@ -327,7 +383,7 @@ struct SettingsView: View {
             } header: {
                 Text("Playback")
             } footer: {
-                Text("Automatically start the next episode when one finishes, and show a button near the end to skip ahead.")
+                Text("Automatically start the next episode when one finishes.")
             }
         }
 
@@ -350,61 +406,6 @@ struct SettingsView: View {
                 Text("Downloads")
             } footer: {
                 Text("Download movies and episodes for offline playback. Auto-delete removes the file once you've finished watching.")
-            }
-        }
-
-        private var playerSection: some View {
-            Section {
-                NavigationLink {
-                    PlayerEnginePriorityView()
-                } label: {
-                    HStack {
-                        Text("Player Engines")
-                        Spacer()
-                        Text(enginePriority.map(\.displayName).joined(separator: " › "))
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
-                            .lineLimit(1)
-                            .truncationMode(.tail)
-                    }
-                }
-
-                NavigationLink("VLCKit Options") { VLCEngineSettingsScreen() }
-                NavigationLink("KSPlayer Options") { KSEngineSettingsScreen() }
-                NavigationLink("Lume Engine Options") { LumeEngineSettingsScreen() }
-            } header: {
-                Text("Player")
-            } footer: {
-                Text("Lume plays each stream with your preferred engine and falls back to the next if it can't be played.")
-            }
-        }
-
-        /// Hand-off to a third-party player. Its own group — this bypasses the
-        /// engines above rather than configuring them — but headerless, so it
-        /// still reads as part of the Player block.
-        private var externalPlayerSection: some View {
-            Section {
-                Picker("External Player", selection: $externalPlayerRaw) {
-                    Text("Off").tag("")
-                    ForEach(ExternalPlayer.allCases) { player in
-                        Text(player.displayName).tag(player.rawValue)
-                    }
-                }
-                .pickerStyle(.menu)
-
-                // Only meaningful once a player is selected — some players
-                // (Infuse, for one) handle VOD but not live streams.
-                if ExternalPlayer(rawValue: externalPlayerRaw) != nil {
-                    Picker("Use For", selection: $externalPlayerScopeRaw) {
-                        ForEach(ExternalPlayerScope.allCases) { scope in
-                            Text(scope.displayName).tag(scope.rawValue)
-                        }
-                    }
-                    .pickerStyle(.menu)
-                }
-            } footer: {
-                // swiftlint:disable:next line_length
-                Text("Streams open in the selected external app instead of Lume's player, when it is installed. Some apps — Infuse among them — play movies and series but no live channels, so you can limit the hand-off to one or the other.")
             }
         }
 
@@ -469,6 +470,7 @@ struct SettingsView: View {
                         // pane reverts to its top-level list.
                         selectedPlaylist = nil
                         selectedEngineOptions = nil
+                        preferredLanguagePane = nil
                     }
                 }
                 .fullScreenCover(isPresented: $showingAddPlaylist) {
@@ -510,7 +512,7 @@ struct SettingsView: View {
         /// credentials for at least one of them.
         private var availableCategories: [SettingsCategory] {
             SettingsCategory.allCases.filter {
-                $0 != .integrations || trakt.isConfigured || openSubtitles.isConfigured
+                $0 != .integrations || trakt.isConfigured || simkl.isConfigured || openSubtitles.isConfigured
             }
         }
 
@@ -543,6 +545,7 @@ struct SettingsView: View {
                         }
                     case .profiles: TVProfilesSettingsView()
                     case .home: tvHomeLayoutDetail
+                    case .sports: TVSportsSettingsPane()
                     case .epg: EPGSettingsView()
                     case .search: tvSearchDetail
                     case .storage: StorageManagementView()
@@ -550,6 +553,8 @@ struct SettingsView: View {
                     case .player:
                         if let selectedEngineOptions {
                             tvEngineOptionsDetail(for: selectedEngineOptions)
+                        } else if let preferredLanguagePane {
+                            tvPreferredLanguageDetail(preferredLanguagePane)
                         } else {
                             tvPlayerDetail
                         }
@@ -569,6 +574,9 @@ struct SettingsView: View {
             VStack(alignment: .leading, spacing: 36) {
                 if trakt.isConfigured {
                     TVTraktIntegrationView()
+                }
+                if simkl.isConfigured {
+                    TVSimklIntegrationView()
                 }
                 if openSubtitles.isConfigured {
                     TVOpenSubtitlesIntegrationView()

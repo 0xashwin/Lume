@@ -18,7 +18,7 @@ import SwiftData
 @MainActor
 enum TMDBLanguageWatcher {
     private static let storedLanguageKey = "TMDBEnrichmentLanguage"
-    private static let logger = Logger(subsystem: "com.lume", category: "TMDBLanguage")
+    private static let logger = Logger.metadata
 
     /// Clears `tmdbEnrichedAt` on every movie and series when the preferred
     /// TMDB language differs from the one previous enrichment ran with, so the

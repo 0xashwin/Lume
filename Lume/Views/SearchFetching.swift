@@ -36,28 +36,17 @@ nonisolated struct SearchRequest {
     /// Max rows per content type, across every playlist searched.
     let limit: Int
 
-    /// The fetches one type is split into. Searching several playlists runs one
-    /// per playlist so a single catalog can't spend the whole budget — plus one
-    /// for rows no category claims, which a per-playlist fetch matches on
-    /// category prefix would otherwise drop (m3u sources don't always supply a
-    /// category).
+    /// The fetches one type is split into: one per playlist, so a single
+    /// catalog can't spend the whole budget on its own. Scoping keys off the
+    /// row's playlist-prefixed `id` (see `SearchScope.playlistIDPrefix`), so a
+    /// playlist's uncategorised titles are inside its own scope.
     var scopes: [SearchScope] {
-        guard playlistIDs.count > 1 else {
-            return [SearchScope(
-                query: query,
-                playlistID: playlistIDs.first ?? "",
-                restrictToPlaylist: !playlistIDs.isEmpty,
-                excluded: excludedCategoryIDs
-            )]
+        guard !playlistIDs.isEmpty else {
+            return [SearchScope(query: query, playlistID: "", restrictToPlaylist: false, excluded: excludedCategoryIDs)]
         }
-        var scopes = playlistIDs.map {
+        return playlistIDs.map {
             SearchScope(query: query, playlistID: $0, restrictToPlaylist: true, excluded: excludedCategoryIDs)
         }
-        scopes.append(SearchScope(
-            query: query, playlistID: "", restrictToPlaylist: false,
-            excluded: excludedCategoryIDs, uncategorisedOnly: true
-        ))
-        return scopes
     }
 }
 
@@ -65,77 +54,64 @@ nonisolated struct SearchRequest {
 /// `ModelContext` and returns only identifiers — never managed objects, which
 /// can't cross actor boundaries.
 nonisolated enum SearchFetcher {
-    /// A matched row and the name it sorts under, kept together so the merge
-    /// can re-sort what it picked without going back to the store.
-    private struct Row {
-        let id: PersistentIdentifier
-        let name: String
-    }
-
     static func fetch(container: ModelContainer, request: SearchRequest) -> SearchHits {
-        let context = ModelContext(container)
         let scopes = request.scopes
         let limit = request.limit
+        let context = ModelContext(container)
         var hits = SearchHits()
 
+        // None of the descriptors sorts. A `sortBy:` defeats `fetchLimit`:
+        // with an ORDER BY, SQLite has to find *and sort* every match before it
+        // can apply the LIMIT, so a bounded fetch still scanned the whole table
+        // (263 ms for movies alone on a 179k-title catalog, 479 ms for the three
+        // together) to show 50 rows. Without it the scan stops at the 50th hit.
+        // The per-type name order the list has always shown is applied over the
+        // hydrated rows instead — see `SearchView.assembleResults`.
+        //
+        // Searching several playlists runs one bounded fetch per playlist and
+        // spends the budget by rotating between them (`interleaved`): one
+        // catalog that happens to come first could otherwise fill every row and
+        // leave the others looking unsearched, while a playlist with only a
+        // couple of matches hands its unused share straight back.
+        //
+        // Each fetch is its own scan, so a superseded query burned the full
+        // cost for a result nobody would read. `SearchView.localSearch`
+        // forwards its cancellation into this task (`Task.detached` does not
+        // inherit it), and `ids` checks it between scans. The partial hits
+        // returned are discarded by the caller, which is cancelled too.
         if request.wantMovies {
-            hits.movies = merge(scopes.map {
-                rows(in: context, predicate: searchMoviePredicate(scope: $0), name: \Movie.name, limit: limit)
-            }, limit: limit)
+            hits.movies = ids(in: context, scopes: scopes, limit: limit, predicate: searchMoviePredicate)
         }
+        guard !Task.isCancelled else { return hits }
 
         if request.wantSeries {
-            hits.series = merge(scopes.map {
-                rows(in: context, predicate: searchSeriesPredicate(scope: $0), name: \Series.name, limit: limit)
-            }, limit: limit)
+            hits.series = ids(in: context, scopes: scopes, limit: limit, predicate: searchSeriesPredicate)
         }
+        guard !Task.isCancelled else { return hits }
 
         if request.wantLive {
-            hits.streams = merge(scopes.map {
-                rows(in: context, predicate: searchLiveStreamPredicate(scope: $0), name: \LiveStream.name, limit: limit)
-            }, limit: limit)
+            hits.streams = ids(in: context, scopes: scopes, limit: limit, predicate: searchLiveStreamPredicate)
         }
 
         return hits
     }
 
-    private static func rows<Model: PersistentModel>(
+    /// One bounded, unsorted fetch per scope, rotated into a single list of at
+    /// most `limit` ids.
+    private static func ids<Model: PersistentModel>(
         in context: ModelContext,
-        predicate: Predicate<Model>,
-        name: KeyPath<Model, String>,
-        limit: Int
-    ) -> [Row] {
-        var descriptor = FetchDescriptor<Model>(predicate: predicate, sortBy: [SortDescriptor(name)])
-        descriptor.fetchLimit = limit
-        return ((try? context.fetch(descriptor)) ?? []).map {
-            Row(id: $0.persistentModelID, name: $0[keyPath: name])
+        scopes: [SearchScope],
+        limit: Int,
+        predicate: (SearchScope) -> Predicate<Model>
+    ) -> [PersistentIdentifier] {
+        var lists: [[PersistentIdentifier]] = []
+        for scope in scopes {
+            guard !Task.isCancelled else { break }
+            var descriptor = FetchDescriptor<Model>(predicate: predicate(scope))
+            descriptor.fetchLimit = limit
+            lists.append(((try? context.fetch(descriptor)) ?? []).map(\.persistentModelID))
         }
-    }
-
-    /// Spends the budget by taking one row from each list in turn, then puts
-    /// what survived back in name order. The rotation is what keeps a playlist
-    /// whose titles sort early from crowding the others out — and a playlist
-    /// with only a couple of matches hands its unused share straight back. A
-    /// single list is already ordered and bounded, so it passes through.
-    private static func merge(_ lists: [[Row]], limit: Int) -> [PersistentIdentifier] {
-        guard lists.count > 1 else { return (lists.first ?? []).map(\.id) }
-        var picked: [Row] = []
-        var seen = Set<PersistentIdentifier>()
-        var index = 0
-        while picked.count < limit {
-            var advanced = false
-            for list in lists where index < list.count {
-                advanced = true
-                guard seen.insert(list[index].id).inserted else { continue }
-                picked.append(list[index])
-                if picked.count == limit { break }
-            }
-            guard advanced, picked.count < limit else { break }
-            index += 1
-        }
-        return picked
-            .sorted { $0.name.localizedStandardCompare($1.name) == .orderedAscending }
-            .map(\.id)
+        return interleaved(lists, limit: limit)
     }
 }
 
@@ -148,10 +124,6 @@ nonisolated struct SearchScope {
     let playlistID: String
     let restrictToPlaylist: Bool
     let excluded: Set<String>
-    /// Matches only rows with no category at all. The other half of a
-    /// per-playlist split: playlist scoping keys off the playlist UUID prefixed
-    /// onto every category id, which uncategorised rows have nowhere to carry.
-    var uncategorisedOnly = false
 
     /// The excluded ids as optionals, so a predicate can test the optional
     /// `categoryId` against them directly. Neither `?? ""` (a ternary) nor a
@@ -160,34 +132,58 @@ nonisolated struct SearchScope {
     var excludedOptional: Set<String?> {
         Set(excluded.map(String?.some))
     }
+
+    /// The playlist restriction as an id prefix. Every catalog row's id is
+    /// `"<playlist uuid>-<kind>-<provider id>"` (see `ContentSyncManager`), so a
+    /// prefix test on the row's own `id` scopes a fetch to one playlist — and
+    /// `id` is `@Attribute(.unique)`, i.e. indexed, the same range seek
+    /// `PlaylistDeletion` scopes with. The separator is part of the prefix so
+    /// the match can't run past the uuid into a longer id.
+    var playlistIDPrefix: String {
+        "\(playlistID)-"
+    }
 }
 
 /// Internal (not fileprivate) so the tests can run them against a SQLite store,
 /// where predicate SQL is actually generated.
+///
+/// The playlist scope is emitted only when it applies rather than being folded
+/// into an `||` with a captured flag: it used to read
+/// `categoryId?.localizedStandardContains(playlistID)`, a second
+/// `NSCoreDataStringSearch` per row — a full substring search used as a prefix
+/// test, and as expensive as the name match it was paired with.
 nonisolated func searchMoviePredicate(scope: SearchScope) -> Predicate<Movie> {
-    let (query, playlistID) = (scope.query, scope.playlistID)
-    let restrictToPlaylist = scope.restrictToPlaylist
-    let uncategorisedOnly = scope.uncategorisedOnly
+    let query = scope.query
     let excluded = scope.excludedOptional
     let filtersCategories = !excluded.isEmpty
+    guard scope.restrictToPlaylist else {
+        return #Predicate { movie in
+            movie.name.localizedStandardContains(query)
+                && (!filtersCategories || movie.categoryId == nil || !excluded.contains(movie.categoryId))
+        }
+    }
+    let prefix = scope.playlistIDPrefix
     return #Predicate { movie in
         movie.name.localizedStandardContains(query)
-            && (!restrictToPlaylist || (movie.categoryId?.localizedStandardContains(playlistID) ?? false))
-            && (!uncategorisedOnly || movie.categoryId == nil)
+            && movie.id.starts(with: prefix)
             && (!filtersCategories || movie.categoryId == nil || !excluded.contains(movie.categoryId))
     }
 }
 
 nonisolated func searchSeriesPredicate(scope: SearchScope) -> Predicate<Series> {
-    let (query, playlistID) = (scope.query, scope.playlistID)
-    let restrictToPlaylist = scope.restrictToPlaylist
-    let uncategorisedOnly = scope.uncategorisedOnly
+    let query = scope.query
     let excluded = scope.excludedOptional
     let filtersCategories = !excluded.isEmpty
+    guard scope.restrictToPlaylist else {
+        return #Predicate { series in
+            series.name.localizedStandardContains(query)
+                && (!filtersCategories || series.categoryId == nil || !excluded.contains(series.categoryId))
+        }
+    }
+    let prefix = scope.playlistIDPrefix
     return #Predicate { series in
         series.name.localizedStandardContains(query)
-            && (!restrictToPlaylist || (series.categoryId?.localizedStandardContains(playlistID) ?? false))
-            && (!uncategorisedOnly || series.categoryId == nil)
+            && series.id.starts(with: prefix)
             && (!filtersCategories || series.categoryId == nil || !excluded.contains(series.categoryId))
     }
 }
@@ -195,16 +191,49 @@ nonisolated func searchSeriesPredicate(scope: SearchScope) -> Predicate<Series> 
 /// Live channels also carry their own Content Management visibility, so a
 /// channel hidden individually is excluded here as well.
 nonisolated func searchLiveStreamPredicate(scope: SearchScope) -> Predicate<LiveStream> {
-    let (query, playlistID) = (scope.query, scope.playlistID)
-    let restrictToPlaylist = scope.restrictToPlaylist
-    let uncategorisedOnly = scope.uncategorisedOnly
+    let query = scope.query
     let excluded = scope.excludedOptional
     let filtersCategories = !excluded.isEmpty
+    guard scope.restrictToPlaylist else {
+        return #Predicate { stream in
+            stream.name.localizedStandardContains(query)
+                && stream.isHidden == false
+                && (!filtersCategories || stream.categoryId == nil || !excluded.contains(stream.categoryId))
+        }
+    }
+    let prefix = scope.playlistIDPrefix
     return #Predicate { stream in
         stream.name.localizedStandardContains(query)
             && stream.isHidden == false
-            && (!restrictToPlaylist || (stream.categoryId?.localizedStandardContains(playlistID) ?? false))
-            && (!uncategorisedOnly || stream.categoryId == nil)
+            && stream.id.starts(with: prefix)
             && (!filtersCategories || stream.categoryId == nil || !excluded.contains(stream.categoryId))
     }
+}
+
+// MARK: - Interleaving
+
+/// Spends `limit` by taking one element from each list in turn, preserving each
+/// list's own order and dropping repeats. Used for hits from several Stalker
+/// portals, where each returns its own relevance ranking and concatenating them
+/// would bury a second portal's best match under everything the first had to
+/// say, and for the local pass's per-playlist fetches, where one catalog would
+/// otherwise fill the whole budget. Lists shorter than the rest simply drop out
+/// of the rotation.
+nonisolated func interleaved<Element: Hashable>(_ lists: [[Element]], limit: Int) -> [Element] {
+    guard lists.count > 1 else { return Array((lists.first ?? []).prefix(limit)) }
+    var merged: [Element] = []
+    var seen = Set<Element>()
+    var index = 0
+    while merged.count < limit {
+        var advanced = false
+        for list in lists where index < list.count {
+            advanced = true
+            guard seen.insert(list[index]).inserted else { continue }
+            merged.append(list[index])
+            if merged.count == limit { break }
+        }
+        guard advanced, merged.count < limit else { break }
+        index += 1
+    }
+    return merged
 }

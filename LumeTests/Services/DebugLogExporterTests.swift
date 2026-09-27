@@ -19,7 +19,7 @@ struct DebugLogExporterTests {
         let exporter = DebugLogExporter(metadata: sampleMetadata())
         let text = exporter.header(now: Date(timeIntervalSince1970: 0)).joined(separator: "\n")
 
-        #expect(text.contains("Lume Diagnostic Log"))
+        #expect(text.contains("Lume Diagnostic Report"))
         #expect(text.contains("App: Lume 1.2.3 (build 42)"))
         #expect(text.contains("Platform: iOS Version 26.4 (Build 23A340)"))
         #expect(text.contains("Device: iPhone17,1"))
@@ -33,6 +33,13 @@ struct DebugLogExporterTests {
         #expect(DebugLogExporter.label(for: .error) == "error")
         #expect(DebugLogExporter.label(for: .fault) == "fault")
         #expect(DebugLogExporter.label(for: .undefined) == "—")
+    }
+
+    @Test func `signpost labels map every case`() {
+        #expect(DebugLogExporter.signpostLabel(for: .intervalBegin) == "signpost-begin")
+        #expect(DebugLogExporter.signpostLabel(for: .intervalEnd) == "signpost-end")
+        #expect(DebugLogExporter.signpostLabel(for: .event) == "signpost-event")
+        #expect(DebugLogExporter.signpostLabel(for: .undefined) == "signpost")
     }
 
     @Test func `device model is never empty`() {

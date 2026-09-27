@@ -9,69 +9,6 @@ import Foundation
 import OSLog
 import SwiftData
 
-// MARK: - ParsedEpisode
-
-/// A provider episode parsed off the main actor, ready to be turned into an
-/// `Episode` model by the caller on its own context. Value type so it can cross
-/// the actor boundary safely.
-struct ParsedEpisode {
-    let id: String
-    let episodeId: String
-    let title: String
-    let containerExtension: String
-    let seasonNum: Int
-    let episodeNum: Int
-    let added: String?
-    let directSource: String?
-    let durationSecs: Int?
-    let movieImage: String?
-    let rating: Double?
-    let airDate: String?
-    let plot: String?
-}
-
-extension Series {
-    /// Materializes fetched episodes on `context` and links them to this series,
-    /// de-duping against any already present (Episode.id is unique). Mutating the
-    /// `episodes` relationship directly updates any observing SwiftUI view, so the
-    /// caller must run this on the same context the view renders from.
-    ///
-    /// Additive on purpose: a refresh merges in episodes the provider has added
-    /// since the last fetch and never deletes, so a provider hiccup (a short or
-    /// empty `get_series_info` response) can't wipe rows that carry watch
-    /// progress. Call only after a *successful* fetch — it stamps the episode
-    /// cache, which suppresses further refreshes until it goes stale again.
-    func insertEpisodes(_ parsed: [ParsedEpisode], into context: ModelContext) {
-        let existingIds = Set(episodes.map(\.id))
-        for parsed in parsed where !existingIds.contains(parsed.id) {
-            let episode = Episode(
-                id: parsed.id,
-                episodeId: parsed.episodeId,
-                title: parsed.title,
-                containerExtension: parsed.containerExtension,
-                seasonNum: parsed.seasonNum,
-                episodeNum: parsed.episodeNum,
-                added: parsed.added,
-                directSource: parsed.directSource
-            )
-            episode.durationSecs = parsed.durationSecs
-            episode.movieImage = parsed.movieImage
-            episode.rating = parsed.rating
-            episode.airDate = parsed.airDate
-            episode.plot = parsed.plot
-            context.insert(episode)
-            episodes.append(episode)
-        }
-        // A Trakt import can only mark episodes that exist, so anything it
-        // parked for this series is applied here — the one place episodes ever
-        // materialize for Xtream and Stalker.
-        TraktWatchedImporter.applyPending(to: self)
-        episodesFetchedAt = Date()
-        episodesFetchedLastModified = lastModified
-        try? context.save()
-    }
-}
-
 // MARK: - ContentSyncManager
 
 actor ContentSyncManager {
@@ -79,6 +16,9 @@ actor ContentSyncManager {
 
     let modelContainer: ModelContainer
     let xtreamClient: XtreamClient
+    let webdavClient: WebDAVClient
+    let jellyfinClient: JellyfinClient
+    let plexClient: PlexClient
     private var activeSyncPlaylistIDs: Set<UUID> = []
 
     /// Number of items to process before saving and resetting the context.
@@ -86,9 +26,18 @@ actor ContentSyncManager {
 
     // MARK: - Initialization
 
-    init(modelContainer: ModelContainer, xtreamClient: XtreamClient = XtreamClient()) {
+    init(
+        modelContainer: ModelContainer,
+        xtreamClient: XtreamClient = XtreamClient(),
+        webdavClient: WebDAVClient = WebDAVClient(),
+        jellyfinClient: JellyfinClient = JellyfinClient(),
+        plexClient: PlexClient = PlexClient()
+    ) {
         self.modelContainer = modelContainer
         self.xtreamClient = xtreamClient
+        self.webdavClient = webdavClient
+        self.jellyfinClient = jellyfinClient
+        self.plexClient = plexClient
     }
 
     // MARK: - Playlist Sync
@@ -113,8 +62,10 @@ actor ContentSyncManager {
             // An aborted sync isn't a failure: restore the playlist to idle so it
             // can be retried cleanly, rather than wedging it in the error state.
             if Task.isCancelled {
+                Logger.database.info("Sync cancelled for playlist \(playlistId)")
                 markPlaylistIdle(playlistId: playlistId)
             } else {
+                Logger.database.error("Sync failed for playlist \(playlistId) — \(error)")
                 markPlaylistError(playlistId: playlistId)
             }
             throw error
@@ -152,7 +103,18 @@ actor ContentSyncManager {
             try await performM3USync(playlist: playlist, playlistId: playlistId, progress: progress)
         case .stalker:
             try await performStalkerSync(playlist: playlist, playlistId: playlistId, progress: progress, full: full)
+        case .webdav:
+            try await performWebDAVSync(playlist: playlist, playlistId: playlistId, progress: progress)
+        case .jellyfin, .emby:
+            // Both speak the same API; the flavour only tags the rows.
+            let flavor = MediaServerFlavor(sourceType: playlist.sourceType) ?? .jellyfin
+            try await performMediaServerSync(playlist: playlist, playlistId: playlistId, flavor: flavor, progress: progress)
+        case .plex:
+            try await performPlexSync(playlist: playlist, playlistId: playlistId, progress: progress)
         }
+
+        // Every source writes the same unread history rows (see the method).
+        purgeCatalogHistory()
 
         let doneContext = ModelContext(modelContainer)
         doneContext.autosaveEnabled = false
@@ -175,10 +137,12 @@ actor ContentSyncManager {
 
         try await syncAllCategories(for: playlist, playlistId: playlistId, progress: progress, full: full)
 
+        // Serialized and spaced apart on purpose — see
+        // `spaceContentPhaseRequests` for the connection-cap reason.
         try await syncMovies(for: playlist, playlistId: playlistId, progress: progress)
-        try await Task.sleep(for: .seconds(2))
+        try await spaceContentPhaseRequests()
         try await syncSeries(for: playlist, playlistId: playlistId, progress: progress)
-        try await Task.sleep(for: .seconds(2))
+        try await spaceContentPhaseRequests()
         try await syncLiveStreams(for: playlist, playlistId: playlistId, progress: progress)
     }
 
@@ -278,7 +242,7 @@ actor ContentSyncManager {
         defer { Perf.end(interval) }
 
         await progress?.start(.movies)
-        let movieDTOs = try await xtreamClient.getVODStreams(playlist: playlist)
+        var movieDTOs = try await xtreamClient.getVODStreams(playlist: playlist)
         let totalCount = movieDTOs.count
         // swiftformat:disable:next redundantSelf
         Logger.database.info("Fetched \(totalCount) movies, syncing in batches of \(self.batchSize)")
@@ -286,43 +250,63 @@ actor ContentSyncManager {
 
         let playlistPrefix = "\(playlistId.uuidString)-\(CategoryType.vod.rawValue)-"
 
-        for batchStart in stride(from: 0, to: totalCount, by: batchSize) {
-            try Task.checkCancellation()
-            try autoreleasepool {
-                let batchEnd = min(batchStart + batchSize, totalCount)
-                let batch = movieDTOs[batchStart ..< batchEnd]
+        // Accumulated as the batches are written so the sweep no longer needs
+        // the DTO array, which can then be released before the sweep runs.
+        var seenIds = Set<String>(minimumCapacity: totalCount)
 
-                let context = ModelContext(modelContainer)
-                context.autosaveEnabled = false
+        do {
+            let upsertInterval = Perf.begin(.upsertMovies)
+            defer { Perf.end(upsertInterval) }
+            for batchStart in stride(from: 0, to: totalCount, by: batchSize) {
+                try Task.checkCancellation()
+                try autoreleasepool {
+                    let batchEnd = min(batchStart + batchSize, totalCount)
+                    let batch = movieDTOs[batchStart ..< batchEnd]
 
-                // Update existing rows in place; see existingMovies for why.
-                let existing = existingMovies(in: batch, playlistId: playlistId, context: context)
+                    let context = ModelContext(modelContainer)
+                    context.autosaveEnabled = false
 
-                for movieDTO in batch {
-                    guard let streamId = movieDTO.streamId else { continue }
-                    let movieId = "\(playlistId.uuidString)-movie-\(streamId)"
+                    // Update existing rows in place; see existingMovies for why.
+                    let existing = existingMovies(in: batch, playlistId: playlistId, context: context)
 
-                    let movie: Movie
-                    if let found = existing[movieId] {
-                        movie = found
-                    } else {
-                        movie = Movie(id: movieId, streamId: streamId, name: "")
-                        context.insert(movie)
+                    for movieDTO in batch {
+                        guard let streamId = movieDTO.streamId else { continue }
+                        let movieId = "\(playlistId.uuidString)-movie-\(streamId)"
+                        seenIds.insert(movieId)
+
+                        let movie: Movie
+                        if let found = existing[movieId] {
+                            movie = found
+                        } else {
+                            movie = Movie(id: movieId, streamId: streamId, name: "")
+                            context.insert(movie)
+                        }
+                        applyMovieFields(from: movieDTO, to: movie, playlistPrefix: playlistPrefix)
                     }
-                    applyMovieFields(from: movieDTO, to: movie, playlistPrefix: playlistPrefix)
-                }
 
-                try context.save()
-                Logger.database.info("Synced movies \(batchStart + 1)–\(batchEnd) of \(totalCount)")
+                    // A re-sync where the provider changed nothing leaves the
+                    // context clean (see applyMovieFields): skip save() entirely
+                    // rather than pay a full transaction for zero rows.
+                    if context.hasChanges {
+                        try context.save()
+                    }
+                    Logger.database.info("Synced movies \(batchStart + 1)–\(batchEnd) of \(totalCount)")
+                }
+                await progress?.update(
+                    detail: "\(min(batchStart + batchSize, totalCount)) of \(totalCount)",
+                    fraction: totalCount == 0 ? 1 : Double(min(batchStart + batchSize, totalCount)) / Double(totalCount)
+                )
             }
-            await progress?.update(
-                detail: "\(min(batchStart + batchSize, totalCount)) of \(totalCount)",
-                fraction: totalCount == 0 ? 1 : Double(min(batchStart + batchSize, totalCount)) / Double(totalCount)
-            )
         }
 
+        // The decoded payload is ~178k rows on a large provider; drop it before
+        // the sweep starts allocating pages of its own.
+        movieDTOs = []
+
         // Remove movies the provider has dropped (see pruneMovies for the guard).
-        pruneMovies(playlistId: playlistId, against: movieDTOs)
+        let pruneInterval = Perf.begin(.pruneMovies)
+        pruneMovies(playlistId: playlistId, seenIds: seenIds, fetchedCount: totalCount)
+        Perf.end(pruneInterval)
 
         Logger.database.info("Completed syncing \(totalCount) movies")
         await progress?.complete(.movies)
@@ -334,7 +318,7 @@ actor ContentSyncManager {
         defer { Perf.end(interval) }
 
         await progress?.start(.series)
-        let seriesDTOs = try await xtreamClient.getSeries(playlist: playlist)
+        var seriesDTOs = try await xtreamClient.getSeries(playlist: playlist)
         let totalCount = seriesDTOs.count
         // swiftformat:disable:next redundantSelf
         Logger.database.info("Fetched \(totalCount) series, syncing in batches of \(self.batchSize)")
@@ -342,43 +326,63 @@ actor ContentSyncManager {
 
         let playlistPrefix = "\(playlistId.uuidString)-\(CategoryType.series.rawValue)-"
 
-        for batchStart in stride(from: 0, to: totalCount, by: batchSize) {
-            try Task.checkCancellation()
-            try autoreleasepool {
-                let batchEnd = min(batchStart + batchSize, totalCount)
-                let batch = seriesDTOs[batchStart ..< batchEnd]
+        // Accumulated as the batches are written so the sweep no longer needs
+        // the DTO array, which can then be released before the sweep runs.
+        var seenIds = Set<String>(minimumCapacity: totalCount)
 
-                let context = ModelContext(modelContainer)
-                context.autosaveEnabled = false
+        do {
+            let upsertInterval = Perf.begin(.upsertSeries)
+            defer { Perf.end(upsertInterval) }
+            for batchStart in stride(from: 0, to: totalCount, by: batchSize) {
+                try Task.checkCancellation()
+                try autoreleasepool {
+                    let batchEnd = min(batchStart + batchSize, totalCount)
+                    let batch = seriesDTOs[batchStart ..< batchEnd]
 
-                // Update existing rows in place; see existingSeries for why.
-                let existing = existingSeries(in: batch, playlistId: playlistId, context: context)
+                    let context = ModelContext(modelContainer)
+                    context.autosaveEnabled = false
 
-                for seriesDTO in batch {
-                    guard let seriesId = seriesDTO.seriesId else { continue }
-                    let id = "\(playlistId.uuidString)-series-\(seriesId)"
+                    // Update existing rows in place; see existingSeries for why.
+                    let existing = existingSeries(in: batch, playlistId: playlistId, context: context)
 
-                    let series: Series
-                    if let found = existing[id] {
-                        series = found
-                    } else {
-                        series = Series(id: id, seriesId: seriesId, name: "")
-                        context.insert(series)
+                    for seriesDTO in batch {
+                        guard let seriesId = seriesDTO.seriesId else { continue }
+                        let id = "\(playlistId.uuidString)-series-\(seriesId)"
+                        seenIds.insert(id)
+
+                        let series: Series
+                        if let found = existing[id] {
+                            series = found
+                        } else {
+                            series = Series(id: id, seriesId: seriesId, name: "")
+                            context.insert(series)
+                        }
+                        applySeriesFields(from: seriesDTO, to: series, playlistPrefix: playlistPrefix)
                     }
-                    applySeriesFields(from: seriesDTO, to: series, playlistPrefix: playlistPrefix)
-                }
 
-                try context.save()
-                Logger.database.info("Synced series \(batchStart + 1)–\(batchEnd) of \(totalCount)")
+                    // A re-sync where the provider changed nothing leaves the
+                    // context clean (see applySeriesFields): skip save() entirely
+                    // rather than pay a full transaction for zero rows.
+                    if context.hasChanges {
+                        try context.save()
+                    }
+                    Logger.database.info("Synced series \(batchStart + 1)–\(batchEnd) of \(totalCount)")
+                }
+                await progress?.update(
+                    detail: "\(min(batchStart + batchSize, totalCount)) of \(totalCount)",
+                    fraction: totalCount == 0 ? 1 : Double(min(batchStart + batchSize, totalCount)) / Double(totalCount)
+                )
             }
-            await progress?.update(
-                detail: "\(min(batchStart + batchSize, totalCount)) of \(totalCount)",
-                fraction: totalCount == 0 ? 1 : Double(min(batchStart + batchSize, totalCount)) / Double(totalCount)
-            )
         }
 
+        // Series rows carry ~1 KB of plot/cast text each; drop the payload
+        // before the sweep starts allocating pages of its own.
+        seriesDTOs = []
+
         // Remove series the provider has dropped (episodes/cast cascade).
-        pruneSeries(playlistId: playlistId, against: seriesDTOs)
+        let pruneInterval = Perf.begin(.pruneSeries)
+        pruneSeries(playlistId: playlistId, seenIds: seenIds, fetchedCount: totalCount)
+        Perf.end(pruneInterval)
 
         Logger.database.info("Completed syncing \(totalCount) series")
         await progress?.complete(.series)
@@ -403,6 +407,14 @@ actor ContentSyncManager {
         case .m3u:
             // m3u episodes are imported alongside the rest of the catalog during
             // sync, so there is nothing to fetch lazily here.
+            []
+        case .webdav:
+            // WebDAV episodes are imported alongside the rest of the catalog
+            // during sync, so there is nothing to fetch lazily here.
+            []
+        case .jellyfin, .emby, .plex:
+            // Media-server episodes are imported alongside the rest of the
+            // catalog during sync, so there is nothing to fetch lazily here.
             []
         }
     }
@@ -464,7 +476,7 @@ actor ContentSyncManager {
         defer { Perf.end(interval) }
 
         await progress?.start(.liveStreams)
-        let streamDTOs = try await xtreamClient.getLiveStreams(playlist: playlist)
+        var streamDTOs = try await xtreamClient.getLiveStreams(playlist: playlist)
         let totalCount = streamDTOs.count
         // swiftformat:disable:next redundantSelf
         Logger.database.info("Fetched \(totalCount) live streams, syncing in batches of \(self.batchSize)")
@@ -472,82 +484,64 @@ actor ContentSyncManager {
 
         let playlistPrefix = "\(playlistId.uuidString)-\(CategoryType.live.rawValue)-"
 
-        for batchStart in stride(from: 0, to: totalCount, by: batchSize) {
-            try Task.checkCancellation()
-            try autoreleasepool {
-                let batchEnd = min(batchStart + batchSize, totalCount)
-                let batch = streamDTOs[batchStart ..< batchEnd]
+        // Accumulated as the batches are written so the sweep no longer needs
+        // the DTO array, which can then be released before the sweep runs.
+        var seenIds = Set<String>(minimumCapacity: totalCount)
 
-                let context = ModelContext(modelContainer)
-                context.autosaveEnabled = false
+        do {
+            let upsertInterval = Perf.begin(.upsertLiveStreams)
+            defer { Perf.end(upsertInterval) }
+            for batchStart in stride(from: 0, to: totalCount, by: batchSize) {
+                try Task.checkCancellation()
+                try autoreleasepool {
+                    let batchEnd = min(batchStart + batchSize, totalCount)
+                    let batch = streamDTOs[batchStart ..< batchEnd]
 
-                // Update existing rows in place; see existingLiveStreams for why.
-                let existing = existingLiveStreams(in: batch, playlistId: playlistId, context: context)
+                    let context = ModelContext(modelContainer)
+                    context.autosaveEnabled = false
 
-                for streamDTO in batch {
-                    guard let streamId = streamDTO.streamId else { continue }
-                    let id = "\(playlistId.uuidString)-live-\(streamId)"
+                    // Update existing rows in place; see existingLiveStreams for why.
+                    let existing = existingLiveStreams(in: batch, playlistId: playlistId, context: context)
 
-                    let liveStream: LiveStream
-                    if let found = existing[id] {
-                        liveStream = found
-                    } else {
-                        liveStream = LiveStream(id: id, streamId: streamId, name: "")
-                        context.insert(liveStream)
+                    for streamDTO in batch {
+                        guard let streamId = streamDTO.streamId else { continue }
+                        let id = "\(playlistId.uuidString)-live-\(streamId)"
+                        seenIds.insert(id)
+
+                        let liveStream: LiveStream
+                        if let found = existing[id] {
+                            liveStream = found
+                        } else {
+                            liveStream = LiveStream(id: id, streamId: streamId, name: "")
+                            context.insert(liveStream)
+                        }
+                        applyLiveStreamFields(from: streamDTO, to: liveStream, playlistPrefix: playlistPrefix)
                     }
-                    liveStream.name = streamDTO.name ?? ""
-                    liveStream.streamIcon = streamDTO.streamIcon
-                    liveStream.epgChannelId = streamDTO.epgChannelId
-                    liveStream.added = streamDTO.added
-                    liveStream.customSid = streamDTO.customSid
-                    liveStream.tvArchive = streamDTO.tvArchive ?? 0
-                    liveStream.tvArchiveDuration = streamDTO.tvArchiveDuration ?? 0
-                    liveStream.isAdult = streamDTO.isAdult ?? 0
-                    liveStream.num = streamDTO.num ?? 0
 
-                    if let catIdStr = streamDTO.categoryId {
-                        liveStream.categoryId = playlistPrefix + catIdStr
+                    // A re-sync where the provider changed nothing leaves the
+                    // context clean (see applyLiveStreamFields): skip save() entirely
+                    // rather than pay a full transaction for zero rows.
+                    if context.hasChanges {
+                        try context.save()
                     }
+                    Logger.database.info("Synced streams \(batchStart + 1)–\(batchEnd) of \(totalCount)")
                 }
-
-                try context.save()
-                Logger.database.info("Synced streams \(batchStart + 1)–\(batchEnd) of \(totalCount)")
+                await progress?.update(
+                    detail: "\(min(batchStart + batchSize, totalCount)) of \(totalCount)",
+                    fraction: totalCount == 0 ? 1 : Double(min(batchStart + batchSize, totalCount)) / Double(totalCount)
+                )
             }
-            await progress?.update(
-                detail: "\(min(batchStart + batchSize, totalCount)) of \(totalCount)",
-                fraction: totalCount == 0 ? 1 : Double(min(batchStart + batchSize, totalCount)) / Double(totalCount)
-            )
         }
 
+        // Drop the payload before the sweep starts allocating pages of its own.
+        streamDTOs = []
+
         // Remove live channels the provider has dropped.
-        pruneLiveStreams(playlistId: playlistId, against: streamDTOs)
+        let pruneInterval = Perf.begin(.pruneLiveStreams)
+        pruneLiveStreams(playlistId: playlistId, seenIds: seenIds, fetchedCount: totalCount)
+        Perf.end(pruneInterval)
 
         Logger.database.info("Completed syncing \(totalCount) live streams")
         await progress?.complete(.liveStreams)
-    }
-}
-
-// MARK: - Sync Error
-
-enum SyncError: LocalizedError {
-    case syncInProgress
-    case playlistNotFound
-    case invalidCredentials
-    case networkError(Error)
-    case databaseError(Error)
-
-    var errorDescription: String? {
-        switch self {
-        case .syncInProgress:
-            "A sync is already in progress for this playlist"
-        case .playlistNotFound:
-            "The playlist could not be found"
-        case .invalidCredentials:
-            "Invalid username or password"
-        case let .networkError(error):
-            "Network error: \(error.localizedDescription)"
-        case let .databaseError(error):
-            "Database error: \(error.localizedDescription)"
-        }
     }
 }

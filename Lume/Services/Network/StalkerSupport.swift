@@ -138,10 +138,14 @@ nonisolated enum StalkerLink {
 
 // MARK: - Errors
 
-enum StalkerError: LocalizedError {
+nonisolated enum StalkerError: LocalizedError {
     case invalidURL
     case handshakeFailed
     case authenticationFailed
+    /// The portal refused this device outright, with its own explanation
+    /// (`get_profile`'s `msg` / `block_msg`) — typically a MAC that isn't
+    /// registered, or one bound to a different device serial number.
+    case deviceBlocked(String)
     case noStreamURL
     case networkError(Error)
     case decodingError(Error)
@@ -156,6 +160,8 @@ enum StalkerError: LocalizedError {
             "Couldn't connect to the Stalker portal. Check the portal URL and MAC address."
         case .authenticationFailed:
             "The portal rejected this MAC address. It may not be authorized, or its subscription has expired."
+        case let .deviceBlocked(message):
+            "The portal blocked this device: \(message)"
         case .noStreamURL:
             "The portal didn't return a playable stream for this item."
         case let .networkError(error):
@@ -182,6 +188,10 @@ enum StalkerError: LocalizedError {
             return "portal handshake failed"
         case .authenticationFailed:
             return "portal rejected the MAC address"
+        case .deviceBlocked:
+            // The portal's own text stays out: it's provider-authored and
+            // could carry anything.
+            return "portal blocked the device (get_profile refusal)"
         case .noStreamURL:
             return "no playable stream in portal response"
         case let .networkError(error):
@@ -204,7 +214,7 @@ enum StalkerError: LocalizedError {
             true
         case let .serverError(code):
             code >= 500
-        case .invalidURL, .handshakeFailed, .authenticationFailed, .noStreamURL,
+        case .invalidURL, .handshakeFailed, .authenticationFailed, .deviceBlocked, .noStreamURL,
              .decodingError, .invalidResponse:
             false
         }
@@ -247,5 +257,33 @@ actor StalkerSessionStore {
 
     func clear(_ key: String) {
         sessions[key] = nil
+    }
+}
+
+// MARK: - Response validation
+
+extension StalkerClient {
+    /// Maps a portal response onto `StalkerError`, or decodes it. Split out of
+    /// `perform` so its one catch can fingerprint every failure path.
+    nonisolated static func decodeValidated<T: Decodable>(_: T.Type, response: URLResponse, data: Data) throws -> T {
+        guard let httpResponse = response as? HTTPURLResponse else {
+            throw StalkerError.invalidResponse
+        }
+        if httpResponse.statusCode == 401 || httpResponse.statusCode == 403 {
+            throw StalkerError.authenticationFailed
+        }
+        guard (200 ... 299).contains(httpResponse.statusCode) else {
+            throw StalkerError.serverError(httpResponse.statusCode)
+        }
+        do {
+            return try JSONDecoder().decode(T.self, from: data)
+        } catch {
+            // Ministra answers a call from an unauthorized device with HTTP 200
+            // and a plain-text `Authorization failed.` — not a 401, not JSON.
+            if isAuthorizationFailure(data) {
+                throw StalkerError.authenticationFailed
+            }
+            throw StalkerError.decodingError(error)
+        }
     }
 }

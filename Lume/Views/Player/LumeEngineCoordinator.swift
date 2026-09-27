@@ -79,8 +79,30 @@ final class LumeEngineCoordinator: NSObject, ObservableObject {
 
     /// Silences this player without pausing it — Multi-View mutes every tile
     /// except the one carrying the audio.
+    ///
+    /// For a Multi-View tile this gives the audio lane up entirely rather than
+    /// turning the volume down: a muted renderer keeps pulling frames and keeps
+    /// its claim on the audio output route, and on tvOS a second claimant never
+    /// becomes ready — which stalls the synchronizer that tile's video shares,
+    /// freezing it on its first frame. The full-screen player is the only
+    /// session playing, so a volume mute is right there and spares it a lane
+    /// rebuild on every toggle.
     var isMuted = false {
-        didSet { session?.renderer.isMuted = isMuted }
+        didSet {
+            guard isMuted != oldValue else { return }
+            applyMute()
+        }
+    }
+
+    private func applyMute() {
+        guard let session else { return }
+        // Volume first in both directions: unmuting before the lane is built
+        // means the first frames are already audible, and muting before it is
+        // torn down means nothing leaks out during teardown.
+        session.renderer.isMuted = isMuted
+        guard isEmbedded else { return }
+        let enabled = !isMuted
+        Task { await session.setAudioEnabled(enabled) }
     }
 
     /// Set before `configure` for a Multi-View tile: with several tiles playing
@@ -100,7 +122,18 @@ final class LumeEngineCoordinator: NSObject, ObservableObject {
     private var tickCount = 0
     private var startupTask: Task<Void, Never>?
     private var reportedFailure = false
+    /// Mirrors `PlayerSession.selectedAudioTrackIndex`, read back after `open`
+    /// rather than assumed: the engine starts on its own preferred/default
+    /// pick, which is not necessarily the first track.
+    private var selectedAudioID: String?
     private var selectedSubtitleID: String?
+    /// A manual pick in the audio or subtitle menu outranks the preferred
+    /// languages for the rest of this stream: the engine has no rebuild in
+    /// place, so a stall recovery re-opens through `makeConfiguration` and
+    /// would otherwise re-assert the preference over the viewer's choice.
+    /// Cleared when the URL changes, so it cannot leak into the next channel
+    /// or episode. Persisted nowhere.
+    private var hasManualTrackSelection = false
     /// The sidecar subtitle file loaded from the OpenSubtitles search, if any.
     /// Kept so the track survives a switch to an embedded track and back — the
     /// engine's sidecar loader is a one-shot parse, so re-selecting means
@@ -111,6 +144,9 @@ final class LumeEngineCoordinator: NSObject, ObservableObject {
 
     func configure(media: PlayableMedia) {
         tearDown()
+        if media.url != currentMedia?.url {
+            hasManualTrackSelection = false
+        }
         currentMedia = media
         reportedFailure = false
         // After `tearDown` (which closes any previous session) so a reload counts
@@ -140,6 +176,11 @@ final class LumeEngineCoordinator: NSObject, ObservableObject {
             do {
                 let info = try await session.open(url: media.url.absoluteString)
                 self.mediaInfo = info
+                self.selectedAudioID = await session.selectedAudioTrackIndex.map { String($0) }
+                // Non-nil only when the engine turned a forced track on by
+                // itself because the chosen audio is foreign to the viewer;
+                // embedded subtitles otherwise start off as they always have.
+                self.selectedSubtitleID = await session.selectedSubtitleTrackIndex.map { String($0) }
                 self.publishTracks(info: info)
                 self.publishVideoInfo(info: info)
                 if !self.isEmbedded {
@@ -219,6 +260,7 @@ final class LumeEngineCoordinator: NSObject, ObservableObject {
         // The sidecar lane belongs to the session that just went away; a fresh
         // session starts with no cues, so the menu must not keep advertising it.
         externalSubtitle = nil
+        selectedAudioID = nil
         selectedSubtitleID = nil
         isPipActive = false
     }
@@ -252,22 +294,36 @@ final class LumeEngineCoordinator: NSObject, ObservableObject {
     }
 
     func togglePictureInPicture() {
+        #if os(macOS)
+            let isStarting = pipBridge?.isActive == false
+        #endif
         pipBridge?.toggle()
         isPipActive = pipBridge?.isActive ?? false
+        #if os(macOS)
+            // Sample-buffer PiP comes out cropped on macOS without this.
+            if isStarting {
+                MacPictureInPictureScaler.shared.pictureInPictureDidStart()
+            } else {
+                MacPictureInPictureScaler.shared.pictureInPictureDidStop()
+            }
+        #endif
     }
 
     // MARK: Tracks
 
     func selectAudioTrack(id: String) {
         guard let index = Int32(id) else { return }
+        hasManualTrackSelection = true
         let session = session
         Task { await session?.selectAudioTrack(index) }
+        selectedAudioID = id
         if let info = mediaInfo {
-            publishTracks(info: info, selectedAudioID: id)
+            publishTracks(info: info)
         }
     }
 
     func selectTextTrack(id: String?) {
+        hasManualTrackSelection = true
         selectedSubtitleID = id
         if let external = externalSubtitle, id == Self.externalTrackID {
             loadExternalSubtitleFile(external)
@@ -302,7 +358,33 @@ final class LumeEngineCoordinator: NSObject, ObservableObject {
         configuration.bufferTarget = Double(media.isLive ? options.liveBuffer : options.vodBuffer) / 1000
         configuration.videoQueueDepth = options.videoQueueDepth
         configuration.audioQueueDepth = options.audioQueueDepth
+        // A Multi-View tile opens with an audio lane only if it is the audible
+        // one. A muted tile that decodes audio anyway still claims the audio
+        // output route, and on tvOS a second claimant never becomes ready —
+        // which stalls the synchronizer its video lane shares, freezing the tile
+        // on its first frame with no failure event. It also spares an Apple TV
+        // three audio decoders it would throw away. `isMuted` moves the lane
+        // afterwards (see `applyMute`); this is only the opening state.
+        configuration.enableAudio = !(isEmbedded && isMuted)
+        configuration.muted = isMuted
         configuration.stallThreshold = Double(options.stallThreshold)
+        // Resolved engine-side while the pipeline is built, before the demuxer
+        // streams a byte: selecting after `open()` would route through a seek
+        // that discards `startPosition` on a VOD resume and that many live IPTV
+        // endpoints do not survive. Empty lists (the default, and what a manual
+        // pick leaves for the rest of this stream) mean the engine keeps the
+        // container's own selection.
+        if !hasManualTrackSelection {
+            let languages = PlayerLanguageOptions.load()
+            configuration.preferredAudioLanguages = languages.preferredAudioLanguages
+            // Subtitling untranslated dialogue is Lume's rule, not the
+            // engine's — the same one `AVPlayerCoordinator+Languages` applies
+            // on AVFoundation.
+            configuration.autoEnableForcedSubtitlesForForeignAudio = true
+        }
+        if let headers = media.httpHeaders, !headers.isEmpty {
+            configuration.demuxer.httpHeaders = headers
+        }
         configuration.demuxer.enableReconnect = options.httpReconnect
         configuration.demuxer.ioTimeout = options.ioTimeout
         // The open timeout stays tied to the engine-fallback budget rather than
@@ -398,14 +480,18 @@ final class LumeEngineCoordinator: NSObject, ObservableObject {
         }
     }
 
-    private func publishTracks(info: MediaInfo, selectedAudioID: String? = nil) {
+    private func publishTracks(info: MediaInfo) {
+        // `selectedAudioID` mirrors the engine's own `selectedAudioTrackIndex`,
+        // which it sets whenever an audio track exists. Falling back to the
+        // first row while it is still nil keeps the menu from rendering with no
+        // checkmark at all.
+        let audioFallsBackToFirst = selectedAudioID == nil
         audioTrackOptions = info.audioTracks.enumerated().map { position, track in
             let id = String(track.index)
-            let fallbackSelected = selectedAudioID == nil && position == 0
             return PlayerTrackOption(
                 id: id,
                 label: trackLabel(track, fallback: "Audio \(position + 1)"),
-                isSelected: selectedAudioID.map { $0 == id } ?? fallbackSelected
+                isSelected: selectedAudioID == id || (audioFallsBackToFirst && position == 0)
             )
         }
         var options = info.subtitleTracks.enumerated().map { position, track in
@@ -441,7 +527,7 @@ final class LumeEngineCoordinator: NSObject, ObservableObject {
             return title
         }
         if let language = track.language, !language.isEmpty {
-            return Locale.current.localizedString(forLanguageCode: language) ?? language
+            return TrackLanguageMatcher.displayName(for: language)
         }
         return fallback
     }
