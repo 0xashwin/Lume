@@ -17726,54 +17726,54 @@
         }
       }
     },
-    "Fixtures, live scores and standings refresh automatically in the background at this interval." : {
+    "Fixtures, live scores and standings refresh whenever you open Home or the Sports tab, and every minute while they're on screen." : {
       "localizations" : {
         "de" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Spielpläne, Live-Ergebnisse und Tabellen werden im Hintergrund in diesem Intervall automatisch aktualisiert."
+            "value" : "Spielpläne, Live-Ergebnisse und Tabellen werden aktualisiert, sobald du „Start“ oder den Sport-Tab öffnest, und jede Minute, solange sie angezeigt werden."
           }
         },
         "es" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Los partidos, los resultados en directo y las clasificaciones se actualizan automáticamente en segundo plano con este intervalo."
+            "value" : "Los partidos, los resultados en directo y las clasificaciones se actualizan cada vez que abres Inicio o la pestaña Deportes, y cada minuto mientras están en pantalla."
           }
         },
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Les matchs, les scores en direct et les classements s'actualisent automatiquement en arrière-plan à cet intervalle."
+            "value" : "Les matchs, les scores en direct et les classements s'actualisent dès que vous ouvrez l'Accueil ou l'onglet Sports, puis chaque minute tant qu'ils sont à l'écran."
           }
         },
         "it" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Partite, risultati in diretta e classifiche si aggiornano automaticamente in background a questo intervallo."
+            "value" : "Partite, risultati in diretta e classifiche si aggiornano ogni volta che apri la Home o la scheda Sport, e ogni minuto finché restano sullo schermo."
           }
         },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "試合日程・ライブスコア・順位表は、この間隔でバックグラウンドで自動的に更新されます。"
+            "value" : "試合日程・ライブスコア・順位表は、ホームまたはスポーツタブを開くたびに更新され、表示中は1分ごとに更新されます。"
           }
         },
         "ko" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "경기 일정, 실시간 스코어, 순위가 이 간격으로 백그라운드에서 자동으로 새로 고쳐집니다."
+            "value" : "경기 일정, 실시간 스코어, 순위는 홈 또는 스포츠 탭을 열 때마다 새로 고쳐지며, 화면에 표시되는 동안 1분마다 새로 고쳐집니다."
           }
         },
         "pt" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Jogos, placares ao vivo e classificações são atualizados automaticamente em segundo plano neste intervalo."
+            "value" : "Jogos, placares ao vivo e classificações são atualizados sempre que você abre o Início ou a aba Esportes, e a cada minuto enquanto estão na tela."
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "赛程、实时比分和积分榜会按此间隔在后台自动刷新。"
+            "value" : "每次打开主页或体育标签页时，赛程、实时比分和积分榜都会刷新；显示期间每分钟刷新一次。"
           }
         }
       }

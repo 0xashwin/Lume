@@ -26,16 +26,14 @@ extension HomeView {
         return sportsFollows.follows.map(\.key).joined(separator: ",")
     }
 
-    /// Loads the cached snapshots and asks for anything missing or stale — the
-    /// same three triggers the Sports tab runs on appear.
+    /// Loads the cached snapshots and re-fetches anything missing or stale — the
+    /// same trigger the Sports tab runs on appear.
     func warmSports() {
         guard isSectionEnabled(.sports), premium.isPremium else { return }
         sportsStore.loadCached(
             leagueIds: SportsRailPlanner.displayLeagueIds(for: sportsFollows.follows)
         )
-        SportsSyncService.shared.syncIfDue()
-        SportsSyncService.shared.refreshMissing()
-        SportsSyncService.shared.catchUpIfStale()
+        SportsSyncService.shared.refreshIfStale()
     }
 
     /// Whether the Sports rail would render anything — the same rule the rail

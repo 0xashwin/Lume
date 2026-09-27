@@ -5,7 +5,7 @@
 //  The Sports settings entry in the main list and its dedicated pane. Follows the
 //  same shape as the TV Guide / Auto-Sync sections: a NavigationLink from the
 //  grouped list into `SportsSettingsView`, which manages followed teams, the tab
-//  toggle, the refresh schedule and a manual refresh. tvOS reaches the equivalent
+//  toggle and a manual refresh. tvOS reaches the equivalent
 //  controls through `TVSportsSettingsPane` (SettingsView+TVComponents), so both
 //  the section and the pane below are iOS / macOS / visionOS only.
 //
@@ -34,17 +34,8 @@ import SwiftUI
     struct SportsSettingsView: View {
         @AppStorage(SportsSyncService.tabEnabledKey) private var tabEnabled = SportsSyncService.tabEnabledDefault
         @AppStorage(SportsSyncService.hideScoresKey) private var hideScores = false
-        @AppStorage(SportsSyncService.syncFrequencyKey)
-        private var freqRaw = SportsSyncService.defaultFrequency.rawValue
         @State private var sync = SportsSyncService.shared
         @State private var showingManageTeams = false
-
-        private var frequency: Binding<SyncFrequency> {
-            Binding(
-                get: { SyncFrequency(rawValue: freqRaw) ?? SportsSyncService.defaultFrequency },
-                set: { freqRaw = $0.rawValue }
-            )
-        }
 
         var body: some View {
             Form {
@@ -95,13 +86,6 @@ import SwiftUI
 
         private var refreshSection: some View {
             Section {
-                Picker("Refresh", selection: frequency) {
-                    ForEach(SyncFrequency.allCases) { frequency in
-                        Text(frequency.label).tag(frequency)
-                    }
-                }
-                .pickerStyle(.menu)
-
                 Button {
                     sync.syncNow()
                 } label: {
@@ -116,10 +100,10 @@ import SwiftUI
                 }
                 .disabled(sync.isSyncing)
             } header: {
-                Text("Automatic Refresh")
+                Text("Sports Data")
             } footer: {
                 VStack(alignment: .leading, spacing: 4) {
-                    Text("Fixtures, live scores and standings refresh automatically in the background at this interval.")
+                    Text("Fixtures, live scores and standings refresh whenever you open Home or the Sports tab, and every minute while they're on screen.")
                     Text(lastRefreshText)
                     Text("Scores and schedules provided by ESPN")
                 }

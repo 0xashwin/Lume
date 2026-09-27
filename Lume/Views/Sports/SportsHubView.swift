@@ -208,9 +208,7 @@ struct SportsHubView: View {
 
     private func onAppear() {
         store.loadCached(leagueIds: displayLeagueIds)
-        SportsSyncService.shared.syncIfDue()
-        SportsSyncService.shared.refreshMissing()
-        SportsSyncService.shared.catchUpIfStale()
+        SportsSyncService.shared.refreshIfStale()
         SportsSyncService.shared.beginLivePolling()
         Task { await EPGSyncService.shared.refreshIfMissingSubtitles() }
     }

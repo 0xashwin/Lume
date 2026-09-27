@@ -2,8 +2,8 @@
 //  SportsSyncServiceTests.swift
 //  LumeTests
 //
-//  Covers the sports cache round-trip, the pure `monthsToFetch` window and the
-//  refresh/merge behaviour against a stub provider — no network, no shared
+//  Covers the sports cache round-trip, the pure `monthsToFetch` window, the
+//  freshness rules and the refresh/merge behaviour against a stub provider — no network, no shared
 //  singletons (each test builds its own store over a temp cache directory).
 //
 
@@ -20,25 +20,6 @@ private nonisolated struct StubFollowSource: SportsFollowSource {
     init(leagues: [String] = [], teams: [String] = []) {
         followedLeagueIds = leagues
         followedTeamIds = teams
-    }
-}
-
-/// Records which days a provider was asked for, so the day-based refreshes can
-/// be checked for what they fetch (not just what they publish).
-private final nonisolated class DayRequestLog: @unchecked Sendable {
-    private let lock = NSLock()
-    private var days: [Date] = []
-
-    func record(_ day: Date) {
-        lock.lock()
-        days.append(day)
-        lock.unlock()
-    }
-
-    var requested: [Date] {
-        lock.lock()
-        defer { lock.unlock() }
-        return days
     }
 }
 
@@ -62,15 +43,11 @@ private final nonisolated class RequestCounter: @unchecked Sendable {
 }
 
 /// A provider that returns whatever it is seeded with. `empty` models a total
-/// ESPN failure (everything degrades to `[]`). Day fetches return the seeded
-/// fixtures that fall on the requested day, so a catch-up over several days
-/// merges only what each day actually holds.
+/// ESPN failure (everything degrades to `[]`).
 private nonisolated struct StubProvider: SportsDataProvider {
     var monthFixtures: [SportsFixture] = []
-    var dayFixtures: [SportsFixture] = []
     var teamList: [SportsTeam] = []
     var standingRows: [SportsStandingRow] = []
-    var dayLog: DayRequestLog?
     var monthCalls: RequestCounter?
 
     func fixtures(league _: SportsLeague, month _: DateComponents) async throws -> [SportsFixture] {
@@ -78,9 +55,8 @@ private nonisolated struct StubProvider: SportsDataProvider {
         return monthFixtures
     }
 
-    func fixtures(league _: SportsLeague, day: Date) async throws -> [SportsFixture] {
-        dayLog?.record(day)
-        return dayFixtures.filter { Calendar.current.isDate($0.startDate, inSameDayAs: day) }
+    func fixtures(league _: SportsLeague, day _: Date) async throws -> [SportsFixture] {
+        []
     }
 
     func teams(league _: SportsLeague) async throws -> [SportsTeam] {
@@ -192,6 +168,13 @@ struct SportsSyncMonthWindowTests {
         #expect(months.last?.month == 10)
     }
 
+    @Test func `the first of the month also fetches the previous month`() {
+        let months = SportsSyncService.monthsToFetch(for: date(2026, 10, 1), calendar: gregorianUTC())
+        #expect(months.count == 2)
+        #expect(months.first?.month == 9)
+        #expect(months.last?.month == 10)
+    }
+
     @Test func `year rolls over in December`() {
         let months = SportsSyncService.monthsToFetch(for: date(2026, 12, 28), calendar: gregorianUTC())
         #expect(months.count == 2)
@@ -272,29 +255,51 @@ struct SportsSyncRefreshTests {
     @Test func `an all-empty refresh leaves the previous snapshot in place and flags an error`() async {
         let leagueId = "espn:soccer/ger.1"
         let store = tempStore()
-        let seeded = StubProvider(
-            monthFixtures: [makeFixture(id: "1", leagueId: leagueId, start: Date(), state: .scheduled)],
-            teamList: [SportsTeam(leagueId: leagueId, teamId: "132", name: "Bayern", shortName: "Bayern", abbreviation: "FCB")]
+        // A snapshot from this morning — nothing followed is current any more.
+        store.update(
+            SportsLeagueSnapshot(
+                fetchedAt: Date().addingTimeInterval(-6 * 3600),
+                fixtures: [makeFixture(id: "1", leagueId: leagueId, start: Date(), state: .scheduled)]
+            ),
+            for: leagueId
         )
         let service = SportsSyncService(
             store: store,
             followSource: StubFollowSource(leagues: [leagueId]),
             defaults: isolatedDefaults()
         )
-        service.configure(provider: seeded)
-        await service.refreshAll()
-        #expect(store.snapshot(for: leagueId)?.fixtures.count == 1)
-
-        // A second pass where ESPN is unreachable (everything empty).
+        // ESPN unreachable: everything degrades to empty.
         service.configure(provider: StubProvider())
         await service.refreshAll()
 
         #expect(store.snapshot(for: leagueId)?.fixtures.count == 1)
         #expect(store.refreshError == true)
     }
+
+    @Test func `an empty pass is not an outage while another followed league is current`() async {
+        let current = "espn:soccer/ger.1"
+        let offSeason = "espn:soccer/eng.1"
+        let store = tempStore()
+        store.update(
+            SportsLeagueSnapshot(fixtures: [makeFixture(id: "1", leagueId: current, start: Date(), state: .scheduled)]),
+            for: current
+        )
+        let service = SportsSyncService(
+            store: store,
+            followSource: StubFollowSource(leagues: [current, offSeason]),
+            defaults: isolatedDefaults()
+        )
+        service.configure(provider: StubProvider())
+
+        // Only the off-season league is stale, and it answers nothing.
+        await service.refreshStale()
+
+        #expect(store.snapshot(for: offSeason) == nil)
+        #expect(store.refreshError == false)
+    }
 }
 
-// MARK: - Overdue / catch-up rules
+// MARK: - Overdue / freshness rules
 
 struct SportsSyncOverdueTests {
     private let now = Date(timeIntervalSince1970: 1_790_000_000)
@@ -321,7 +326,7 @@ struct SportsSyncOverdueTests {
         #expect(!SportsSyncService.isOverdue(fixture("2", startingIn: -3600, state: .postponed), now: now))
     }
 
-    @Test func `a game stuck live beyond the lookback is left to the scheduled refresh`() {
+    @Test func `a game stuck live beyond the lookback is left to the month refresh`() {
         let tooOld = -(SportsSyncService.overdueLookback + 3600)
         #expect(!SportsSyncService.isOverdue(fixture("1", startingIn: tooOld, state: .inProgress), now: now))
     }
@@ -348,111 +353,26 @@ struct SportsSyncOverdueTests {
         #expect(SportsSyncService.pollDays(fixtures: fixtures, now: now).isEmpty)
     }
 
-    @Test func `catch-up always covers today and yesterday`() throws {
-        let calendar = gregorianUTC()
-        let days = SportsSyncService.catchUpDays(fixtures: [], now: now, calendar: calendar)
-        let today = calendar.startOfDay(for: now)
-        #expect(try days == [#require(calendar.date(byAdding: .day, value: -1, to: today)), today])
+    @Test func `a missing snapshot is never fresh`() {
+        #expect(!SportsSyncService.isFresh(nil, now: now))
     }
 
-    @Test func `catch-up adds the day of an older overdue fixture`() {
-        let calendar = gregorianUTC()
-        let twoDaysAgo = fixture("stuck", startingIn: -50 * 3600, state: .inProgress)
-        let days = SportsSyncService.catchUpDays(fixtures: [twoDaysAgo], now: now, calendar: calendar)
-        #expect(days.count == 3)
-        #expect(days.first == calendar.startOfDay(for: twoDaysAgo.startDate))
-    }
-
-    @Test func `catch-up is needed with no snapshot or a snapshot older than the threshold`() {
-        #expect(SportsSyncService.needsCatchUp(newestFetch: nil, now: now))
-        #expect(SportsSyncService.needsCatchUp(newestFetch: now.addingTimeInterval(-20 * 60), now: now))
-        #expect(!SportsSyncService.needsCatchUp(newestFetch: now.addingTimeInterval(-5 * 60), now: now))
+    @Test func `a snapshot is fresh only within the freshness window`() {
+        let recent = SportsLeagueSnapshot(fetchedAt: now.addingTimeInterval(-60))
+        let old = SportsLeagueSnapshot(fetchedAt: now.addingTimeInterval(-(SportsSyncService.freshness + 1)))
+        #expect(SportsSyncService.isFresh(recent, now: now))
+        #expect(!SportsSyncService.isFresh(old, now: now))
     }
 }
 
-// MARK: - Catch-up refresh
+// MARK: - Stale refresh
 
+/// `refreshStale` is what every sports surface runs as it appears, so the Home
+/// rail and the hub never show a morning's schedule in the evening. Its rules:
+/// a missing or stale league is fetched in full, a fresh one costs nothing, and a
+/// pass the provider never answered stays eligible (after `retryInterval`).
 @MainActor
-struct SportsSyncCatchUpTests {
-    private func tempStore() -> SportsStore {
-        let dir = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString, isDirectory: true)
-        return SportsStore(cache: SportsCacheStore(directory: dir))
-    }
-
-    private func isolatedDefaults() -> UserDefaults {
-        UserDefaults(suiteName: "sports.test." + UUID().uuidString)!
-    }
-
-    @Test func `catch-up closes out a game the stale snapshot still calls scheduled`() async throws {
-        let leagueId = "espn:soccer/ger.1"
-        let store = tempStore()
-        let kickoff = Date().addingTimeInterval(-4 * 3600)
-        let stale = SportsLeagueSnapshot(
-            fetchedAt: Date().addingTimeInterval(-8 * 3600),
-            fixtures: [
-                makeFixture(id: "played", leagueId: leagueId, start: kickoff, state: .scheduled),
-                makeFixture(id: "next-week", leagueId: leagueId, start: Date().addingTimeInterval(6 * 86400), state: .scheduled)
-            ]
-        )
-        store.update(stale, for: leagueId)
-
-        let log = DayRequestLog()
-        let provider = StubProvider(
-            dayFixtures: [makeFixture(id: "played", leagueId: leagueId, start: kickoff, state: .final)],
-            dayLog: log
-        )
-        let service = SportsSyncService(
-            store: store,
-            followSource: StubFollowSource(leagues: [leagueId]),
-            defaults: isolatedDefaults()
-        )
-        service.configure(provider: provider)
-
-        await service.catchUp()
-
-        let fixtures = store.snapshot(for: leagueId)?.fixtures ?? []
-        #expect(fixtures.first { $0.id == "played" }?.status.state == .final)
-        // The rest of the month is left intact, not replaced by the day fetch.
-        #expect(fixtures.contains { $0.id == "next-week" })
-        // Today and yesterday were asked for, nothing else.
-        let calendar = Calendar.current
-        let today = calendar.startOfDay(for: Date())
-        let requested = Set(log.requested.map { calendar.startOfDay(for: $0) })
-        #expect(try requested == [today, #require(calendar.date(byAdding: .day, value: -1, to: today))])
-    }
-
-    @Test func `catch-up over an unreachable provider leaves the snapshot untouched`() async {
-        let leagueId = "espn:soccer/ger.1"
-        let store = tempStore()
-        let kickoff = Date().addingTimeInterval(-4 * 3600)
-        let stale = SportsLeagueSnapshot(
-            fetchedAt: Date().addingTimeInterval(-8 * 3600),
-            fixtures: [makeFixture(id: "played", leagueId: leagueId, start: kickoff, state: .scheduled)]
-        )
-        store.update(stale, for: leagueId)
-        let service = SportsSyncService(
-            store: store,
-            followSource: StubFollowSource(leagues: [leagueId]),
-            defaults: isolatedDefaults()
-        )
-        service.configure(provider: StubProvider())
-
-        await service.catchUp()
-
-        #expect(store.snapshot(for: leagueId)?.fixtures.count == 1)
-        #expect(store.snapshot(for: leagueId)?.fixtures.first?.status.state == .scheduled)
-    }
-}
-
-// MARK: - Filling leagues with nothing cached
-
-/// `refreshMissing` is what puts fixtures on the Home rail when the schedule says
-/// nothing is due — a followed league with an empty (or purged) cache. Its retry
-/// rule is the part that matters: a pass the provider never answered must stay
-/// eligible, or one offline launch leaves the rail blank until the viewer finds
-/// Settings › Sports › Refresh Now.
-@MainActor
-struct SportsFillMissingTests {
+struct SportsSyncStaleRefreshTests {
     private let leagueId = "espn:soccer/ger.1"
 
     private func tempStore() -> SportsStore {
@@ -472,19 +392,50 @@ struct SportsFillMissingTests {
         )
     }
 
-    @Test func `a followed league with nothing cached is filled`() async {
+    @Test func `a followed league with nothing cached is fetched`() async {
         let store = tempStore()
         let sync = service(store: store)
         sync.configure(provider: StubProvider(
             monthFixtures: [makeFixture(id: "1", leagueId: leagueId, start: Date(), state: .scheduled)]
         ))
 
-        await sync.fillMissing()
+        await sync.refreshStale()
 
         #expect(store.snapshot(for: leagueId)?.fixtures.count == 1)
     }
 
-    @Test func `a league that answered is not fetched twice, even with no fixtures`() async {
+    @Test func `a stale snapshot picks up moved kickoffs, results and new fixtures`() async {
+        let store = tempStore()
+        let played = Date().addingTimeInterval(-4 * 3600)
+        let tonight = Date().addingTimeInterval(3 * 3600)
+        store.update(
+            SportsLeagueSnapshot(
+                fetchedAt: Date().addingTimeInterval(-8 * 3600),
+                fixtures: [
+                    makeFixture(id: "played", leagueId: leagueId, start: played, state: .scheduled),
+                    makeFixture(id: "moved", leagueId: leagueId, start: tonight, state: .scheduled)
+                ]
+            ),
+            for: leagueId
+        )
+        let later = tonight.addingTimeInterval(3600)
+        let sync = service(store: store)
+        sync.configure(provider: StubProvider(monthFixtures: [
+            makeFixture(id: "played", leagueId: leagueId, start: played, state: .final),
+            makeFixture(id: "moved", leagueId: leagueId, start: later, state: .scheduled),
+            makeFixture(id: "new", leagueId: leagueId, start: Date().addingTimeInterval(2 * 86400), state: .scheduled)
+        ]))
+
+        await sync.refreshStale()
+
+        let fixtures = store.snapshot(for: leagueId)?.fixtures ?? []
+        #expect(fixtures.first { $0.id == "played" }?.status.state == .final)
+        #expect(fixtures.first { $0.id == "moved" }?.startDate == later)
+        #expect(fixtures.contains { $0.id == "new" })
+        #expect(SportsSyncService.isFresh(store.snapshot(for: leagueId), now: Date()))
+    }
+
+    @Test func `a fresh league is not fetched again, even with no fixtures`() async {
         let store = tempStore()
         let counter = RequestCounter()
         let sync = service(store: store)
@@ -495,36 +446,17 @@ struct SportsFillMissingTests {
             monthCalls: counter
         ))
 
-        await sync.fillMissing()
-        // Within a week of a month's end the pass also fetches the next month,
-        // so the first fill's request count depends on today's date.
+        await sync.refreshStale()
+        // Within a week of a month's end (or on the 1st) the pass fetches two
+        // months, so the first request count depends on today's date.
         let firstFill = counter.count
-        await sync.fillMissing()
+        await sync.refreshStale()
 
         #expect(firstFill == SportsSyncService.monthsToFetch(for: Date()).count)
         #expect(counter.count == firstFill)
     }
 
-    @Test func `a fill the provider never answered is retried`() async {
-        let store = tempStore()
-        let sync = service(store: store)
-        // First pass: ESPN unreachable, everything degrades to empty.
-        sync.configure(provider: StubProvider())
-        await sync.fillMissing()
-        #expect(store.snapshot(for: leagueId)?.fixtures.isEmpty ?? true)
-        #expect(store.refreshError == true)
-
-        // Second pass, provider back: the league must not have been struck off.
-        sync.configure(provider: StubProvider(
-            monthFixtures: [makeFixture(id: "1", leagueId: leagueId, start: Date(), state: .scheduled)]
-        ))
-        await sync.fillMissing()
-
-        #expect(store.snapshot(for: leagueId)?.fixtures.count == 1)
-        #expect(store.refreshError == false)
-    }
-
-    @Test func `a league already holding fixtures is left alone`() async {
+    @Test func `a fresh league goes stale after the freshness window`() async {
         let store = tempStore()
         let counter = RequestCounter()
         store.update(
@@ -532,10 +464,41 @@ struct SportsFillMissingTests {
             for: leagueId
         )
         let sync = service(store: store)
-        sync.configure(provider: StubProvider(monthCalls: counter))
+        sync.configure(provider: StubProvider(
+            monthFixtures: [makeFixture(id: "cached", leagueId: leagueId, start: Date(), state: .inProgress)],
+            monthCalls: counter
+        ))
 
-        await sync.fillMissing()
-
+        await sync.refreshStale()
         #expect(counter.count == 0)
+
+        await sync.refreshStale(now: Date().addingTimeInterval(SportsSyncService.freshness + 1))
+        #expect(counter.count > 0)
+        #expect(store.snapshot(for: leagueId)?.fixtures.first?.status.state == .inProgress)
+    }
+
+    @Test func `a pass the provider never answered is retried, but not on every appearance`() async {
+        let store = tempStore()
+        let counter = RequestCounter()
+        let sync = service(store: store)
+        // First pass: ESPN unreachable, everything degrades to empty.
+        sync.configure(provider: StubProvider(monthCalls: counter))
+        await sync.refreshStale()
+        let firstPass = counter.count
+        #expect(store.snapshot(for: leagueId) == nil)
+        #expect(store.refreshError == true)
+
+        // A surface appearing a moment later does not hammer the provider.
+        await sync.refreshStale()
+        #expect(counter.count == firstPass)
+
+        // Once the retry interval has passed, with the provider back, it fills.
+        sync.configure(provider: StubProvider(
+            monthFixtures: [makeFixture(id: "1", leagueId: leagueId, start: Date(), state: .scheduled)]
+        ))
+        await sync.refreshStale(now: Date().addingTimeInterval(SportsSyncService.retryInterval + 1))
+
+        #expect(store.snapshot(for: leagueId)?.fixtures.count == 1)
+        #expect(store.refreshError == false)
     }
 }

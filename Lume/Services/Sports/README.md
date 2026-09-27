@@ -26,7 +26,7 @@ Services/Sports/
 ├── SportsCacheStore.swift    On-disk JSON snapshot per league (below)
 ├── SportsCrestTint.swift     Fallback team colour read off the crest (below)
 ├── SportsStore.swift         @MainActor @Observable — what the UI reads
-├── SportsSyncService.swift   Schedules refreshes + the live-score poll
+├── SportsSyncService.swift   Short-lived cache refresh + the live-score poll
 ├── SportsFollowService.swift Follows (per profile, ordered) + region pre-follows
 ├── SportsMatcher.swift       Pure team-token matching (+ SportsTeamAliases.json)
 ├── SportsChannelResolver.swift  Fixture → channel resolve (below)
@@ -80,10 +80,16 @@ hopping to the main actor. It lives in `Caches/` (like `ImageDiskCache`), not th
 catalog store, because it is disposable.
 
 `SportsStore` (`@MainActor @Observable`) is the in-memory front of the cache and
-the single source every sports view reads. `SportsSyncService` fills it: a
-scheduled refresh (`SyncFrequency`, key `sports.syncFrequency`) plus a 60 s
-live-score poll that runs only while the hub is visible and is paused during
-playback.
+the single source every sports view reads. `SportsSyncService` fills it. There
+is no refresh schedule: a snapshot is fresh for `freshness` (5 min), and every
+surface that shows sports data — the Home rail, the hub, the app returning to the
+foreground, a follow change — calls `refreshIfStale()`, which re-fetches the
+months and standings of each followed league past that age. While a sports
+surface is visible a 60 s loop (paused during playback) does the same, and also
+re-fetches by day the leagues holding a live or overdue game. The day poll leaves
+`fetchedAt` alone, so it never postpones a league's full refresh. A league that
+answers empty — ESPN's shape for both a failure and an off-season league — stays
+stale but is retried at most once a minute.
 
 ## Tennis
 

@@ -163,8 +163,8 @@ struct MainTabView: View {
                 // app this is the practical equivalent of "on launch".
                 if phase == .active {
                     enqueueDueSyncs(playlists)
-                    SportsSyncService.shared.syncIfDue()
                 }
+                // Coming back to `.active` also refreshes stale sports data.
                 SportsSyncService.shared.isForeground = phase == .active
             }
             .syncCover(item: $activeSyncPlaylist, onDismiss: promoteNextIfIdle)

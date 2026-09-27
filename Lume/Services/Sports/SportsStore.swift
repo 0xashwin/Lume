@@ -23,9 +23,6 @@ final class SportsStore {
     /// Cached snapshots keyed by league id ("espn:{sport}/{slug}").
     private(set) var snapshots: [String: SportsLeagueSnapshot] = [:]
 
-    /// When the last successful refresh published new data.
-    private(set) var lastRefresh: Date?
-
     /// True when the most recent refresh failed outright (network down, ESPN
     /// unreachable). The hub degrades to whatever snapshots are already loaded and
     /// shows a subtle "Scores unavailable" note rather than a blank screen.
@@ -60,7 +57,6 @@ final class SportsStore {
     func update(_ snapshot: SportsLeagueSnapshot, for leagueId: String) {
         snapshots[leagueId] = snapshot
         cache.save(snapshot, for: leagueId)
-        lastRefresh = Date()
         refreshError = false
     }
 
@@ -92,16 +88,9 @@ final class SportsStore {
     }
 
     /// Every cached fixture of the given leagues, in no particular order — the
-    /// input to the sync service's overdue and catch-up day calculations.
+    /// input to the sync service's live-poll day calculation.
     func fixtures(inLeagues leagueIds: [String]) -> [SportsFixture] {
         leagueIds.flatMap { snapshots[$0]?.fixtures ?? [] }
-    }
-
-    /// When the most recently fetched of the given leagues' snapshots was
-    /// written; `nil` when none of them is loaded. What the catch-up compares
-    /// against `SportsSyncService.catchUpStaleness`.
-    func newestFetch(for leagueIds: [String]) -> Date? {
-        leagueIds.compactMap { snapshots[$0]?.fetchedAt }.max()
     }
 
     /// Every cached fixture that kicks off on the given calendar day, across all
@@ -130,15 +119,6 @@ final class SportsStore {
         guard let team = team(by: teamId) else { return nil }
         return SportsTeamColors(primaryHex: team.colorHex, alternateHex: team.alternateColorHex)
     }
-
-    /// True when there is no data, or the newest snapshot is old enough that a
-    /// refresh is worth showing an "updating" affordance for.
-    var isStale: Bool {
-        guard let lastRefresh else { return true }
-        return Date().timeIntervalSince(lastRefresh) > Self.staleThreshold
-    }
-
-    private static let staleThreshold: TimeInterval = 15 * 60
 }
 
 /// A team's raw colour hexes (no leading `#`), provider-neutral so the view layer

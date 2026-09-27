@@ -197,7 +197,7 @@ final class SportsFollowService {
         // need their leagues fetched now. The Home rail hides itself while it
         // has no fixtures, so it can never ask for them on its own.
         if !gained.isEmpty {
-            SportsSyncService.shared.refreshMissing()
+            SportsSyncService.shared.refreshIfStale()
         }
     }
 
