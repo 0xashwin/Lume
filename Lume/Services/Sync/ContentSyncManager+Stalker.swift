@@ -48,19 +48,19 @@ extension ContentSyncManager {
         // Fetch the category/genre lists once and reuse them to both persist the
         // categories and walk each one's content.
         await progress?.start(.movieCategories)
-        let vodCategories = await (try? client.getCategories(type: "vod")) ?? []
+        let vodCategories = await stalkerCategories("vod") { try await client.getCategories(type: "vod") }
         try syncStalkerCategories(vodCategories, type: .vod, playlistId: playlistId)
         await progress?.update(detail: "\(vodCategories.count) categories")
         await progress?.complete(.movieCategories)
 
         await progress?.start(.seriesCategories)
-        let seriesCategories = await (try? client.getCategories(type: "series")) ?? []
+        let seriesCategories = await stalkerCategories("series") { try await client.getCategories(type: "series") }
         try syncStalkerCategories(seriesCategories, type: .series, playlistId: playlistId)
         await progress?.update(detail: "\(seriesCategories.count) categories")
         await progress?.complete(.seriesCategories)
 
         await progress?.start(.liveCategories)
-        let genres = await (try? client.getLiveGenres()) ?? []
+        let genres = await stalkerCategories("live") { try await client.getLiveGenres() }
         try syncStalkerCategories(genres, type: .live, playlistId: playlistId)
         await progress?.update(detail: "\(genres.count) categories")
         await progress?.complete(.liveCategories)
@@ -80,6 +80,22 @@ extension ContentSyncManager {
     }
 
     // MARK: - Categories
+
+    /// A category list, or `[]` when the portal won't serve it — some portals
+    /// lack a VOD or series section, and that mustn't fail the whole sync. The
+    /// failure is logged so a diagnostic report still shows it.
+    private func stalkerCategories(
+        _ kind: String,
+        _ fetch: () async throws -> [StalkerCategory]
+    ) async -> [StalkerCategory] {
+        do {
+            return try await fetch()
+        } catch {
+            let reason = (error as? StalkerError)?.logDescription ?? String(describing: type(of: error))
+            Logger.network.warning("Stalker: \(kind, privacy: .public) categories unavailable (\(reason, privacy: .public))")
+            return []
+        }
+    }
 
     private func syncStalkerCategories(_ cats: [StalkerCategory], type: CategoryType, playlistId: UUID) throws {
         let context = ModelContext(modelContainer)

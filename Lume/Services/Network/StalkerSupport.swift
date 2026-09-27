@@ -142,6 +142,10 @@ enum StalkerError: LocalizedError {
     case invalidURL
     case handshakeFailed
     case authenticationFailed
+    /// The portal refused this device outright, with its own explanation
+    /// (`get_profile`'s `msg` / `block_msg`) — typically a MAC that isn't
+    /// registered, or one bound to a different device serial number.
+    case deviceBlocked(String)
     case noStreamURL
     case networkError(Error)
     case decodingError(Error)
@@ -156,6 +160,8 @@ enum StalkerError: LocalizedError {
             "Couldn't connect to the Stalker portal. Check the portal URL and MAC address."
         case .authenticationFailed:
             "The portal rejected this MAC address. It may not be authorized, or its subscription has expired."
+        case let .deviceBlocked(message):
+            "The portal blocked this device: \(message)"
         case .noStreamURL:
             "The portal didn't return a playable stream for this item."
         case let .networkError(error):
@@ -182,6 +188,10 @@ enum StalkerError: LocalizedError {
             return "portal handshake failed"
         case .authenticationFailed:
             return "portal rejected the MAC address"
+        case .deviceBlocked:
+            // The portal's own text stays out: it's provider-authored and
+            // could carry anything.
+            return "portal blocked the device (get_profile refusal)"
         case .noStreamURL:
             return "no playable stream in portal response"
         case let .networkError(error):
@@ -204,7 +214,7 @@ enum StalkerError: LocalizedError {
             true
         case let .serverError(code):
             code >= 500
-        case .invalidURL, .handshakeFailed, .authenticationFailed, .noStreamURL,
+        case .invalidURL, .handshakeFailed, .authenticationFailed, .deviceBlocked, .noStreamURL,
              .decodingError, .invalidResponse:
             false
         }

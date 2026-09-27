@@ -96,18 +96,46 @@ nonisolated struct StalkerProfile: Decodable {
     let status: String?
     let expDate: String?
     let phone: String?
+    /// Why the portal refused this device, when it did. Ministra answers an
+    /// unregistered or mismatched device with a normal-looking profile —
+    /// `{"status":1,"msg":"Device conflict - Serial Number mismatch",
+    /// "block_msg":"Please contact your provider<br>to register this device."}`
+    /// — and then every later call returns a bare `Authorization failed.`.
+    /// `msg` and `block_msg` joined, with the portal's HTML line breaks
+    /// flattened.
+    let blockMessage: String?
 
     init(from decoder: any Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
         status = container.stalkerString(.status)
         expDate = container.stalkerString(.expDate)
         phone = container.stalkerString(.phone)
+        let parts = [container.stalkerString(.msg), container.stalkerString(.blockMsg)]
+            .compactMap { $0.map(Self.plainText) }
+            .filter { !$0.isEmpty }
+        blockMessage = parts.isEmpty ? nil : parts.joined(separator: ". ")
+    }
+
+    /// Whether the portal refused the device. A non-zero status alone isn't
+    /// enough — portals are loose with it — so this also needs the message a
+    /// genuine refusal carries.
+    var isBlocked: Bool {
+        blockMessage != nil && (status ?? "0") != "0"
+    }
+
+    private static func plainText(_ html: String) -> String {
+        html.replacingOccurrences(of: "<br\\s*/?>", with: " ", options: [.regularExpression, .caseInsensitive])
+            .replacingOccurrences(of: "<[^>]+>", with: "", options: .regularExpression)
+            .replacingOccurrences(of: "\\s+", with: " ", options: .regularExpression)
+            .trimmingCharacters(in: .whitespacesAndNewlines)
     }
 
     enum CodingKeys: String, CodingKey {
         case status
         case expDate = "exp_date"
         case phone
+        case msg
+        case blockMsg = "block_msg"
     }
 }
 

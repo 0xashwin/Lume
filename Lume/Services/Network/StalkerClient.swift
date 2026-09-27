@@ -190,7 +190,14 @@ class StalkerClient {
                     refreshedAuth = true
                     continue
                 }
-                guard error.isRetriable, attempt < Self.maxAttempts else { throw error }
+                guard error.isRetriable, attempt < Self.maxAttempts else {
+                    // Only here, not in `perform`: the handshake's endpoint
+                    // probing decodes HTML from the wrong candidates by design.
+                    Logger.network.error(
+                        "Stalker: \(type, privacy: .public) \(action, privacy: .public) failed — \(error.logDescription, privacy: .public)"
+                    )
+                    throw error
+                }
                 let delay = pow(2.0, Double(attempt))
                 Logger.network.warning(
                     "Stalker request failed (\(error.localizedDescription)); retry \(attempt)/\(Self.maxAttempts - 1) in \(delay)s"
@@ -237,8 +244,19 @@ class StalkerClient {
         do {
             return try JSONDecoder().decode(T.self, from: data)
         } catch {
+            // Ministra answers a call from an unauthorized device with HTTP 200
+            // and a plain-text `Authorization failed.` — not a 401, not JSON.
+            if Self.isAuthorizationFailure(data) {
+                throw StalkerError.authenticationFailed
+            }
             throw StalkerError.decodingError(error)
         }
+    }
+
+    nonisolated static func isAuthorizationFailure(_ data: Data) -> Bool {
+        guard data.count < 256, let body = String(data: data, encoding: .utf8) else { return false }
+        return body.trimmingCharacters(in: .whitespacesAndNewlines)
+            .localizedCaseInsensitiveContains("authorization failed")
     }
 
     // MARK: - Profile
@@ -255,9 +273,16 @@ class StalkerClient {
 
     /// Validates the portal connection by handshaking and reading the profile.
     /// Used by the add-playlist flow as the connection test.
+    /// Throws `.deviceBlocked` with the portal's own explanation when it
+    /// refuses the device — otherwise the refusal only surfaces later, as an
+    /// undecodable `Authorization failed.` from the first catalog call.
     func authenticate() async throws -> StalkerProfile {
         let session = try await authorizedSession()
-        return try await getProfile(using: session)
+        let profile = try await getProfile(using: session)
+        if profile.isBlocked, let message = profile.blockMessage {
+            throw StalkerError.deviceBlocked(message)
+        }
+        return profile
     }
 
     // MARK: - Live TV (itv)
