@@ -60,7 +60,7 @@
                 Text("Simkl")
             } footer: {
                 VStack(alignment: .leading, spacing: 6) {
-                    Text("Sync the movies and episodes you watch to Simkl.")
+                    Text("Sync the movies and episodes you watch to Simkl, and surface your Simkl watchlist on Home.")
                     if let error = simkl.connectionError {
                         Text(error)
                             .foregroundStyle(.red)
