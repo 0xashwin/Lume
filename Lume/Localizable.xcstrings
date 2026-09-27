@@ -19030,6 +19030,58 @@
         }
       }
     },
+    "From Your Simkl Watchlist" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Aus deiner Simkl-Watchlist"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "De tu lista de seguimiento de Simkl"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Depuis votre liste de suivi Simkl"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Dalla tua watchlist di Simkl"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Simklのウォッチリストから"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Simkl 시청 목록에서"
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Da Sua Lista do Simkl"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "来自您的Simkl待看列表"
+          }
+        }
+      }
+    },
     "From Your Trakt Watchlist" : {
       "localizations" : {
         "de" : {
@@ -40608,54 +40660,54 @@
         }
       }
     },
-    "Scrobble what you watch to Simkl and import your Simkl history." : {
+    "Scrobble what you watch to Simkl, import your Simkl history and surface your Simkl watchlist on Home." : {
       "localizations" : {
         "de" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Übertrage, was du ansiehst, an Simkl und importiere deinen Simkl-Verlauf."
+            "value" : "Übertrage, was du ansiehst, an Simkl, importiere deinen Simkl-Verlauf und zeige deine Simkl-Watchlist auf der Startseite."
           }
         },
         "es" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Registra lo que ves en Simkl e importa tu historial de Simkl."
+            "value" : "Registra lo que ves en Simkl, importa tu historial de Simkl y muestra tu lista de seguimiento de Simkl en Inicio."
           }
         },
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Scrobblez ce que vous regardez vers Simkl et importez votre historique Simkl."
+            "value" : "Scrobblez ce que vous regardez vers Simkl, importez votre historique Simkl et affichez votre liste de suivi Simkl sur l’écran d’accueil."
           }
         },
         "it" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Esegui lo scrobble di ciò che guardi su Simkl e importa la tua cronologia di Simkl."
+            "value" : "Esegui lo scrobble di ciò che guardi su Simkl, importa la tua cronologia di Simkl e mostra la tua watchlist di Simkl nella Home."
           }
         },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "視聴した内容をSimklにスクロブルし、Simklの履歴をインポートします。"
+            "value" : "視聴した内容をSimklにスクロブルし、Simklの履歴をインポートして、Simklのウォッチリストをホームに表示します。"
           }
         },
         "ko" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "시청 내역을 Simkl에 스크로블하고 Simkl 기록을 가져오세요."
+            "value" : "시청 내역을 Simkl에 스크로블하고, Simkl 기록을 가져오며, 홈에 Simkl 시청 목록을 표시하세요."
           }
         },
         "pt" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Faça scrobble do que você assiste no Simkl e importe seu histórico do Simkl."
+            "value" : "Faça scrobble do que você assiste no Simkl, importe seu histórico do Simkl e mostre sua lista do Simkl na Tela Inicial."
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "将您观看的内容记录到Simkl，并导入您的Simkl历史记录。"
+            "value" : "将您观看的内容记录到Simkl，导入您的Simkl历史记录，并在主页上展示您的Simkl待看列表。"
           }
         }
       }
@@ -43941,6 +43993,58 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Simkl集成"
+          }
+        }
+      }
+    },
+    "Simkl Watchlist" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Simkl-Watchlist"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Lista de seguimiento de Simkl"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Liste de suivi Simkl"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Watchlist di Simkl"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Simklウォッチリスト"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Simkl 시청 목록"
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Lista do Simkl"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Simkl待看列表"
           }
         }
       }
@@ -47526,54 +47630,54 @@
         }
       }
     },
-    "Sync the movies and episodes you watch to Simkl." : {
+    "Sync the movies and episodes you watch to Simkl, and surface your Simkl watchlist on Home." : {
       "localizations" : {
         "de" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Synchronisiere die Filme und Episoden, die du ansiehst, mit Simkl."
+            "value" : "Synchronisiere die Filme und Episoden, die du ansiehst, mit Simkl und zeige deine Simkl-Watchlist auf dem Startbildschirm."
           }
         },
         "es" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Sincroniza con Simkl las películas y los episodios que ves."
+            "value" : "Sincroniza con Simkl las películas y los episodios que ves, y muestra tu lista de seguimiento de Simkl en Inicio."
           }
         },
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Synchronisez les films et les épisodes que vous regardez avec Simkl."
+            "value" : "Synchronisez les films et les épisodes que vous regardez avec Simkl, et affichez votre liste de suivi Simkl sur l’écran d’accueil."
           }
         },
         "it" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Sincronizza i film e gli episodi che guardi con Simkl."
+            "value" : "Sincronizza i film e gli episodi che guardi con Simkl e mostra la tua watchlist di Simkl nella Home."
           }
         },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "視聴した映画やエピソードをSimklに同期します。"
+            "value" : "視聴した映画やエピソードをSimklに同期し、Simklのウォッチリストをホームに表示します。"
           }
         },
         "ko" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "시청한 영화와 에피소드를 Simkl에 동기화하세요."
+            "value" : "시청한 영화와 에피소드를 Simkl에 동기화하고, 홈에 Simkl 시청 목록을 표시하세요."
           }
         },
         "pt" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Sincronize os filmes e episódios que você assiste com o Simkl."
+            "value" : "Sincronize os filmes e episódios que você assiste com o Simkl e mostre sua lista do Simkl na Tela Inicial."
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "将您观看的电影和剧集同步到Simkl。"
+            "value" : "将您观看的电影和剧集同步到Simkl，并在主页上展示您的Simkl待看列表。"
           }
         }
       }
@@ -47735,54 +47839,54 @@
         }
       }
     },
-    "Sync watched movies and episodes, show your Trakt watchlist on Home, and download subtitles for anything that ships without them." : {
+    "Sync watched movies and episodes, show your Trakt or Simkl watchlist on Home, and download subtitles for anything that ships without them." : {
       "localizations" : {
         "de" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Synchronisiere gesehene Filme und Episoden, zeige deine Trakt-Watchlist auf dem Startbildschirm und lade Untertitel für alles herunter, was ohne sie ausgeliefert wird."
+            "value" : "Synchronisiere gesehene Filme und Episoden, zeige deine Trakt- oder Simkl-Watchlist auf dem Startbildschirm und lade Untertitel für alles herunter, was ohne sie ausgeliefert wird."
           }
         },
         "es" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Sincroniza las películas y los episodios vistos, muestra tu lista de seguimiento de Trakt en Inicio y descarga subtítulos para todo lo que no los incluya."
+            "value" : "Sincroniza las películas y los episodios vistos, muestra tu lista de seguimiento de Trakt o Simkl en Inicio y descarga subtítulos para todo lo que no los incluya."
           }
         },
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Synchronisez les films et épisodes vus, affichez votre liste de suivi Trakt sur l’écran d’accueil et téléchargez des sous-titres pour tout ce qui n’en propose pas."
+            "value" : "Synchronisez les films et épisodes vus, affichez votre liste de suivi Trakt ou Simkl sur l’écran d’accueil et téléchargez des sous-titres pour tout ce qui n’en propose pas."
           }
         },
         "it" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Sincronizza i film e gli episodi visti, mostra la tua watchlist di Trakt nella Home e scarica i sottotitoli per tutto ciò che ne è sprovvisto."
+            "value" : "Sincronizza i film e gli episodi visti, mostra la tua watchlist di Trakt o Simkl nella Home e scarica i sottotitoli per tutto ciò che ne è sprovvisto."
           }
         },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "視聴済みの映画やエピソードを同期し、Traktのウォッチリストをホームに表示し、字幕のないコンテンツには字幕をダウンロードできます。"
+            "value" : "視聴済みの映画やエピソードを同期し、TraktまたはSimklのウォッチリストをホームに表示し、字幕のないコンテンツには字幕をダウンロードできます。"
           }
         },
         "ko" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "시청한 영화와 에피소드를 동기화하고, 홈에 Trakt 시청 목록을 표시하며, 자막이 없는 콘텐츠의 자막을 다운로드하세요."
+            "value" : "시청한 영화와 에피소드를 동기화하고, 홈에 Trakt 또는 Simkl 시청 목록을 표시하며, 자막이 없는 콘텐츠의 자막을 다운로드하세요."
           }
         },
         "pt" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Sincronize filmes e episódios assistidos, mostre sua lista do Trakt na Tela Inicial e baixe legendas para o que não vier com elas."
+            "value" : "Sincronize filmes e episódios assistidos, mostre sua lista do Trakt ou do Simkl na Tela Inicial e baixe legendas para o que não vier com elas."
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "同步已观看的电影和剧集，在主页上显示您的 Trakt 待看列表，并为没有字幕的内容下载字幕。"
+            "value" : "同步已观看的电影和剧集，在主页上显示您的 Trakt 或 Simkl 待看列表，并为没有字幕的内容下载字幕。"
           }
         }
       }

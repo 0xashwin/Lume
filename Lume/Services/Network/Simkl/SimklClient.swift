@@ -5,7 +5,8 @@
 //  Stateless networking client for the Simkl API, covering the OAuth 2.0
 //  *device* flow (RFC 8628 — the only flow that works on tvOS, and uniform
 //  across every platform), token refresh/revoke, the connected user's profile,
-//  watched-history sync, and the full watchlist pull used by the import.
+//  watched-history sync, and the full library pull used by the import. The
+//  "Plan to Watch" reads behind Home's watchlist row live in SimklWatchlist.swift.
 //
 //  Simkl's AUTH V2 requires no client secret for TV/device registrations, so
 //  the secret is optional and only sent when present. Every request carries
@@ -199,7 +200,9 @@ nonisolated struct SimklClient {
 
     // MARK: - Networking
 
-    private func get<T: Decodable>(_ path: String, query: [URLQueryItem] = [], accessToken: String) async throws -> T {
+    /// Internal (not private) so the watchlist extension in
+    /// `SimklWatchlist.swift` can reach it.
+    func get<T: Decodable>(_ path: String, query: [URLQueryItem] = [], accessToken: String) async throws -> T {
         let request = try makeRequest(path: path, method: "GET", query: query, accessToken: accessToken)
         let (data, response) = try await send(request)
         try Self.requireSuccess(response)

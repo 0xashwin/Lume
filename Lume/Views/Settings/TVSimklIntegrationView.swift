@@ -36,7 +36,7 @@
 
         private var connect: some View {
             VStack(alignment: .leading, spacing: 16) {
-                Text("Sync the movies and episodes you watch to Simkl.")
+                Text("Sync the movies and episodes you watch to Simkl, and surface your Simkl watchlist on Home.")
                     .font(.system(size: 24))
                     .foregroundStyle(.secondary)
                     .padding(.horizontal, TVSettingsMetrics.rowHPadding)

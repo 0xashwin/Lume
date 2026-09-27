@@ -2,7 +2,7 @@
 //  HomeView+Trending.swift
 //  Lume
 //
-//  Home's TMDB trending and Trakt watchlist loading, split from `HomeView` to
+//  Home's TMDB trending and Trakt/Simkl watchlist loading, split from `HomeView` to
 //  keep the view file within size limits. Trending/watchlist titles are matched
 //  against the local catalog in batched queries keyed by `tmdbId`.
 //
@@ -134,7 +134,7 @@ extension HomeView {
     /// user actually owns in the active playlist — matched by TMDB id, the same
     /// way the trending rows work.
     func loadWatchlist(cacheKey: String) async {
-        if let cached = HomeTrendingCache.shared.watchlistEntry(for: cacheKey) {
+        if let cached = HomeTrendingCache.shared.watchlistEntry(.trakt, for: cacheKey) {
             watchlist = cached
             return
         }
@@ -143,25 +143,57 @@ extension HomeView {
             return
         }
         let items = await trakt.fetchWatchlist()
-        let moviesByTmdbId = fetchMovies(tmdbIds: items.compactMap { $0.movie?.ids.tmdb })
-        let seriesByTmdbId = fetchSeries(tmdbIds: items.compactMap { $0.show?.ids.tmdb })
-        var matched: [HomeMediaItem] = []
-        for item in items {
+        watchlist = matchWatchlist(items.compactMap { item in
             switch item.type {
-            case "movie":
-                if let tmdbID = item.movie?.ids.tmdb, let movie = moviesByTmdbId[tmdbID] {
-                    matched.append(.movie(movie))
-                }
-            case "show":
-                if let tmdbID = item.show?.ids.tmdb, let series = seriesByTmdbId[tmdbID] {
-                    matched.append(.series(series))
-                }
-            default:
-                break
+            case "movie": item.movie?.ids.tmdb.map(WatchlistTitle.movie)
+            case "show": item.show?.ids.tmdb.map(WatchlistTitle.show)
+            default: nil
+            }
+        })
+        HomeTrendingCache.shared.storeWatchlist(.trakt, key: cacheKey, items: watchlist)
+    }
+
+    /// The Simkl counterpart of `loadWatchlist`, built from the account's
+    /// "Plan to Watch" list.
+    func loadSimklWatchlist(cacheKey: String) async {
+        if let cached = HomeTrendingCache.shared.watchlistEntry(.simkl, for: cacheKey) {
+            simklWatchlist = cached
+            return
+        }
+        guard simkl.isConnected else {
+            simklWatchlist = []
+            return
+        }
+        let entries = await simkl.fetchWatchlist()
+        simklWatchlist = matchWatchlist(entries.map { entry in
+            switch entry.kind {
+            case .movie: .movie(entry.tmdbID)
+            case .show: .show(entry.tmdbID)
+            }
+        })
+        HomeTrendingCache.shared.storeWatchlist(.simkl, key: cacheKey, items: simklWatchlist)
+    }
+
+    /// The first 20 watchlist titles the active playlist carries, in watchlist
+    /// order.
+    private func matchWatchlist(_ titles: [WatchlistTitle]) -> [HomeMediaItem] {
+        var movieIDs: [Int] = []
+        var showIDs: [Int] = []
+        for title in titles {
+            switch title {
+            case let .movie(id): movieIDs.append(id)
+            case let .show(id): showIDs.append(id)
             }
         }
-        watchlist = Array(matched.prefix(20))
-        HomeTrendingCache.shared.storeWatchlist(key: cacheKey, items: watchlist)
+        let moviesByTmdbId = fetchMovies(tmdbIds: movieIDs)
+        let seriesByTmdbId = fetchSeries(tmdbIds: showIDs)
+        let matched: [HomeMediaItem] = titles.compactMap { title in
+            switch title {
+            case let .movie(id): moviesByTmdbId[id].map(HomeMediaItem.movie)
+            case let .show(id): seriesByTmdbId[id].map(HomeMediaItem.series)
+            }
+        }
+        return Array(matched.prefix(20))
     }
 
     // MARK: - Batched catalog lookup
@@ -197,6 +229,12 @@ extension HomeView {
         }
         return byId
     }
+}
+
+/// A watchlist title from either service, by TMDB id.
+private enum WatchlistTitle {
+    case movie(Int)
+    case show(Int)
 }
 
 /// `tmdbId` is optional, and neither `?? -1` (TERNARY) nor a nil-check +

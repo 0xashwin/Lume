@@ -45,7 +45,7 @@ enum PremiumFeature: String, CaseIterable, Identifiable {
         case .downloads: "Save movies and episodes to watch offline, anywhere."
         case .multipleProfiles: "Give everyone their own watch history, progress and favorites."
         case .trakt: "Scrobble what you watch and surface your Trakt watchlist on Home."
-        case .simkl: "Scrobble what you watch to Simkl and import your Simkl history."
+        case .simkl: "Scrobble what you watch to Simkl, import your Simkl history and surface your Simkl watchlist on Home."
         case .playbackControls: "Autoplay the next episode, skip intros, and jump ahead with one tap."
         case .recommendations: "Get an on-device \"For You\" row tuned to your taste from your library and what you watch."
         case .multiView: "Watch up to four live channels side by side — across playlists, so a single-connection provider is no obstacle."

@@ -363,7 +363,7 @@ struct SettingsView: View {
             } header: {
                 Text("Integrations")
             } footer: {
-                Text("Sync watched movies and episodes, show your Trakt watchlist on Home, and download subtitles for anything that ships without them.")
+                Text("Sync watched movies and episodes, show your Trakt or Simkl watchlist on Home, and download subtitles for anything that ships without them.")
             }
         }
 

@@ -5,7 +5,8 @@
 //  The app-wide coordinator for the Simkl integration. Owns the OAuth token
 //  lifecycle (device-flow connect, refresh, disconnect), exposes connection
 //  state for the Settings UI to observe, and provides fire-and-forget watched
-//  syncing. Mirrors `TraktService` against the Simkl AUTH V2 API.
+//  syncing plus watchlist fetching. Mirrors `TraktService` against the Simkl
+//  AUTH V2 API.
 //
 //  A shared singleton because watched-state changes originate from many places
 //  (player completion, detail-screen toggles, model methods) that don't all
@@ -45,6 +46,7 @@ final class SimklService {
     private var tokens: SimklTokens?
     private var pollingTask: Task<Void, Never>?
     private var refreshTask: Task<String?, Never>?
+    private var watchlistTask: Task<[SimklWatchlistEntry], Never>?
 
     /// The catalog context the connect flow captured, so the watched-history
     /// import can run the moment the device code is approved.
@@ -189,6 +191,7 @@ final class SimklService {
         SimklTokenStore.clear()
         // Parked watched state belongs to the account that was just signed out.
         SimklPendingWatchedStore.clearAll()
+        SimklWatchlistStore.clear()
         tokens = nil
         username = nil
         pendingCode = nil
@@ -235,6 +238,52 @@ final class SimklService {
                 // playback or the UI.
             }
         }
+    }
+
+    // MARK: - Watchlist
+
+    /// The user's "Plan to Watch" titles, most recently added first. Served
+    /// from the on-disk copy, refetching only the buckets `/sync/activities`
+    /// says have moved (see `SimklWatchlist.swift`). Returns an empty array when
+    /// not connected; on error it falls back to the cached copy, so the home row
+    /// keeps what it last showed rather than blinking out.
+    func fetchWatchlist() async -> [SimklWatchlistEntry] {
+        if let watchlistTask {
+            return await watchlistTask.value
+        }
+        let task = Task { [weak self] () -> [SimklWatchlistEntry] in
+            await self?.loadWatchlist() ?? []
+        }
+        watchlistTask = task
+        let result = await task.value
+        watchlistTask = nil
+        return result
+    }
+
+    private func loadWatchlist() async -> [SimklWatchlistEntry] {
+        guard let username, let accessToken = await validAccessToken() else { return [] }
+        var cache = SimklWatchlistStore.load(for: username) ?? SimklWatchlistCache(username: username)
+        guard let activities = try? await client.activities(accessToken: accessToken) else {
+            return cache.entries
+        }
+        let original = cache
+        for bucket in cache.staleBuckets(for: activities) {
+            guard let fingerprint = activities.fingerprint(for: bucket) else {
+                cache.buckets[bucket] = SimklWatchlistCache.Bucket(fingerprint: nil, entries: [])
+                continue
+            }
+            // A failed bucket keeps its old copy and fingerprint, so the next
+            // Home load retries it.
+            guard let entries = try? await client.planToWatch(bucket, accessToken: accessToken) else { continue }
+            cache.buckets[bucket] = SimklWatchlistCache.Bucket(fingerprint: fingerprint, entries: entries)
+        }
+        // A disconnect mid-fetch already cleared the store; writing now would
+        // resurrect the signed-out account's list.
+        guard self.username == username else { return [] }
+        if cache != original {
+            SimklWatchlistStore.save(cache)
+        }
+        return cache.entries
     }
 
     // MARK: - Watched import
