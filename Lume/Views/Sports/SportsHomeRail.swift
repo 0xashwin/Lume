@@ -245,20 +245,16 @@ struct SportsHomeRail: View {
 
         // MARK: - Lifecycle
 
-        /// Loads the cached snapshots, then fetches any followed league that has
-        /// none — the system may purge `Caches/` between launches, and the daily
-        /// refresh alone would leave the rail empty until it next fell due. Then
-        /// catches a stale snapshot up by day and joins the live poll, so the
-        /// rail closes out finished games and moves scores like the hub does.
-        /// The poll is reference counted and paired with `onDisappear`, so it is
-        /// begun outside the premium guard; with nothing followed it is idle.
+        /// Loads the cached snapshots, re-fetches every followed league that is
+        /// missing or stale, and joins the live poll, so the rail closes out
+        /// finished games and moves scores like the hub does. The poll is
+        /// reference counted and paired with `onDisappear`, so it is begun
+        /// outside the premium guard; with nothing followed it is idle.
         private func warm() {
             SportsSyncService.shared.beginLivePolling()
             guard premium.isPremium else { return }
             store.loadCached(leagueIds: displayLeagueIds)
-            SportsSyncService.shared.syncIfDue()
-            SportsSyncService.shared.refreshMissing()
-            SportsSyncService.shared.catchUpIfStale()
+            SportsSyncService.shared.refreshIfStale()
         }
 
         /// Re-runs when the fixture set changes or an EPG/catalog sync finishes

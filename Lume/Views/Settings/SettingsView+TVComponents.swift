@@ -177,8 +177,6 @@ import SwiftUI
     struct TVSportsSettingsPane: View {
         @AppStorage(SportsSyncService.tabEnabledKey) private var tabEnabled = SportsSyncService.tabEnabledDefault
         @AppStorage(SportsSyncService.hideScoresKey) private var hideScores = false
-        @AppStorage(SportsSyncService.syncFrequencyKey)
-        private var freqRaw = SportsSyncService.defaultFrequency.rawValue
         @State private var sync = SportsSyncService.shared
         @State private var showManageTeams = false
 
@@ -206,11 +204,6 @@ import SwiftUI
                 VStack(alignment: .leading, spacing: 8) {
                     TVSettingsSectionLabel("Sports Data")
 
-                    TVOptionCycleRow(
-                        title: "Refresh",
-                        valueLabel: String(localized: frequency.label)
-                    ) { freqRaw = PlayerOptionCycle.next(freqRaw, in: SyncFrequency.self) }
-
                     Button {
                         sync.syncNow()
                     } label: {
@@ -236,10 +229,6 @@ import SwiftUI
             .fullScreenCover(isPresented: $showManageTeams) {
                 TVManageTeamsPane()
             }
-        }
-
-        private var frequency: SyncFrequency {
-            SyncFrequency(rawValue: freqRaw) ?? SportsSyncService.defaultFrequency
         }
 
         /// A relative "last refreshed" line, or "Never" before the first refresh.

@@ -175,16 +175,13 @@ import SwiftUI
 
         // MARK: - Lifecycle
 
-        /// Loads the cached snapshots, then fetches any followed league that has
-        /// none, catches a stale snapshot up and joins the live poll (see
-        /// `PhoneSportsHomeRail.warm`).
+        /// Loads the cached snapshots, re-fetches every followed league that is
+        /// missing or stale and joins the live poll (see `PhoneSportsHomeRail.warm`).
         private func warm() {
             SportsSyncService.shared.beginLivePolling()
             guard premium.isPremium else { return }
             store.loadCached(leagueIds: displayLeagueIds)
-            SportsSyncService.shared.syncIfDue()
-            SportsSyncService.shared.refreshMissing()
-            SportsSyncService.shared.catchUpIfStale()
+            SportsSyncService.shared.refreshIfStale()
         }
 
         private var resolveKey: String {
